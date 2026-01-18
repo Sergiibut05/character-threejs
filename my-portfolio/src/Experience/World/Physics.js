@@ -63,6 +63,13 @@ export default class Physics
         const rigidBody = this.world.createRigidBody(rigidBodyDesc)
 
         const colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+            .setFriction(0.6) // Friction to reduce sliding
+            .setRestitution(0.1) // Low restitution to prevent jittering
+            .setActiveCollisionTypes(
+                RAPIER.ActiveCollisionTypes.DEFAULT | 
+                RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED
+            )
+        
         const collider = this.world.createCollider(colliderDesc, rigidBody)
 
         // Store reference to Three.js mesh for syncing
@@ -85,6 +92,13 @@ export default class Physics
         const rigidBody = this.world.createRigidBody(rigidBodyDesc)
 
         const colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+            .setFriction(0.6) // Friction for static objects
+            .setRestitution(0.0) // No bounce on static objects
+            .setActiveCollisionTypes(
+                RAPIER.ActiveCollisionTypes.DEFAULT | 
+                RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED
+            )
+        
         const collider = this.world.createCollider(colliderDesc, rigidBody)
 
         // Store reference to Three.js mesh for syncing (though static bodies don't move)

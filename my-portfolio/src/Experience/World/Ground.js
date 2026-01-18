@@ -18,11 +18,17 @@ export default class Ground
 
         // Grid shader parameters
         this.gridParams = {
-            gridScale: 1.0,
+            gridScale: 0.2,
+            lineThickness: 0.01,
             lineWidthX: 0.01,
             lineWidthY: 0.01,
+            crossDensity: 5.0,
+            crossSizeX: 0.08,
+            crossSizeY: 0.02,
             lineColor: '#ffffff',
-            baseColor: '#1a1a1a'
+            crossColor: '#938ccf',
+            baseColor: '#18181B',
+            fadeDistance: 20.0
         }
 
         this.setGeometry()
@@ -49,8 +55,12 @@ export default class Ground
             uniforms: {
                 uGridScale: { value: this.gridParams.gridScale },
                 uLineWidth: { value: new THREE.Vector2(this.gridParams.lineWidthX, this.gridParams.lineWidthY) },
+                uCrossDensity: { value: this.gridParams.crossDensity },
+                uCrossSize: { value: new THREE.Vector2(this.gridParams.crossSizeX, this.gridParams.crossSizeY) },
                 uLineColor: { value: new THREE.Color(this.gridParams.lineColor) },
-                uBaseColor: { value: new THREE.Color(this.gridParams.baseColor) }
+                uCrossColor: { value: new THREE.Color(this.gridParams.crossColor) },
+                uBaseColor: { value: new THREE.Color(this.gridParams.baseColor) },
+                uFadeDistance: { value: this.gridParams.fadeDistance }
             }
         })
     }
@@ -87,9 +97,22 @@ export default class Ground
             .min(0.1)
             .max(10)
             .step(0.1)
-            .name('Grid Scale')
+            .name('Grid Scale (cell size)')
             .onChange(() => {
                 this.material.uniforms.uGridScale.value = this.gridParams.gridScale
+            })
+
+        this.debugFolder
+            .add(this.gridParams, 'lineThickness')
+            .min(0)
+            .max(0.5)
+            .step(0.001)
+            .name('Line Thickness')
+            .onChange(() => {
+                this.gridParams.lineWidthX = this.gridParams.lineThickness
+                this.gridParams.lineWidthY = this.gridParams.lineThickness
+                this.material.uniforms.uLineWidth.value.x = this.gridParams.lineThickness
+                this.material.uniforms.uLineWidth.value.y = this.gridParams.lineThickness
             })
 
         this.debugFolder
@@ -97,7 +120,7 @@ export default class Ground
             .min(0)
             .max(0.5)
             .step(0.001)
-            .name('Line Width X')
+            .name('Line Width X (fine)')
             .onChange(() => {
                 this.material.uniforms.uLineWidth.value.x = this.gridParams.lineWidthX
             })
@@ -107,9 +130,49 @@ export default class Ground
             .min(0)
             .max(0.5)
             .step(0.001)
-            .name('Line Width Y')
+            .name('Line Width Y (fine)')
             .onChange(() => {
                 this.material.uniforms.uLineWidth.value.y = this.gridParams.lineWidthY
+            })
+
+        this.debugFolder
+            .add(this.gridParams, 'crossDensity')
+            .min(0)
+            .max(5)
+            .step(1)
+            .name('Cross Density (crosses per cell)')
+            .onChange(() => {
+                this.material.uniforms.uCrossDensity.value = this.gridParams.crossDensity
+            })
+
+        this.debugFolder
+            .add(this.gridParams, 'crossSizeX')
+            .min(0)
+            .max(0.5)
+            .step(0.001)
+            .name('Cross Size X')
+            .onChange(() => {
+                this.material.uniforms.uCrossSize.value.x = this.gridParams.crossSizeX
+            })
+
+        this.debugFolder
+            .add(this.gridParams, 'crossSizeY')
+            .min(0)
+            .max(0.5)
+            .step(0.001)
+            .name('Cross Size Y')
+            .onChange(() => {
+                this.material.uniforms.uCrossSize.value.y = this.gridParams.crossSizeY
+            })
+
+        this.debugFolder
+            .add(this.gridParams, 'fadeDistance')
+            .min(0)
+            .max(100)
+            .step(1)
+            .name('Fade Distance')
+            .onChange(() => {
+                this.material.uniforms.uFadeDistance.value = this.gridParams.fadeDistance
             })
 
         this.debugFolder
@@ -117,6 +180,13 @@ export default class Ground
             .name('Line Color')
             .onChange(() => {
                 this.material.uniforms.uLineColor.value = new THREE.Color(this.gridParams.lineColor)
+            })
+
+        this.debugFolder
+            .addColor(this.gridParams, 'crossColor')
+            .name('Cross Color')
+            .onChange(() => {
+                this.material.uniforms.uCrossColor.value = new THREE.Color(this.gridParams.crossColor)
             })
 
         this.debugFolder

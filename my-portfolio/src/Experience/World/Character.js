@@ -12,9 +12,9 @@ export default class Character
         this.physics = this.experience.world.physics
         this.debug = this.experience.debug
 
-        // Character state
-        this.position = new THREE.Vector3(0, 1, 0)
-        this.previousPosition = new THREE.Vector3(0, 1, 0)
+        // Character state - Y position will be adjusted in setPhysics() to match capsule
+        this.position = new THREE.Vector3(0, 0.5, 0) // Temporary, will be adjusted
+        this.previousPosition = new THREE.Vector3(0, 0.5, 0)
         this.moveSpeed = 2.0
         this.rotationSpeed = 5.0 // Rotation lerp speed
 
@@ -51,7 +51,20 @@ export default class Character
         
         // Adjust scale - the Armature has 0.01, so we compensate
         this.model.scale.set(1, 1, 1)
-        this.model.position.set(0, 0, 0)
+        
+        // Calculate bounding box to find the bottom of the model
+        const box = new THREE.Box3().setFromObject(this.model)
+        const modelHeight = box.max.y - box.min.y
+        const modelBottomY = box.min.y
+        
+        // Adjust model position so its bottom touches ground when container is at y=0.5
+        // Container is at y=0.5 (center of capsule), we want model bottom at world y=0
+        // worldY = container.y + model.y + modelBottomY
+        // 0 = 0.5 + model.y + modelBottomY
+        // model.y = -0.5 - modelBottomY
+        const modelOffsetY = -0.5 - modelBottomY
+        
+        this.model.position.set(0, modelOffsetY, 0)
         
         // Enable shadows
         this.model.traverse((child) => {
@@ -123,17 +136,39 @@ export default class Character
     {
         if(!this.physics.world) return
 
-        // Create kinematic rigid body for character
         const RAPIER = this.physics.RAPIER
+        
+        // Capsule dimensions
+        const halfHeight = 0.5
+        const radius = 0.4
+        
+        // Adjust position so capsule base touches ground (y=0)
+        this.position.y = halfHeight
+        
+        // Create kinematic rigid body for character
         const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
             .setTranslation(this.position.x, this.position.y, this.position.z)
         this.rigidBody = this.physics.world.createRigidBody(rigidBodyDesc)
 
-        // Create capsule collider (better for character movement)
-        const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4) // halfHeight, radius
+        // Create capsule collider with proper collision types
+        // KINEMATIC_FIXED enables collisions between kinematic and fixed (static) bodies
+        const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius)
+            .setActiveCollisionTypes(
+                RAPIER.ActiveCollisionTypes.DEFAULT | 
+                RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED
+            )
         this.collider = this.physics.world.createCollider(colliderDesc, this.rigidBody)
         
-        // Store previous position for collision checking
+        // Create Rapier's built-in Character Controller
+        // The offset (0.01) is a skin width that prevents getting stuck in geometry
+        this.characterController = this.physics.world.createCharacterController(0.01)
+        
+        // Configure character controller
+        this.characterController.setApplyImpulsesToDynamicBodies(true) // Push dynamic objects
+        this.characterController.setMaxSlopeClimbAngle(Math.PI * 0.25) // ~45 degrees
+        this.characterController.setMinSlopeSlideAngle(Math.PI * 0.3)  // ~54 degrees
+        
+        // Store previous position
         this.previousPosition = this.position.clone()
         
         // Ensure initial sync
@@ -180,84 +215,42 @@ export default class Character
             this.animation.mixer.update(deltaTime)
         }
 
-        // Move character
-        if(isMoving)
+        // Move character using Rapier's built-in Character Controller
+        if(isMoving && this.characterController && this.collider && this.rigidBody)
         {
             moveDirection.normalize()
-            const movement = moveDirection.multiplyScalar(this.moveSpeed * deltaTime)
             
-            // Store previous position
-            this.previousPosition.copy(this.position)
-            
-            // Calculate new position
-            const newX = this.position.x + movement.x
-            const newZ = this.position.z + movement.z
-            const newY = 1.0
-            
-            // Check for collisions with STATIC objects only using raycast
-            let canMove = true
-            if(this.rigidBody && this.collider && this.physics?.world)
-            {
-                try {
-                    const RAPIER = this.physics.RAPIER
-                    const maxDistance = Math.sqrt(movement.x * movement.x + movement.z * movement.z) + 0.1
-                    
-                    // Normalize ray direction
-                    const rayLength = Math.sqrt(movement.x * movement.x + movement.z * movement.z)
-                    const dirX = rayLength > 0 ? movement.x / rayLength : 0
-                    const dirZ = rayLength > 0 ? movement.z / rayLength : 0
-                    
-                    // Create ray using RAPIER.Ray (not Vector3 directly)
-                    const rayOrigin = new RAPIER.Vector3(this.position.x, this.position.y, this.position.z)
-                    const rayDir = new RAPIER.Vector3(dirX, 0, dirZ)
-                    const ray = new RAPIER.Ray(rayOrigin, rayDir)
-                    
-                    // Cast ray - EXCLUDE_DYNAMIC so we only detect static objects
-                    const hit = this.physics.world.castRay(
-                        ray,
-                        maxDistance,
-                        true, // solid
-                        RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC,
-                        0, // groups
-                        this.collider.handle, // exclude self
-                        null, // excludeRigidBody
-                        null  // filterPredicate
-                    )
-                    
-                    // If we hit something (static), block movement
-                    if(hit !== null)
-                    {
-                        canMove = false
-                    }
-                } catch(error) {
-                    // If raycast fails, allow movement (fallback)
-                    console.warn('Raycast collision check failed:', error)
-                }
+            // Calculate desired movement
+            const desiredMovement = {
+                x: moveDirection.x * this.moveSpeed * deltaTime,
+                y: 0, // No vertical movement (gravity handled separately if needed)
+                z: moveDirection.z * this.moveSpeed * deltaTime
             }
             
-            // Move if no static collision, or allow pushing dynamic objects
-            if(canMove)
-            {
-                this.position.x = newX
-                this.position.z = newZ
-                this.position.y = newY
-
-                // Update rigid body (this will naturally push dynamic objects)
-                if(this.rigidBody)
-                {
-                    this.rigidBody.setNextKinematicTranslation({
-                        x: this.position.x,
-                        y: this.position.y,
-                        z: this.position.z
-                    })
-                }
+            // Use Rapier's Character Controller to compute corrected movement
+            // This handles collisions with both static and dynamic objects
+            this.characterController.computeColliderMovement(
+                this.collider,
+                desiredMovement
+            )
+            
+            // Get the corrected movement (after collision resolution)
+            const correctedMovement = this.characterController.computedMovement()
+            
+            // Apply corrected movement to position
+            const currentPos = this.rigidBody.translation()
+            const newPos = {
+                x: currentPos.x + correctedMovement.x,
+                y: 0.5, // Keep Y at halfHeight so base touches ground
+                z: currentPos.z + correctedMovement.z
             }
-            else
-            {
-                // Blocked by static object - stay in previous position
-                this.position.copy(this.previousPosition)
-            }
-
+            
+            // Update rigid body position
+            this.rigidBody.setNextKinematicTranslation(newPos)
+            
+            // Update our position tracking
+            this.position.set(newPos.x, newPos.y, newPos.z)
+            
             // Update container position
             this.container.position.copy(this.position)
             
@@ -275,6 +268,7 @@ export default class Character
         }
         else
         {
+            // Not moving - sync position from physics
             if(this.rigidBody)
             {
                 const translation = this.rigidBody.translation()

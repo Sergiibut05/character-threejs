@@ -2,12 +2,14 @@
 {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
 }
 
 html,
 body
 {
     overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 .webgl
@@ -16,4 +18,108 @@ body
     top: 0;
     left: 0;
     outline: none;
+}
+
+/* Modal Styles */
+.modal-overlay
+{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.is-visible
+{
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-container
+{
+    background: #1a1a1f;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    transform: translateY(20px) scale(0.95);
+    transition: transform 0.3s ease;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.modal-overlay.is-visible .modal-container
+{
+    transform: translateY(0) scale(1);
+}
+
+.modal-close
+{
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.modal-close:hover
+{
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.modal-title
+{
+    color: #fff;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-right: 40px;
+}
+
+.modal-body
+{
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.modal-body p
+{
+    margin-bottom: 12px;
+}
+
+.modal-body a
+{
+    color: #6054D0;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.modal-body a:hover
+{
+    color: #938ccf;
 }
