@@ -24,10 +24,12 @@ export default class Renderer
     {
         this.instance = new THREE.WebGLRenderer({
             canvas: this.canvas,
-            antialias: true
+            antialias: true,
+            powerPreference: 'high-performance'
         })
-        this.instance.toneMapping = THREE.CineonToneMapping
-        this.instance.toneMappingExposure = 1.75
+        this.instance.outputColorSpace = THREE.SRGBColorSpace
+        this.instance.toneMapping = THREE.ACESFilmicToneMapping
+        this.instance.toneMappingExposure = 1.1
         this.instance.shadowMap.enabled = true
         this.instance.shadowMap.type = THREE.PCFSoftShadowMap
         this.instance.setSize(this.sizes.width, this.sizes.height)
@@ -51,9 +53,9 @@ export default class Renderer
         )
 
         // Configure outline appearance
-        this.outlinePass.edgeStrength = 5.0      // How strong/visible the outline is
-        this.outlinePass.edgeGlow = 0.5          // Glow effect around the edge
-        this.outlinePass.edgeThickness = 2.0    // Thickness of the outline
+        this.outlinePass.edgeStrength = 2.5      // How strong/visible the outline is
+        this.outlinePass.edgeGlow = 0.15         // Glow effect around the edge
+        this.outlinePass.edgeThickness = 1.5    // Thickness of the outline
         this.outlinePass.pulsePeriod = 0        // 0 = no pulse, >0 = pulsing glow
         this.outlinePass.visibleEdgeColor.set('#ffffff')  // Color when edge is visible
         this.outlinePass.hiddenEdgeColor.set('#ffffff')   // Color when edge is behind objects

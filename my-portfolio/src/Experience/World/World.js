@@ -34,6 +34,7 @@ export default class World
             // Add interactive cubes after a short delay to ensure physics is initialized
             setTimeout(() => {
                 this.setInteractiveCubes()
+                this.setPhysicsTestArea()
                 this.setInteractiveObjects()
             }, 300)
             
@@ -53,6 +54,64 @@ export default class World
         // Position Y should be half the height so base touches ground (y=0)
         const staticCube1 = this.createStaticCube({ x: 0, y: 1.0, z: 5 }, { x: 2, y: 2, z: 2 })
         const staticCube2 = this.createStaticCube({ x: 0, y: 1.5, z: -5 }, { x: 1.5, y: 3, z: 1.5 })
+    }
+
+    setPhysicsTestArea()
+    {
+        // Physics test: seesaw (plank on triangular support)
+        const baseX = 8
+        const baseZ = -6
+
+        // Support block (static, straight)
+        const supportGeometry = new THREE.BoxGeometry(0.5, 0.4, 0.5)
+        const supportMaterial = new THREE.MeshStandardMaterial({
+            color: '#f7d794',
+            metalness: 0.1,
+            roughness: 0.8
+        })
+        const supportMesh = new THREE.Mesh(supportGeometry, supportMaterial)
+        supportMesh.position.set(baseX, 0.15, baseZ)
+        supportMesh.castShadow = true
+        supportMesh.receiveShadow = true
+        this.scene.add(supportMesh)
+
+        if(this.physics.world)
+        {
+            this.physics.createStaticTrimesh(
+                supportGeometry,
+                supportMesh.position,
+                supportMesh.quaternion,
+                supportMesh
+            )
+        }
+
+        // Plank (dynamic, rotation only around Z)
+        const plankSize = { x: 3.6, y: 0.12, z: 0.9 }
+        const plankGeometry = new THREE.BoxGeometry(plankSize.x, plankSize.y, plankSize.z)
+        const plankMaterial = new THREE.MeshStandardMaterial({
+            color: '#eccc68',
+            metalness: 0.1,
+            roughness: 0.6
+        })
+        const plankMesh = new THREE.Mesh(plankGeometry, plankMaterial)
+        plankMesh.position.set(baseX + 0.25, 0.45, baseZ)
+        plankMesh.rotation.z = -0.12
+        plankMesh.castShadow = true
+        plankMesh.receiveShadow = true
+        this.scene.add(plankMesh)
+
+        if(this.physics.world)
+        {
+            const { rigidBody } = this.physics.createDynamicBox(plankSize, plankMesh.position, plankMesh)
+            if(rigidBody)
+            {
+                rigidBody.setEnabledTranslations(false, false, false, true)
+                rigidBody.setEnabledRotations(false, false, true, true)
+                rigidBody.setRotation(plankMesh.quaternion, true)
+                rigidBody.setLinearDamping(6)
+                rigidBody.setAngularDamping(1.0)
+            }
+        }
     }
 
     createPushableCube(position, size)

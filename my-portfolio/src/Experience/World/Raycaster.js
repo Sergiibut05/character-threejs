@@ -50,8 +50,8 @@ export default class Raycaster
             this.onMouseMove(event)
         })
 
-        // Click detection
-        this.canvas.addEventListener('click', (event) =>
+        // Click detection (use press, not release)
+        this.canvas.addEventListener('mousedown', (event) =>
         {
             this.onClick(event)
         })

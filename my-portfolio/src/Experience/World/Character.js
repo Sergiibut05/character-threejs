@@ -12,11 +12,19 @@ export default class Character
         this.physics = this.experience.world.physics
         this.debug = this.experience.debug
 
+        // Capsule dimensions and initial center position
+        this.capsuleHalfHeight = 0.5
+        this.capsuleRadius = 0.32
+        this.capsuleCenterY = this.capsuleHalfHeight + this.capsuleRadius
+
         // Character state - Y position will be adjusted in setPhysics() to match capsule
-        this.position = new THREE.Vector3(0, 0.5, 0) // Temporary, will be adjusted
-        this.previousPosition = new THREE.Vector3(0, 0.5, 0)
+        this.position = new THREE.Vector3(0, this.capsuleCenterY, 0)
+        this.previousPosition = new THREE.Vector3(0, this.capsuleCenterY, 0)
         this.moveSpeed = 2.0
         this.rotationSpeed = 5.0 // Rotation lerp speed
+        this.gravity = -9.81
+        this.verticalVelocity = 0
+        this.isGrounded = false
 
         // Input state
         this.keys = {
@@ -57,12 +65,12 @@ export default class Character
         const modelHeight = box.max.y - box.min.y
         const modelBottomY = box.min.y
         
-        // Adjust model position so its bottom touches ground when container is at y=0.5
-        // Container is at y=0.5 (center of capsule), we want model bottom at world y=0
+        // Adjust model position so its bottom touches ground when container is at capsule center
+        // Container is at capsule center, we want model bottom at world y=0
         // worldY = container.y + model.y + modelBottomY
-        // 0 = 0.5 + model.y + modelBottomY
-        // model.y = -0.5 - modelBottomY
-        const modelOffsetY = -0.5 - modelBottomY
+        // 0 = capsuleCenterY + model.y + modelBottomY
+        // model.y = -capsuleCenterY - modelBottomY
+        const modelOffsetY = -this.capsuleCenterY - modelBottomY - 0.01
         
         this.model.position.set(0, modelOffsetY, 0)
         
@@ -89,17 +97,33 @@ export default class Character
 
         this.animation = {}
         this.animation.mixer = new THREE.AnimationMixer(this.model)
-        this.animation.action = this.animation.mixer.clipAction(this.resource.animations[0])
-        
-        // Set up animation
-        this.animation.action.setLoop(THREE.LoopRepeat)
-        this.animation.action.reset()
-        this.animation.action.play() // Always play, control visibility with weight
-        
-        // Start with weight 0 (invisible)
-        this.animation.action.setEffectiveWeight(0)
-        this.animation.targetWeight = 0
-        
+
+        const walkClip = this.resource.animations[0]
+        const idleClip = this.resource.animations[1]
+
+        this.animation.walkAction = this.animation.mixer.clipAction(walkClip)
+        this.animation.idleAction = idleClip ? this.animation.mixer.clipAction(idleClip) : null
+
+        // Set up animations
+        this.animation.walkAction.setLoop(THREE.LoopRepeat)
+        this.animation.walkAction.reset()
+        this.animation.walkAction.play()
+
+        if(this.animation.idleAction)
+        {
+            this.animation.idleAction.setLoop(THREE.LoopRepeat)
+            this.animation.idleAction.reset()
+            this.animation.idleAction.play()
+        }
+
+        // Start with idle visible (if available)
+        this.animation.walkAction.setEffectiveWeight(0)
+        if(this.animation.idleAction)
+        {
+            this.animation.idleAction.setEffectiveWeight(1)
+        }
+
+        this.animation.targetWalkWeight = 0
         this.animation.fadeDuration = 0.3 // Transition duration in seconds
     }
 
@@ -139,11 +163,11 @@ export default class Character
         const RAPIER = this.physics.RAPIER
         
         // Capsule dimensions
-        const halfHeight = 0.5
-        const radius = 0.4
+        const halfHeight = this.capsuleHalfHeight
+        const radius = this.capsuleRadius
         
         // Adjust position so capsule base touches ground (y=0)
-        this.position.y = halfHeight
+        this.position.y = this.capsuleCenterY
         
         // Create kinematic rigid body for character
         const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
@@ -167,6 +191,9 @@ export default class Character
         this.characterController.setApplyImpulsesToDynamicBodies(true) // Push dynamic objects
         this.characterController.setMaxSlopeClimbAngle(Math.PI * 0.25) // ~45 degrees
         this.characterController.setMinSlopeSlideAngle(Math.PI * 0.3)  // ~54 degrees
+        // Allow stepping over small ledges and keep feet snapped to ground
+        this.characterController.enableAutostep(0.25, 0.2, false)
+        this.characterController.enableSnapToGround(0.1)
         
         // Store previous position
         this.previousPosition = this.position.clone()
@@ -191,24 +218,30 @@ export default class Character
         const isMoving = moveDirection.length() > 0.01
 
         // Handle animation transitions
-        if(this.animation?.action && this.animation?.mixer)
+        if(this.animation?.walkAction && this.animation?.mixer)
         {
             // Determine target weight based on movement
-            this.animation.targetWeight = isMoving ? 1.0 : 0.0
+            this.animation.targetWalkWeight = isMoving ? 1.0 : 0.0
             
             // Smoothly interpolate weight
-            const currentWeight = this.animation.action.getEffectiveWeight()
-            const weightDiff = this.animation.targetWeight - currentWeight
+            const currentWeight = this.animation.walkAction.getEffectiveWeight()
+            const weightDiff = this.animation.targetWalkWeight - currentWeight
             
             if(Math.abs(weightDiff) > 0.01)
             {
                 const weightChangeSpeed = 1.0 / this.animation.fadeDuration
                 const newWeight = currentWeight + Math.sign(weightDiff) * Math.min(Math.abs(weightDiff), weightChangeSpeed * deltaTime)
-                this.animation.action.setEffectiveWeight(newWeight)
+                this.animation.walkAction.setEffectiveWeight(newWeight)
             }
             else
             {
-                this.animation.action.setEffectiveWeight(this.animation.targetWeight)
+                this.animation.walkAction.setEffectiveWeight(this.animation.targetWalkWeight)
+            }
+
+            if(this.animation.idleAction)
+            {
+                const idleWeight = 1.0 - this.animation.walkAction.getEffectiveWeight()
+                this.animation.idleAction.setEffectiveWeight(idleWeight)
             }
             
             // Always update mixer (critical for animations to work)
@@ -216,15 +249,25 @@ export default class Character
         }
 
         // Move character using Rapier's built-in Character Controller
-        if(isMoving && this.characterController && this.collider && this.rigidBody)
+        if(this.characterController && this.collider && this.rigidBody)
         {
-            moveDirection.normalize()
-            
+            if(this.isGrounded && this.verticalVelocity < 0)
+            {
+                this.verticalVelocity = 0
+            }
+
+            this.verticalVelocity += this.gravity * deltaTime
+
+            if(isMoving)
+            {
+                moveDirection.normalize()
+            }
+
             // Calculate desired movement
             const desiredMovement = {
-                x: moveDirection.x * this.moveSpeed * deltaTime,
-                y: 0, // No vertical movement (gravity handled separately if needed)
-                z: moveDirection.z * this.moveSpeed * deltaTime
+                x: isMoving ? moveDirection.x * this.moveSpeed * deltaTime : 0,
+                y: this.verticalVelocity * deltaTime,
+                z: isMoving ? moveDirection.z * this.moveSpeed * deltaTime : 0
             }
             
             // Use Rapier's Character Controller to compute corrected movement
@@ -241,7 +284,7 @@ export default class Character
             const currentPos = this.rigidBody.translation()
             const newPos = {
                 x: currentPos.x + correctedMovement.x,
-                y: 0.5, // Keep Y at halfHeight so base touches ground
+                y: currentPos.y + correctedMovement.y,
                 z: currentPos.z + correctedMovement.z
             }
             
@@ -254,17 +297,26 @@ export default class Character
             // Update container position
             this.container.position.copy(this.position)
             
-            // Smooth rotation towards movement direction
-            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z)
-            const currentRotation = this.container.rotation.y
-            
-            // Normalize angles for lerp
-            let rotationDiff = targetRotation - currentRotation
-            if(rotationDiff > Math.PI) rotationDiff -= Math.PI * 2
-            if(rotationDiff < -Math.PI) rotationDiff += Math.PI * 2
-            
-            // Smooth lerp rotation
-            this.container.rotation.y += rotationDiff * this.rotationSpeed * deltaTime
+            this.isGrounded = this.characterController.computedGrounded()
+            if(this.isGrounded && this.verticalVelocity < 0)
+            {
+                this.verticalVelocity = 0
+            }
+
+            if(isMoving)
+            {
+                // Smooth rotation towards movement direction
+                const targetRotation = Math.atan2(moveDirection.x, moveDirection.z)
+                const currentRotation = this.container.rotation.y
+                
+                // Normalize angles for lerp
+                let rotationDiff = targetRotation - currentRotation
+                if(rotationDiff > Math.PI) rotationDiff -= Math.PI * 2
+                if(rotationDiff < -Math.PI) rotationDiff += Math.PI * 2
+                
+                // Smooth lerp rotation
+                this.container.rotation.y += rotationDiff * this.rotationSpeed * deltaTime
+            }
         }
         else
         {

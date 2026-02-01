@@ -110,6 +110,39 @@ export default class Physics
         return { rigidBody, collider }
     }
 
+    createStaticTrimesh(geometry, position, quaternion, threeMesh = null)
+    {
+        if(!this.world) return null
+
+        const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
+            .setTranslation(position.x, position.y, position.z)
+            .setRotation({
+                x: quaternion.x,
+                y: quaternion.y,
+                z: quaternion.z,
+                w: quaternion.w
+            })
+        const rigidBody = this.world.createRigidBody(rigidBodyDesc)
+
+        const vertices = Array.from(geometry.attributes.position.array)
+        const indices = geometry.index
+            ? Array.from(geometry.index.array)
+            : Array.from({ length: vertices.length / 3 }, (_, i) => i)
+
+        const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices)
+            .setFriction(0.8)
+            .setRestitution(0.0)
+
+        const collider = this.world.createCollider(colliderDesc, rigidBody)
+
+        if(threeMesh)
+        {
+            rigidBody.userData = { mesh: threeMesh }
+        }
+
+        return { rigidBody, collider }
+    }
+
     update(deltaTime)
     {
         if(!this.world || !this.eventQueue) return
