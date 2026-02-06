@@ -16,12 +16,15 @@ export default class Character
         this.capsuleHalfHeight = 0.5
         this.capsuleRadius = 0.32
         this.capsuleCenterY = this.capsuleHalfHeight + this.capsuleRadius
+        this.spawnOffsetY = 0.15
 
-        // Character state - Y position will be adjusted in setPhysics() to match capsule
-        this.position = new THREE.Vector3(0, this.capsuleCenterY, 0)
-        this.previousPosition = new THREE.Vector3(0, this.capsuleCenterY, 0)
+        // Character state - start slightly above ground to avoid falling through
+        this.position = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
+        this.previousPosition = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
         this.moveSpeed = 2.0
-        this.rotationSpeed = 5.0 // Rotation lerp speed
+        this.angularVelocity = 0
+        this.rotationAcceleration = 12.0
+        this.rotationGain = 6.0
         this.gravity = -9.81
         this.verticalVelocity = 0
         this.isGrounded = false
@@ -166,9 +169,9 @@ export default class Character
         const halfHeight = this.capsuleHalfHeight
         const radius = this.capsuleRadius
         
-        // Adjust position so capsule base touches ground (y=0)
-        this.position.y = this.capsuleCenterY
-        
+        // Start slightly above ground to avoid falling through floor
+        this.position.y = this.capsuleCenterY + this.spawnOffsetY
+
         // Create kinematic rigid body for character
         const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
             .setTranslation(this.position.x, this.position.y, this.position.z)
@@ -305,17 +308,20 @@ export default class Character
 
             if(isMoving)
             {
-                // Smooth rotation towards movement direction
                 const targetRotation = Math.atan2(moveDirection.x, moveDirection.z)
-                const currentRotation = this.container.rotation.y
-                
-                // Normalize angles for lerp
-                let rotationDiff = targetRotation - currentRotation
+                let rotationDiff = targetRotation - this.container.rotation.y
                 if(rotationDiff > Math.PI) rotationDiff -= Math.PI * 2
                 if(rotationDiff < -Math.PI) rotationDiff += Math.PI * 2
-                
-                // Smooth lerp rotation
-                this.container.rotation.y += rotationDiff * this.rotationSpeed * deltaTime
+
+                const desiredAngularVelocity = rotationDiff * this.rotationGain
+                this.angularVelocity += (desiredAngularVelocity - this.angularVelocity) * this.rotationAcceleration * deltaTime
+                this.container.rotation.y += this.angularVelocity * deltaTime
+            }
+            else
+            {
+                this.angularVelocity *= Math.max(0, 1 - 8.0 * deltaTime)
+                if(Math.abs(this.angularVelocity) > 0.01)
+                    this.container.rotation.y += this.angularVelocity * deltaTime
             }
         }
         else

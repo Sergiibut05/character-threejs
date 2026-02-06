@@ -8,6 +8,7 @@
     "build": "vite build"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.4",
     "vite": "^6.2.2",
     "vite-plugin-restart": "^0.4.2",
     "vite-plugin-wasm": "^3.5.0"

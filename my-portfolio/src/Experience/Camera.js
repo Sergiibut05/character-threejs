@@ -18,10 +18,13 @@ export default class Camera
     setInstance()
     {
         this.instance = new THREE.PerspectiveCamera(35, this.sizes.width / this.sizes.height, 0.1, 100)
-        // Initial position - will be updated to follow character
         this.instance.position.set(0, 8, 8)
         this.instance.lookAt(0, 0, 0)
         this.scene.add(this.instance)
+        this.cameraOffset = new THREE.Vector3(0, 2, 5)
+        this.smoothPosition = this.instance.position.clone()
+        this.smoothLookAt = new THREE.Vector3(0, 0, 0)
+        this.lerpFactor = 0.12
     }
 
     setOrbitControls()
@@ -40,18 +43,18 @@ export default class Camera
 
     update()
     {
-        // Update OrbitControls
         this.controls.update()
-        
-        // Camera follows character (Animal Crossing style - fixed angle)
-        // Temporarily disabled when using OrbitControls
-        // if(this.experience.world.character)
-        // {
-        //     const characterPosition = this.experience.world.character.position
-        //     const offset = new THREE.Vector3(0, 8, 8)
-        //     
-        //     this.instance.position.copy(characterPosition).add(offset)
-        //     this.instance.lookAt(characterPosition)
-        // }
+
+        if(this.experience.world.character)
+        {
+            const characterPosition = this.experience.world.character.position
+            const desiredPosition = new THREE.Vector3()
+                .copy(characterPosition)
+                .add(this.cameraOffset)
+            this.smoothPosition.lerp(desiredPosition, this.lerpFactor)
+            this.smoothLookAt.lerp(characterPosition, this.lerpFactor)
+            this.instance.position.copy(this.smoothPosition)
+            this.instance.lookAt(this.smoothLookAt)
+        }
     }
 }

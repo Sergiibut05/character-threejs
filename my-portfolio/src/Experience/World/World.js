@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 import Environment from './Environment.js'
-import Ground from './Ground.js'
+import GroundPerlin from './GroundPerlin.js'
 import Character from './Character.js'
 import Physics from './Physics.js'
 import InteractiveObject from './InteractiveObject.js'
 import Raycaster from './Raycaster.js'
+import Grass from './Grass.js'
 
 export default class World
 {
@@ -25,8 +26,13 @@ export default class World
         this.resources.on('ready', () =>
         {
             this.environment = new Environment()
-            this.ground = new Ground()
+            this.ground = new GroundPerlin()
             this.character = new Character()
+            this.grass = new Grass({
+                size: 10,
+                count: 3000,
+                position: new THREE.Vector3(0, 0, 0)
+            })
             
             // Initialize raycaster for mouse interactions
             this.raycaster = new Raycaster()
@@ -86,7 +92,7 @@ export default class World
         }
 
         // Plank (dynamic, rotation only around Z)
-        const plankSize = { x: 3.6, y: 0.12, z: 0.9 }
+        const plankSize = { x: 3.6, y: 0.08, z: 0.9 }
         const plankGeometry = new THREE.BoxGeometry(plankSize.x, plankSize.y, plankSize.z)
         const plankMaterial = new THREE.MeshStandardMaterial({
             color: '#eccc68',
@@ -273,6 +279,11 @@ export default class World
             {
                 obj.update(characterPos)
             }
+        }
+
+        if(this.grass)
+        {
+            this.grass.update()
         }
     }
 }

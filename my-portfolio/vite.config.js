@@ -1,5 +1,6 @@
 import restart from 'vite-plugin-restart'
 import wasm from 'vite-plugin-wasm'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default {
     root: 'src/', // Sources files (typically where index.html is)
@@ -17,6 +18,7 @@ export default {
     },
     plugins:
     [
+        basicSsl(), // Enable HTTPS with compatible self-signed certificate
         wasm(), // Enable WASM support for Rapier.js
         restart({ restart: [ '../static/**', ] }) // Restart server on static file change
     ],
