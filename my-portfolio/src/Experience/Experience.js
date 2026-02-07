@@ -6,6 +6,7 @@ import Camera from './Camera.js'
 import Renderer from './Renderer.js'
 import Resources from './Utils/Resources.js'
 import World from './World/World.js'
+import MobileControls from './Utils/MobileControls.js'
 import sources from './sources.js'
 
 let instance = null
@@ -36,6 +37,7 @@ export default class Experience
         this.camera = new Camera()
         this.renderer = new Renderer()
         this.world = new World()
+        this.mobileControls = new MobileControls()
 
         // Resize event
         this.sizes.on('resize', () =>
@@ -58,6 +60,7 @@ export default class Experience
 
     update()
     {
+        this.mobileControls.update()
         this.camera.update()
         this.world.update()
         this.renderer.update()

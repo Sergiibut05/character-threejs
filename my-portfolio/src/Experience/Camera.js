@@ -21,7 +21,12 @@ export default class Camera
         this.instance.position.set(0, 8, 8)
         this.instance.lookAt(0, 0, 0)
         this.scene.add(this.instance)
-        this.cameraOffset = new THREE.Vector3(0, 2, 5)
+
+        // Check if mobile and adjust camera offset
+        const isMobile = this.checkIfMobile()
+        this.cameraOffset = isMobile
+            ? new THREE.Vector3(0, 3, 7)  // Further back on mobile
+            : new THREE.Vector3(0, 2, 5)  // Closer on desktop
         this.smoothPosition = this.instance.position.clone()
         this.smoothLookAt = new THREE.Vector3(0, 0, 0)
         this.lerpFactor = 0.12
@@ -40,6 +45,17 @@ export default class Camera
         this.instance.aspect = this.sizes.width / this.sizes.height
         this.instance.updateProjectionMatrix()
     }
+
+    checkIfMobile()
+    {
+        // Check for touch capability and screen size
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const isSmallScreen = window.innerWidth < 768 || window.innerHeight < 768
+
+        return hasTouch && isSmallScreen
+    }
+
+
 
     update()
     {

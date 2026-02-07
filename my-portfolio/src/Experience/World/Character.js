@@ -211,12 +211,20 @@ export default class Character
 
         if(!this.container) return
 
-        // Calculate movement
+        // Calculate movement from keyboard
         const moveDirection = new THREE.Vector3(0, 0, 0)
         if(this.keys.w) moveDirection.z -= 1
         if(this.keys.s) moveDirection.z += 1
         if(this.keys.a) moveDirection.x -= 1
         if(this.keys.d) moveDirection.x += 1
+
+        // Add mobile controls input
+        if(this.experience.mobileControls?.isActive())
+        {
+            const mobileMovement = this.experience.mobileControls.getMovement()
+            moveDirection.x += mobileMovement.x * mobileMovement.force
+            moveDirection.z -= mobileMovement.y * mobileMovement.force // Invert Y axis for correct forward/backward movement
+        }
 
         const isMoving = moveDirection.length() > 0.01
 

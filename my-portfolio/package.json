@@ -16,6 +16,7 @@
   "dependencies": {
     "@dimforge/rapier3d": "^0.19.3",
     "lil-gui": "^0.20.0",
+    "nipplejs": "^0.10.2",
     "three": "^0.174.0"
   }
 }
