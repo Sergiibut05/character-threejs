@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "npx vite build"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.4",
