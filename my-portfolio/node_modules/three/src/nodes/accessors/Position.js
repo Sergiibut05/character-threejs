@@ -1,6 +1,28 @@
 import { attribute } from '../core/AttributeNode.js';
-import { Fn } from '../tsl/TSLCore.js';
+import { Fn, vec3, vec4 } from '../tsl/TSLCore.js';
 import { modelWorldMatrix } from './ModelNode.js';
+import { cameraProjectionMatrixInverse } from './Camera.js';
+import { warnOnce } from '../../utils.js';
+
+/**
+ * TSL object that represents the clip space position of the current rendered object.
+ *
+ * @tsl
+ * @type {VaryingNode<vec4>}
+ */
+export const clipSpace = /*@__PURE__*/ ( Fn( ( builder ) => {
+
+	if ( builder.shaderStage !== 'fragment' ) {
+
+		warnOnce( 'TSL: `clipSpace` is only available in fragment stage.' );
+
+		return vec4();
+
+	}
+
+	return builder.context.clipSpace.toVarying( 'v_clipSpace' );
+
+} ).once() )();
 
 /**
  * TSL object that represents the position attribute of the current rendered object.
@@ -33,7 +55,11 @@ export const positionPrevious = /*@__PURE__*/ positionGeometry.toVarying( 'posit
  * @tsl
  * @type {VaryingNode<vec3>}
  */
-export const positionWorld = /*@__PURE__*/ modelWorldMatrix.mul( positionLocal ).xyz.toVarying( 'v_positionWorld' ).context( { needsPositionReassign: true } );
+export const positionWorld = /*@__PURE__*/ ( Fn( ( builder ) => {
+
+	return modelWorldMatrix.mul( positionLocal ).xyz.toVarying( builder.getSubBuildProperty( 'v_positionWorld' ) );
+
+}, 'vec3' ).once( [ 'POSITION' ] ) )();
 
 /**
  * TSL object that represents the position world direction of the current rendered object.
@@ -41,7 +67,13 @@ export const positionWorld = /*@__PURE__*/ modelWorldMatrix.mul( positionLocal )
  * @tsl
  * @type {Node<vec3>}
  */
-export const positionWorldDirection = /*@__PURE__*/ positionLocal.transformDirection( modelWorldMatrix ).toVarying( 'v_positionWorldDirection' ).normalize().toVar( 'positionWorldDirection' ).context( { needsPositionReassign: true } );
+export const positionWorldDirection = /*@__PURE__*/ ( Fn( () => {
+
+	const vertexPWD = positionLocal.transformDirection( modelWorldMatrix ).toVarying( 'v_positionWorldDirection' );
+
+	return vertexPWD.normalize().toVar( 'positionWorldDirection' );
+
+}, 'vec3' ).once( [ 'POSITION' ] ) )();
 
 /**
  * TSL object that represents the vertex position in view space of the current rendered object.
@@ -51,9 +83,19 @@ export const positionWorldDirection = /*@__PURE__*/ positionLocal.transformDirec
  */
 export const positionView = /*@__PURE__*/ ( Fn( ( builder ) => {
 
-	return builder.context.setupPositionView();
+	if ( builder.shaderStage === 'fragment' && builder.material.vertexNode ) {
 
-}, 'vec3' ).once() )().toVarying( 'v_positionView' ).context( { needsPositionReassign: true } );
+		// reconstruct view position from clip space
+
+		const viewPos = cameraProjectionMatrixInverse.mul( clipSpace );
+
+		return viewPos.xyz.div( viewPos.w ).toVar( 'positionView' );
+
+	}
+
+	return builder.context.setupPositionView().toVarying( 'v_positionView' );
+
+}, 'vec3' ).once( [ 'POSITION', 'VERTEX' ] ) )();
 
 /**
  * TSL object that represents the position view direction of the current rendered object.
@@ -61,4 +103,20 @@ export const positionView = /*@__PURE__*/ ( Fn( ( builder ) => {
  * @tsl
  * @type {VaryingNode<vec3>}
  */
-export const positionViewDirection = /*@__PURE__*/ positionView.negate().toVarying( 'v_positionViewDirection' ).normalize().toVar( 'positionViewDirection' );
+export const positionViewDirection = /*@__PURE__*/ ( Fn( ( builder ) => {
+
+	let output;
+
+	if ( builder.camera.isOrthographicCamera ) {
+
+		output = vec3( 0, 0, 1 );
+
+	} else {
+
+		output = positionView.negate().toVarying( 'v_positionViewDirection' ).normalize();
+
+	}
+
+	return output.toVar( 'positionViewDirection' );
+
+}, 'vec3' ).once( [ 'POSITION' ] ) )();

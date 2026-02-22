@@ -2,10 +2,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import Experience from './Experience.js'
 
-export default class Camera
-{
-    constructor()
-    {
+export default class Camera {
+    constructor() {
         this.experience = new Experience()
         this.sizes = this.experience.sizes
         this.scene = this.experience.scene
@@ -15,8 +13,7 @@ export default class Camera
         this.setOrbitControls()
     }
 
-    setInstance()
-    {
+    setInstance() {
         this.instance = new THREE.PerspectiveCamera(35, this.sizes.width / this.sizes.height, 0.1, 100)
         this.instance.position.set(0, 8, 8)
         this.instance.lookAt(0, 0, 0)
@@ -32,22 +29,19 @@ export default class Camera
         this.lerpFactor = 0.12
     }
 
-    setOrbitControls()
-    {
+    setOrbitControls() {
         this.controls = new OrbitControls(this.instance, this.canvas)
         this.controls.enableDamping = true
         this.controls.dampingFactor = 0.05
         this.controls.target.set(0, 0, 0)
     }
 
-    resize()
-    {
+    resize() {
         this.instance.aspect = this.sizes.width / this.sizes.height
         this.instance.updateProjectionMatrix()
     }
 
-    checkIfMobile()
-    {
+    checkIfMobile() {
         // Check for touch capability and screen size
         const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
         const isSmallScreen = window.innerWidth < 768 || window.innerHeight < 768
@@ -57,12 +51,10 @@ export default class Camera
 
 
 
-    update()
-    {
+    update() {
         this.controls.update()
 
-        if(this.experience.world.character)
-        {
+        if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
             const desiredPosition = new THREE.Vector3()
                 .copy(characterPosition)

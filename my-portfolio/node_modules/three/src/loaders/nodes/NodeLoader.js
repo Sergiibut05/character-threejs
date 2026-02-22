@@ -1,7 +1,8 @@
-import { nodeObject, float } from '../../nodes/tsl/TSLBase.js';
+import { float } from '../../nodes/tsl/TSLBase.js';
 
 import { Loader } from '../Loader.js';
 import { FileLoader } from '../../loaders/FileLoader.js';
+import { error } from '../../utils.js';
 
 /**
  * A loader for loading node objects in the three.js JSON Object/Scene format.
@@ -13,7 +14,7 @@ class NodeLoader extends Loader {
 	/**
 	 * Constructs a new node loader.
 	 *
-	 * @param {?LoadingManager} manager - A reference to a loading manager.
+	 * @param {LoadingManager} [manager] - A reference to a loading manager.
 	 */
 	constructor( manager ) {
 
@@ -63,7 +64,7 @@ class NodeLoader extends Loader {
 
 				} else {
 
-					console.error( e );
+					error( e );
 
 				}
 
@@ -78,7 +79,7 @@ class NodeLoader extends Loader {
 	/**
 	 * Parse the node dependencies for the loaded node.
 	 *
-	 * @param {Object} json - The JSON definition
+	 * @param {Array<Object>} [json] - The JSON definition
 	 * @return {Object<string,Node>} A dictionary with node dependencies.
 	 */
 	parseNodes( json ) {
@@ -119,6 +120,10 @@ class NodeLoader extends Loader {
 	 * Parses the node from the given JSON.
 	 *
 	 * @param {Object} json - The JSON definition
+	 * @param {string} json.type - The node type.
+	 * @param {string} json.uuid - The node UUID.
+	 * @param {Array<Object>} [json.nodes] - The node dependencies.
+	 * @param {Object} [json.meta] - The meta data.
 	 * @return {Node} The parsed node.
 	 */
 	parse( json ) {
@@ -175,12 +180,12 @@ class NodeLoader extends Loader {
 
 		if ( this.nodes[ type ] === undefined ) {
 
-			console.error( 'THREE.NodeLoader: Node type not found:', type );
+			error( 'NodeLoader: Node type not found:', type );
 			return float();
 
 		}
 
-		return nodeObject( new this.nodes[ type ]() );
+		return new this.nodes[ type ]();
 
 	}
 

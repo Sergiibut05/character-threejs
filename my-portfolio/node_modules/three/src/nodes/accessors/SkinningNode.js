@@ -9,7 +9,9 @@ import { positionLocal, positionPrevious } from './Position.js';
 import { tangentLocal } from './Tangent.js';
 import { uniform } from '../core/UniformNode.js';
 import { buffer } from './BufferNode.js';
-import { getDataFromObject } from '../core/NodeUtils.js';
+import { storage } from './StorageBufferNode.js';
+import { InstancedBufferAttribute } from '../../core/InstancedBufferAttribute.js';
+import { instanceIndex } from '../core/IndexNode.js';
 
 const _frameId = new WeakMap();
 
@@ -31,9 +33,8 @@ class SkinningNode extends Node {
 	 * Constructs a new skinning node.
 	 *
 	 * @param {SkinnedMesh} skinnedMesh - The skinned mesh.
-	 * @param {boolean} [useReference=false] - Whether to use reference nodes for internal skinned mesh related data or not.
 	 */
-	constructor( skinnedMesh, useReference = false ) {
+	constructor( skinnedMesh ) {
 
 		super( 'void' );
 
@@ -43,14 +44,6 @@ class SkinningNode extends Node {
 		 * @type {SkinnedMesh}
 		 */
 		this.skinnedMesh = skinnedMesh;
-
-		/**
-		 * Whether to use reference nodes for internal skinned mesh related data or not.
-		 * TODO: Explain the purpose of the property.
-		 *
-		 * @type {boolean}
-		 */
-		this.useReference = useReference;
 
 		/**
 		 * The update type overwritten since skinning nodes are updated per object.
@@ -75,42 +68,40 @@ class SkinningNode extends Node {
 		 */
 		this.skinWeightNode = attribute( 'skinWeight', 'vec4' );
 
-		let bindMatrixNode, bindMatrixInverseNode, boneMatricesNode;
-
-		if ( useReference ) {
-
-			bindMatrixNode = reference( 'bindMatrix', 'mat4' );
-			bindMatrixInverseNode = reference( 'bindMatrixInverse', 'mat4' );
-			boneMatricesNode = referenceBuffer( 'skeleton.boneMatrices', 'mat4', skinnedMesh.skeleton.bones.length );
-
-		} else {
-
-			bindMatrixNode = uniform( skinnedMesh.bindMatrix, 'mat4' );
-			bindMatrixInverseNode = uniform( skinnedMesh.bindMatrixInverse, 'mat4' );
-			boneMatricesNode = buffer( skinnedMesh.skeleton.boneMatrices, 'mat4', skinnedMesh.skeleton.bones.length );
-
-		}
-
 		/**
 		 * The bind matrix node.
 		 *
 		 * @type {Node<mat4>}
 		 */
-		this.bindMatrixNode = bindMatrixNode;
+		this.bindMatrixNode = reference( 'bindMatrix', 'mat4' );
 
 		/**
 		 * The bind matrix inverse node.
 		 *
 		 * @type {Node<mat4>}
 		 */
-		this.bindMatrixInverseNode = bindMatrixInverseNode;
+		this.bindMatrixInverseNode = reference( 'bindMatrixInverse', 'mat4' );
 
 		/**
 		 * The bind matrices as a uniform buffer node.
 		 *
 		 * @type {Node}
 		 */
-		this.boneMatricesNode = boneMatricesNode;
+		this.boneMatricesNode = referenceBuffer( 'skeleton.boneMatrices', 'mat4', skinnedMesh.skeleton.bones.length );
+
+		/**
+		 * The current vertex position in local space.
+		 *
+		 * @type {Node<vec3>}
+		 */
+		this.positionNode = positionLocal;
+
+		/**
+		 * The result of vertex position in local space.
+		 *
+		 * @type {Node<vec3>}
+		 */
+		this.toPositionNode = positionLocal;
 
 		/**
 		 * The previous bind matrices as a uniform buffer node.
@@ -127,10 +118,10 @@ class SkinningNode extends Node {
 	 * Transforms the given vertex position via skinning.
 	 *
 	 * @param {Node} [boneMatrices=this.boneMatricesNode] - The bone matrices
-	 * @param {Node<vec3>} [position=positionLocal] - The vertex position in local space.
+	 * @param {Node<vec3>} [position=this.positionNode] - The vertex position in local space.
 	 * @return {Node<vec3>} The transformed vertex position.
 	 */
-	getSkinnedPosition( boneMatrices = this.boneMatricesNode, position = positionLocal ) {
+	getSkinnedPosition( boneMatrices = this.boneMatricesNode, position = this.positionNode ) {
 
 		const { skinIndexNode, skinWeightNode, bindMatrixNode, bindMatrixInverseNode } = this;
 
@@ -155,13 +146,14 @@ class SkinningNode extends Node {
 	}
 
 	/**
-	 * Transforms the given vertex normal via skinning.
+	 * Transforms the given vertex normal and tangent via skinning.
 	 *
 	 * @param {Node} [boneMatrices=this.boneMatricesNode] - The bone matrices
 	 * @param {Node<vec3>} [normal=normalLocal] - The vertex normal in local space.
-	 * @return {Node<vec3>} The transformed vertex normal.
+	 * @param {Node<vec3>} [tangent=tangentLocal] - The vertex tangent in local space.
+	 * @return {{skinNormal: Node<vec3>, skinTangent:Node<vec3>}} The transformed vertex normal and tangent.
 	 */
-	getSkinnedNormal( boneMatrices = this.boneMatricesNode, normal = normalLocal ) {
+	getSkinnedNormalAndTangent( boneMatrices = this.boneMatricesNode, normal = normalLocal, tangent = tangentLocal ) {
 
 		const { skinIndexNode, skinWeightNode, bindMatrixNode, bindMatrixInverseNode } = this;
 
@@ -170,7 +162,7 @@ class SkinningNode extends Node {
 		const boneMatZ = boneMatrices.element( skinIndexNode.z );
 		const boneMatW = boneMatrices.element( skinIndexNode.w );
 
-		// NORMAL
+		// NORMAL and TANGENT
 
 		let skinMatrix = add(
 			skinWeightNode.x.mul( boneMatX ),
@@ -181,12 +173,15 @@ class SkinningNode extends Node {
 
 		skinMatrix = bindMatrixInverseNode.mul( skinMatrix ).mul( bindMatrixNode );
 
-		return skinMatrix.transformDirection( normal ).xyz;
+		const skinNormal = skinMatrix.transformDirection( normal ).xyz;
+		const skinTangent = skinMatrix.transformDirection( tangent ).xyz;
+
+		return { skinNormal, skinTangent };
 
 	}
 
 	/**
-	 * Transforms the given vertex normal via skinning.
+	 * Computes the transformed/skinned vertex position of the previous frame.
 	 *
 	 * @param {NodeBuilder} builder - The current node builder.
 	 * @return {Node<vec3>} The skinned position from the previous frame.
@@ -208,27 +203,14 @@ class SkinningNode extends Node {
 	}
 
 	/**
-	 * Returns `true` if bone matrices from the previous frame are required.
-	 *
-	 * @param {NodeBuilder} builder - The current node builder.
-	 * @return {boolean} Whether bone matrices from the previous frame are required or not.
-	 */
-	needsPreviousBoneMatrices( builder ) {
-
-		const mrt = builder.renderer.getMRT();
-
-		return ( mrt && mrt.has( 'velocity' ) ) || getDataFromObject( builder.object ).useVelocity === true;
-
-	}
-
-	/**
 	 * Setups the skinning node by assigning the transformed vertex data to predefined node variables.
 	 *
 	 * @param {NodeBuilder} builder - The current node builder.
+	 * @return {Node<vec3>} The transformed vertex position.
 	 */
 	setup( builder ) {
 
-		if ( this.needsPreviousBoneMatrices( builder ) ) {
+		if ( builder.needsPreviousData() ) {
 
 			positionPrevious.assign( this.getPreviousSkinnedPosition( builder ) );
 
@@ -236,22 +218,25 @@ class SkinningNode extends Node {
 
 		const skinPosition = this.getSkinnedPosition();
 
+		if ( this.toPositionNode ) this.toPositionNode.assign( skinPosition );
 
-		positionLocal.assign( skinPosition );
+		//
 
 		if ( builder.hasGeometryAttribute( 'normal' ) ) {
 
-			const skinNormal = this.getSkinnedNormal();
+			const { skinNormal, skinTangent } = this.getSkinnedNormalAndTangent();
 
 			normalLocal.assign( skinNormal );
 
 			if ( builder.hasGeometryAttribute( 'tangent' ) ) {
 
-				tangentLocal.assign( skinNormal );
+				tangentLocal.assign( skinTangent );
 
 			}
 
 		}
+
+		return skinPosition;
 
 	}
 
@@ -266,7 +251,7 @@ class SkinningNode extends Node {
 
 		if ( output !== 'void' ) {
 
-			return positionLocal.build( builder, output );
+			return super.generate( builder, output );
 
 		}
 
@@ -279,14 +264,26 @@ class SkinningNode extends Node {
 	 */
 	update( frame ) {
 
-		const object = this.useReference ? frame.object : this.skinnedMesh;
-		const skeleton = object.skeleton;
+		const skeleton = frame.object && frame.object.skeleton ? frame.object.skeleton : this.skinnedMesh.skeleton;
 
 		if ( _frameId.get( skeleton ) === frame.frameId ) return;
 
 		_frameId.set( skeleton, frame.frameId );
 
-		if ( this.previousBoneMatricesNode !== null ) skeleton.previousBoneMatrices.set( skeleton.boneMatrices );
+		if ( this.previousBoneMatricesNode !== null ) {
+
+			if ( skeleton.previousBoneMatrices === null ) {
+
+				// cloned skeletons miss "previousBoneMatrices" in their first updated
+
+				skeleton.previousBoneMatrices = new Float32Array( skeleton.boneMatrices );
+
+			}
+
+			skeleton.previousBoneMatrices.set( skeleton.boneMatrices );
+
+
+		}
 
 		skeleton.update();
 
@@ -304,14 +301,28 @@ export default SkinningNode;
  * @param {SkinnedMesh} skinnedMesh - The skinned mesh.
  * @returns {SkinningNode}
  */
-export const skinning = ( skinnedMesh ) => nodeObject( new SkinningNode( skinnedMesh ) );
+export const skinning = ( skinnedMesh ) => new SkinningNode( skinnedMesh );
 
 /**
- * TSL function for creating a skinning node with reference usage.
+ * TSL function for computing skinning.
  *
  * @tsl
  * @function
  * @param {SkinnedMesh} skinnedMesh - The skinned mesh.
+ * @param {Node<vec3>} [toPosition=null] - The target position.
  * @returns {SkinningNode}
  */
-export const skinningReference = ( skinnedMesh ) => nodeObject( new SkinningNode( skinnedMesh, true ) );
+export const computeSkinning = ( skinnedMesh, toPosition = null ) => {
+
+	const node = new SkinningNode( skinnedMesh );
+	node.positionNode = storage( new InstancedBufferAttribute( skinnedMesh.geometry.getAttribute( 'position' ).array, 3 ), 'vec3' ).setPBO( true ).toReadOnly().element( instanceIndex ).toVar();
+	node.skinIndexNode = storage( new InstancedBufferAttribute( new Uint32Array( skinnedMesh.geometry.getAttribute( 'skinIndex' ).array ), 4 ), 'uvec4' ).setPBO( true ).toReadOnly().element( instanceIndex ).toVar();
+	node.skinWeightNode = storage( new InstancedBufferAttribute( skinnedMesh.geometry.getAttribute( 'skinWeight' ).array, 4 ), 'vec4' ).setPBO( true ).toReadOnly().element( instanceIndex ).toVar();
+	node.bindMatrixNode = uniform( skinnedMesh.bindMatrix, 'mat4' );
+	node.bindMatrixInverseNode = uniform( skinnedMesh.bindMatrixInverse, 'mat4' );
+	node.boneMatricesNode = buffer( skinnedMesh.skeleton.boneMatrices, 'mat4', skinnedMesh.skeleton.bones.length );
+	node.toPositionNode = toPosition;
+
+	return nodeObject( node );
+
+};

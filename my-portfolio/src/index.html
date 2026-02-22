@@ -4,11 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Imported models</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
     <canvas class="webgl"></canvas>
-    
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <svg viewBox="0 0 40 40" class="loading-icon">
+                    <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <polygon points="20,12 30,32 10,32" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                </svg>
+            </div>
+            <div class="loading-text">Cargando experiencia</div>
+            <div class="loading-bar-container">
+                <div class="loading-bar-track">
+                    <div class="loading-bar-fill" id="loading-bar-fill"></div>
+                </div>
+                <div class="loading-percentage" id="loading-percentage">0%</div>
+            </div>
+            <button class="loading-enter-btn" id="loading-enter-btn">
+                <span>Explorar</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <!-- Modal Overlay -->
     <div class="modal-overlay">
         <div class="modal-container">

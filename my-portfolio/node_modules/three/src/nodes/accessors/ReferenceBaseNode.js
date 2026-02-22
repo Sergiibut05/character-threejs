@@ -4,7 +4,7 @@ import { uniform } from '../core/UniformNode.js';
 import { nodeObject } from '../tsl/TSLCore.js';
 import ArrayElementNode from '../utils/ArrayElementNode.js';
 
-// TODO: Avoid duplicated code and ues only ReferenceBaseNode or ReferenceNode
+// TODO: Avoid duplicated code and use only ReferenceBaseNode or ReferenceNode
 
 /**
  * This class is only relevant if the referenced property is array-like.
@@ -24,7 +24,7 @@ class ReferenceElementNode extends ArrayElementNode {
 	/**
 	 * Constructs a new reference element node.
 	 *
-	 * @param {?ReferenceBaseNode} referenceNode - The reference node.
+	 * @param {ReferenceBaseNode} referenceNode - The reference node.
 	 * @param {Node} indexNode - The index node that defines the element access.
 	 */
 	constructor( referenceNode, indexNode ) {
@@ -199,7 +199,7 @@ class ReferenceBaseNode extends Node {
 	 */
 	element( indexNode ) {
 
-		return nodeObject( new ReferenceElementNode( this, nodeObject( indexNode ) ) );
+		return new ReferenceElementNode( this, nodeObject( indexNode ) );
 
 	}
 
@@ -211,7 +211,7 @@ class ReferenceBaseNode extends Node {
 	 */
 	setNodeType( uniformType ) {
 
-		const node = uniform( null, uniformType ).getSelf();
+		const node = uniform( null, uniformType );
 
 		if ( this.group !== null ) {
 
@@ -294,7 +294,7 @@ class ReferenceBaseNode extends Node {
 	}
 
 	/**
-	 * Overwritten to to update the internal uniform value.
+	 * Overwritten to update the internal uniform value.
 	 *
 	 * @param {NodeFrame} frame - A reference to the current node frame.
 	 */
@@ -340,7 +340,7 @@ export default ReferenceBaseNode;
  * @param {Object} object - The object the property belongs to.
  * @returns {ReferenceBaseNode}
  */
-export const reference = ( name, type, object ) => nodeObject( new ReferenceBaseNode( name, type, object ) );
+export const reference = ( name, type, object ) => new ReferenceBaseNode( name, type, object );
 
 /**
  * TSL function for creating a reference base node. Use this function if you want need a reference
@@ -351,7 +351,7 @@ export const reference = ( name, type, object ) => nodeObject( new ReferenceBase
  * @param {string} name - The name of the property the node refers to.
  * @param {string} type - The uniform type that should be used to represent the property value.
  * @param {number} count - The number of value inside the array-like object.
- * @param {Object} object - An array-like object the property belongs to.
+ * @param {Object} [object] - An array-like object the property belongs to.
  * @returns {ReferenceBaseNode}
  */
-export const referenceBuffer = ( name, type, count, object ) => nodeObject( new ReferenceBaseNode( name, type, object, count ) );
+export const referenceBuffer = ( name, type, count, object ) => new ReferenceBaseNode( name, type, object, count );

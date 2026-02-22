@@ -61,10 +61,25 @@ class ArrayElementNode extends Node { // @TODO: If extending from TempNode it br
 
 	}
 
+	/**
+	 * This method is overwritten since the member type is inferred from the array-like node.
+	 *
+	 * @param {NodeBuilder} builder - The current node builder.
+	 * @param {string} name - The member name.
+	 * @return {string} The member type.
+	 */
+	getMemberType( builder, name ) {
+
+		return this.node.getMemberType( builder, name );
+
+	}
+
 	generate( builder ) {
 
+		const indexType = this.indexNode.getNodeType( builder );
+
 		const nodeSnippet = this.node.build( builder );
-		const indexSnippet = this.indexNode.build( builder, 'uint' );
+		const indexSnippet = this.indexNode.build( builder, ! builder.isVector( indexType ) && builder.isInteger( indexType ) ? indexType : 'uint' );
 
 		return `${ nodeSnippet }[ ${ indexSnippet } ]`;
 

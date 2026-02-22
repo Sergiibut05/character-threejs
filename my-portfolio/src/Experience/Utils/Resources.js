@@ -3,10 +3,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import EventEmitter from './EventEmitter.js'
 
-export default class Resources extends EventEmitter
-{
-    constructor(sources)
-    {
+export default class Resources extends EventEmitter {
+    constructor(sources) {
         super()
 
         // Options
@@ -21,50 +19,41 @@ export default class Resources extends EventEmitter
         this.startLoading()
     }
 
-    setLoaders()
-    {
+    setLoaders() {
         this.loaders = {}
         this.loaders.gltfLoader = new GLTFLoader()
         this.loaders.textureLoader = new THREE.TextureLoader()
         this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
-        
+
         // Setup Draco Loader
         this.loaders.dracoLoader = new DRACOLoader()
         this.loaders.dracoLoader.setDecoderPath('/draco/')
         this.loaders.gltfLoader.setDRACOLoader(this.loaders.dracoLoader)
     }
 
-    startLoading()
-    {
+    startLoading() {
         // Load each source
-        for(const source of this.sources)
-        {
-            if(source.type === 'gltfModel')
-            {
+        for (const source of this.sources) {
+            if (source.type === 'gltfModel') {
                 this.loaders.gltfLoader.load(
                     source.path,
-                    (file) =>
-                    {
+                    (file) => {
                         this.sourceLoaded(source, file)
                     }
                 )
             }
-            else if(source.type === 'texture')
-            {
+            else if (source.type === 'texture') {
                 this.loaders.textureLoader.load(
                     source.path,
-                    (file) =>
-                    {
+                    (file) => {
                         this.sourceLoaded(source, file)
                     }
                 )
             }
-            else if(source.type === 'cubeTexture')
-            {
+            else if (source.type === 'cubeTexture') {
                 this.loaders.cubeTextureLoader.load(
                     source.path,
-                    (file) =>
-                    {
+                    (file) => {
                         this.sourceLoaded(source, file)
                     }
                 )
@@ -72,14 +61,15 @@ export default class Resources extends EventEmitter
         }
     }
 
-    sourceLoaded(source, file)
-    {
+    sourceLoaded(source, file) {
         this.items[source.name] = file
 
         this.loaded++
 
-        if(this.loaded === this.toLoad)
-        {
+        // Emit progress (0 to 1)
+        this.trigger('progress', [this.loaded / this.toLoad])
+
+        if (this.loaded === this.toLoad) {
             this.trigger('ready')
         }
     }

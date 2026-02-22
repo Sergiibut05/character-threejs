@@ -1,6 +1,6 @@
 import BufferNode from './BufferNode.js';
 import { bufferAttribute } from './BufferAttributeNode.js';
-import { nodeObject, varying } from '../tsl/TSLBase.js';
+import { varying } from '../tsl/TSLBase.js';
 import { storageElement } from '../utils/StorageArrayElementNode.js';
 import { NodeAccess } from '../core/constants.js';
 import { getTypeFromLength } from '../core/NodeUtils.js';
@@ -60,6 +60,12 @@ class StorageBufferNode extends BufferNode {
 			nodeType = 'struct';
 			structTypeNode = bufferType.layout;
 
+			if ( value.isStorageBufferAttribute || value.isStorageInstancedBufferAttribute ) {
+
+				bufferCount = value.count;
+
+			}
+
 		} else if ( bufferType === null && ( value.isStorageBufferAttribute || value.isStorageInstancedBufferAttribute ) ) {
 
 			nodeType = getTypeFromLength( value.itemSize );
@@ -86,7 +92,7 @@ class StorageBufferNode extends BufferNode {
 		/**
 		 * The buffer struct type.
 		 *
-		 * @type {?structTypeNode}
+		 * @type {?StructTypeNode}
 		 * @default null
 		 */
 		this.structTypeNode = structTypeNode;
@@ -119,6 +125,7 @@ class StorageBufferNode extends BufferNode {
 		/**
 		 * A reference to the internal buffer attribute node.
 		 *
+		 * @private
 		 * @type {?BufferAttributeNode}
 		 * @default null
 		 */
@@ -127,6 +134,7 @@ class StorageBufferNode extends BufferNode {
 		/**
 		 * A reference to the internal varying node.
 		 *
+		 * @private
 		 * @type {?VaryingNode}
 		 * @default null
 		 */
@@ -330,6 +338,25 @@ class StorageBufferNode extends BufferNode {
 	}
 
 	/**
+	 * Returns the type of a member of the struct.
+	 *
+	 * @param {NodeBuilder} builder - The current node builder.
+	 * @param {string} name - The name of the member.
+	 * @return {string} The type of the member.
+	 */
+	getMemberType( builder, name ) {
+
+		if ( this.structTypeNode !== null ) {
+
+			return this.structTypeNode.getMemberType( builder, name );
+
+		}
+
+		return 'void';
+
+	}
+
+	/**
 	 * Generates the code snippet of the storage buffer node.
 	 *
 	 * @param {NodeBuilder} builder - The current node builder.
@@ -369,22 +396,4 @@ export default StorageBufferNode;
  * @param {number} [count=0] - The buffer count.
  * @returns {StorageBufferNode}
  */
-export const storage = ( value, type = null, count = 0 ) => nodeObject( new StorageBufferNode( value, type, count ) );
-
-/**
- * @tsl
- * @function
- * @deprecated since r171. Use `storage().setPBO( true )` instead.
- *
- * @param {StorageBufferAttribute|StorageInstancedBufferAttribute|BufferAttribute} value - The buffer data.
- * @param {?string} type - The buffer type (e.g. `'vec3'`).
- * @param {number} count - The buffer count.
- * @returns {StorageBufferNode}
- */
-export const storageObject = ( value, type, count ) => { // @deprecated, r171
-
-	console.warn( 'THREE.TSL: "storageObject()" is deprecated. Use "storage().setPBO( true )" instead.' );
-
-	return storage( value, type, count ).setPBO( true );
-
-};
+export const storage = ( value, type = null, count = 0 ) => new StorageBufferNode( value, type, count );

@@ -61,6 +61,14 @@ class Uniform {
 		 */
 		this.offset = 0;
 
+		/**
+		 * This property is set by {@link UniformsGroup} and marks
+		 * the index position in the uniform array.
+		 *
+		 * @type {number}
+		 */
+		this.index = - 1;
+
 	}
 
 	/**
@@ -284,7 +292,7 @@ class Matrix2Uniform extends Uniform {
 		 */
 		this.isMatrix2Uniform = true;
 
-		this.boundary = 16;
+		this.boundary = 8;
 		this.itemSize = 4;
 
 	}

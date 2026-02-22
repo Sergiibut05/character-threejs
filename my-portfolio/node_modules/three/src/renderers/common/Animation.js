@@ -9,10 +9,18 @@ class Animation {
 	/**
 	 * Constructs a new animation loop management component.
 	 *
+	 * @param {Renderer} renderer - A reference to the main renderer.
 	 * @param {Nodes} nodes - Renderer component for managing nodes related logic.
 	 * @param {Info} info - Renderer component for managing metrics and monitoring data.
 	 */
-	constructor( nodes, info ) {
+	constructor( renderer, nodes, info ) {
+
+		/**
+		 * A reference to the main renderer.
+		 *
+		 * @type {Renderer}
+		 */
+		this.renderer = renderer;
 
 		/**
 		 * Renderer component for managing nodes related logic.
@@ -32,9 +40,9 @@ class Animation {
 		 * A reference to the context from `requestAnimationFrame()` can
 		 * be called (usually `window`).
 		 *
-		 * @type {Window|XRSession}
+		 * @type {?(Window|XRSession)}
 		 */
-		this._context = self;
+		this._context = typeof self !== 'undefined' ? self : null;
 
 		/**
 		 * The user-defined animation loop.
@@ -70,7 +78,11 @@ class Animation {
 
 			this.info.frame = this.nodes.nodeFrame.frameId;
 
+			this.renderer._inspector.begin();
+
 			if ( this._animationLoop !== null ) this._animationLoop( time, xrFrame );
+
+			this.renderer._inspector.finish();
 
 		};
 
@@ -92,7 +104,7 @@ class Animation {
 	/**
 	 * Returns the user-level animation loop.
 	 *
-	 * @return {Function} The animation loop.
+	 * @return {?Function} The animation loop.
 	 */
 	getAnimationLoop() {
 
@@ -103,7 +115,7 @@ class Animation {
 	/**
 	 * Defines the user-level animation loop.
 	 *
-	 * @param {Function} callback - The animation loop.
+	 * @param {?Function} callback - The animation loop.
 	 */
 	setAnimationLoop( callback ) {
 

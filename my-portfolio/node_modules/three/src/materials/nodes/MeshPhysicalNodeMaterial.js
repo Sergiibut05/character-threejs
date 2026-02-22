@@ -1,4 +1,4 @@
-import { clearcoat, clearcoatRoughness, sheen, sheenRoughness, iridescence, iridescenceIOR, iridescenceThickness, specularColor, specularF90, diffuseColor, metalness, roughness, anisotropy, alphaT, anisotropyT, anisotropyB, ior, transmission, thickness, attenuationDistance, attenuationColor, dispersion } from '../../nodes/core/PropertyNode.js';
+import { clearcoat, clearcoatRoughness, sheen, sheenRoughness, iridescence, iridescenceIOR, iridescenceThickness, specularColor, specularColorBlended, specularF90, diffuseColor, metalness, roughness, anisotropy, alphaT, anisotropyT, anisotropyB, ior, transmission, thickness, attenuationDistance, attenuationColor, dispersion } from '../../nodes/core/PropertyNode.js';
 import { materialClearcoat, materialClearcoatRoughness, materialClearcoatNormal, materialSheen, materialSheenRoughness, materialIridescence, materialIridescenceIOR, materialIridescenceThickness, materialSpecularIntensity, materialSpecularColor, materialAnisotropy, materialIOR, materialTransmission, materialThickness, materialAttenuationDistance, materialAttenuationColor, materialDispersion } from '../../nodes/accessors/MaterialNode.js';
 import { float, vec2, vec3, If } from '../../nodes/tsl/TSLBase.js';
 import getRoughness from '../../nodes/functions/material/getRoughness.js';
@@ -6,13 +6,14 @@ import { TBNViewMatrix } from '../../nodes/accessors/AccessorsUtils.js';
 import PhysicalLightingModel from '../../nodes/functions/PhysicalLightingModel.js';
 import MeshStandardNodeMaterial from './MeshStandardNodeMaterial.js';
 import { mix, pow2, min } from '../../nodes/math/MathNode.js';
+import { subBuild } from '../../nodes/core/SubBuildNode.js';
 
 import { MeshPhysicalMaterial } from '../MeshPhysicalMaterial.js';
 
 const _defaultValues = /*@__PURE__*/ new MeshPhysicalMaterial();
 
 /**
- * Node material version of `MeshPhysicalMaterial`.
+ * Node material version of {@link MeshPhysicalMaterial}.
  *
  * @augments MeshStandardNodeMaterial
  */
@@ -27,7 +28,7 @@ class MeshPhysicalNodeMaterial extends MeshStandardNodeMaterial {
 	/**
 	 * Constructs a new mesh physical node material.
 	 *
-	 * @param {?Object} parameters - The configuration parameter.
+	 * @param {Object} [parameters] - The configuration parameter.
 	 */
 	constructor( parameters ) {
 
@@ -349,7 +350,8 @@ class MeshPhysicalNodeMaterial extends MeshStandardNodeMaterial {
 		const iorNode = this.iorNode ? float( this.iorNode ) : materialIOR;
 
 		ior.assign( iorNode );
-		specularColor.assign( mix( min( pow2( ior.sub( 1.0 ).div( ior.add( 1.0 ) ) ).mul( materialSpecularColor ), vec3( 1.0 ) ).mul( materialSpecularIntensity ), diffuseColor.rgb, metalness ) );
+		specularColor.assign( min( pow2( ior.sub( 1.0 ).div( ior.add( 1.0 ) ) ).mul( materialSpecularColor ), vec3( 1.0 ) ).mul( materialSpecularIntensity ) );
+		specularColorBlended.assign( mix( specularColor, diffuseColor.rgb, metalness ) );
 		specularF90.assign( mix( materialSpecularIntensity, 1.0, metalness ) );
 
 	}
@@ -478,7 +480,7 @@ class MeshPhysicalNodeMaterial extends MeshStandardNodeMaterial {
 
 	setup( builder ) {
 
-		builder.context.setupClearcoatNormal = () => this.setupClearcoatNormal( builder );
+		builder.context.setupClearcoatNormal = () => subBuild( this.setupClearcoatNormal( builder ), 'NORMAL', 'vec3' );
 
 		super.setup( builder );
 
@@ -499,6 +501,8 @@ class MeshPhysicalNodeMaterial extends MeshStandardNodeMaterial {
 
 		this.specularIntensityNode = source.specularIntensityNode;
 		this.specularColorNode = source.specularColorNode;
+
+		this.iorNode = source.iorNode;
 
 		this.transmissionNode = source.transmissionNode;
 		this.thicknessNode = source.thicknessNode;

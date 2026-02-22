@@ -8,10 +8,8 @@ import InteractiveObject from './InteractiveObject.js'
 import Raycaster from './Raycaster.js'
 import Grass from './Grass.js'
 
-export default class World
-{
-    constructor()
-    {
+export default class World {
+    constructor() {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.resources = this.experience.resources
@@ -23,8 +21,7 @@ export default class World
         this.interactiveObjects = []
 
         // Wait for resources to be ready
-        this.resources.on('ready', () =>
-        {
+        this.resources.on('ready', () => {
             this.environment = new Environment()
             this.ground = new GroundPerlin()
             this.character = new Character()
@@ -33,24 +30,23 @@ export default class World
                 count: 3000,
                 position: new THREE.Vector3(0, 0, 0)
             })
-            
+
             // Initialize raycaster for mouse interactions
             this.raycaster = new Raycaster()
-            
+
             // Add interactive cubes after a short delay to ensure physics is initialized
             setTimeout(() => {
                 this.setInteractiveCubes()
                 this.setPhysicsTestArea()
                 this.setInteractiveObjects()
             }, 300)
-            
+
             // Setup modal close functionality
             this.setupModal()
         })
     }
 
-    setInteractiveCubes()
-    {
+    setInteractiveCubes() {
         // Pushable cubes (dynamic)
         // Position Y should be half the height so base touches ground (y=0)
         const pushableCube1 = this.createPushableCube({ x: 5, y: 0.5, z: 0 }, { x: 1, y: 1, z: 1 })
@@ -62,8 +58,7 @@ export default class World
         const staticCube2 = this.createStaticCube({ x: 0, y: 1.5, z: -5 }, { x: 1.5, y: 3, z: 1.5 })
     }
 
-    setPhysicsTestArea()
-    {
+    setPhysicsTestArea() {
         // Physics test: seesaw (plank on triangular support)
         const baseX = 8
         const baseZ = -6
@@ -81,8 +76,7 @@ export default class World
         supportMesh.receiveShadow = true
         this.scene.add(supportMesh)
 
-        if(this.physics.world)
-        {
+        if (this.physics.world) {
             this.physics.createStaticTrimesh(
                 supportGeometry,
                 supportMesh.position,
@@ -106,11 +100,9 @@ export default class World
         plankMesh.receiveShadow = true
         this.scene.add(plankMesh)
 
-        if(this.physics.world)
-        {
+        if (this.physics.world) {
             const { rigidBody } = this.physics.createDynamicBox(plankSize, plankMesh.position, plankMesh)
-            if(rigidBody)
-            {
+            if (rigidBody) {
                 rigidBody.setEnabledTranslations(false, false, false, true)
                 rigidBody.setEnabledRotations(false, false, true, true)
                 rigidBody.setRotation(plankMesh.quaternion, true)
@@ -120,11 +112,10 @@ export default class World
         }
     }
 
-    createPushableCube(position, size)
-    {
+    createPushableCube(position, size) {
         // Create Three.js mesh
         const geometry = new THREE.BoxGeometry(size.x, size.y, size.z)
-        const material = new THREE.MeshStandardMaterial({ 
+        const material = new THREE.MeshStandardMaterial({
             color: '#ff6b6b',
             metalness: 0.3,
             roughness: 0.4
@@ -136,19 +127,17 @@ export default class World
         this.scene.add(mesh)
 
         // Create physics rigid body
-        if(this.physics.world)
-        {
+        if (this.physics.world) {
             this.physics.createDynamicBox(size, position, mesh)
         }
 
         return mesh
     }
 
-    createStaticCube(position, size)
-    {
+    createStaticCube(position, size) {
         // Create Three.js mesh
         const geometry = new THREE.BoxGeometry(size.x, size.y, size.z)
-        const material = new THREE.MeshStandardMaterial({ 
+        const material = new THREE.MeshStandardMaterial({
             color: '#4ecdc4',
             metalness: 0.5,
             roughness: 0.3
@@ -160,16 +149,14 @@ export default class World
         this.scene.add(mesh)
 
         // Create physics rigid body
-        if(this.physics.world)
-        {
+        if (this.physics.world) {
             this.physics.createStaticBox(size, position, mesh)
         }
 
         return mesh
     }
 
-    setInteractiveObjects()
-    {
+    setInteractiveObjects() {
         // Create an interactive object (clickable cube)
         const interactiveObj = new InteractiveObject({
             position: { x: 3, y: 0.75, z: 3 },
@@ -213,76 +200,61 @@ export default class World
         this.interactiveObjects.push(interactiveObj2)
     }
 
-    setupModal()
-    {
+    setupModal() {
         const modalOverlay = document.querySelector('.modal-overlay')
         const closeButton = document.querySelector('.modal-close')
 
-        if(closeButton)
-        {
-            closeButton.addEventListener('click', () =>
-            {
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
                 modalOverlay.classList.remove('is-visible')
             })
         }
 
         // Close on overlay click (outside modal)
-        if(modalOverlay)
-        {
-            modalOverlay.addEventListener('click', (event) =>
-            {
-                if(event.target === modalOverlay)
-                {
+        if (modalOverlay) {
+            modalOverlay.addEventListener('click', (event) => {
+                if (event.target === modalOverlay) {
                     modalOverlay.classList.remove('is-visible')
                 }
             })
         }
 
         // Close on Escape key
-        document.addEventListener('keydown', (event) =>
-        {
-            if(event.key === 'Escape')
-            {
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
                 modalOverlay.classList.remove('is-visible')
             }
         })
     }
 
-    update()
-    {
+    update() {
         // Update character (sets desired position for physics)
-        if(this.character)
-        {
+        if (this.character) {
             this.character.update()
         }
 
         // Update physics (steps simulation and syncs positions)
-        if(this.physics && this.physics.world)
-        {
+        if (this.physics && this.physics.world) {
             const deltaTime = this.experience.time.delta * 0.001
-            
+
             // Step physics simulation
             this.physics.update(deltaTime)
         }
 
         // Update raycaster for hover detection
-        if(this.raycaster)
-        {
+        if (this.raycaster) {
             this.raycaster.update()
         }
 
         // Update interactive objects (check proximity to character)
-        if(this.interactiveObjects.length > 0 && this.character)
-        {
+        if (this.interactiveObjects.length > 0 && this.character) {
             const characterPos = this.character.position
-            for(const obj of this.interactiveObjects)
-            {
+            for (const obj of this.interactiveObjects) {
                 obj.update(characterPos)
             }
         }
 
-        if(this.grass)
-        {
+        if (this.grass) {
             this.grass.update()
         }
     }

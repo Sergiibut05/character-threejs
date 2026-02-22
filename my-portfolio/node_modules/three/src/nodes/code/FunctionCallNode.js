@@ -1,5 +1,6 @@
 import TempNode from '../core/TempNode.js';
-import { addMethodChaining, nodeArray, nodeObject, nodeObjects } from '../tsl/TSLCore.js';
+import { addMethodChaining, nodeArray, nodeObject, nodeObjects, float } from '../tsl/TSLCore.js';
+import { error } from '../../utils.js';
 
 /**
  * This module represents the call of a {@link FunctionNode}. Developers are usually not confronted
@@ -69,9 +70,28 @@ class FunctionCallNode extends TempNode {
 
 	}
 
+	/**
+	 * Returns the type of this function call node.
+	 *
+	 * @param {NodeBuilder} builder - The current node builder.
+	 * @returns {string} The type of this node.
+	 */
 	getNodeType( builder ) {
 
 		return this.functionNode.getNodeType( builder );
+
+	}
+
+	/**
+	 * Returns the function node of this function call node.
+	 *
+	 * @param {NodeBuilder} builder - The current node builder.
+	 * @param {string} [name] - The name of the member.
+	 * @returns {string} The type of the member.
+	 */
+	getMemberType( builder, name ) {
+
+		return this.functionNode.getMemberType( builder, name );
 
 	}
 
@@ -100,6 +120,24 @@ class FunctionCallNode extends TempNode {
 
 		if ( Array.isArray( parameters ) ) {
 
+			if ( parameters.length > inputs.length ) {
+
+				error( 'TSL: The number of provided parameters exceeds the expected number of inputs in \'Fn()\'.' );
+
+				parameters.length = inputs.length;
+
+			} else if ( parameters.length < inputs.length ) {
+
+				error( 'TSL: The number of provided parameters is less than the expected number of inputs in \'Fn()\'.' );
+
+				while ( parameters.length < inputs.length ) {
+
+					parameters.push( float( 0 ) );
+
+				}
+
+			}
+
 			for ( let i = 0; i < parameters.length; i ++ ) {
 
 				params.push( generateInput( parameters[ i ], inputs[ i ] ) );
@@ -118,7 +156,9 @@ class FunctionCallNode extends TempNode {
 
 				} else {
 
-					throw new Error( `FunctionCallNode: Input '${inputNode.name}' not found in FunctionNode.` );
+					error( `TSL: Input '${ inputNode.name }' not found in \'Fn()\'.` );
+
+					params.push( generateInput( float( 0 ), inputNode ) );
 
 				}
 
@@ -128,7 +168,7 @@ class FunctionCallNode extends TempNode {
 
 		const functionName = functionNode.build( builder, 'property' );
 
-		return `${functionName}( ${params.join( ', ' )} )`;
+		return `${ functionName }( ${ params.join( ', ' ) } )`;
 
 	}
 
@@ -140,7 +180,7 @@ export const call = ( func, ...params ) => {
 
 	params = params.length > 1 || ( params[ 0 ] && params[ 0 ].isNode === true ) ? nodeArray( params ) : nodeObjects( params[ 0 ] );
 
-	return nodeObject( new FunctionCallNode( nodeObject( func ), params ) );
+	return new FunctionCallNode( nodeObject( func ), params );
 
 };
 

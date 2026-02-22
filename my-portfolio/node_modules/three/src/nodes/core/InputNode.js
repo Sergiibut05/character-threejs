@@ -1,5 +1,6 @@
 import Node from './Node.js';
 import { getValueType, getValueFromType, arrayBufferToBase64 } from './NodeUtils.js';
+import { warn } from '../../utils.js';
 
 /**
  * Base class for representing data input nodes.
@@ -17,7 +18,7 @@ class InputNode extends Node {
 	/**
 	 * Constructs a new input node.
 	 *
-	 * @param {any} value - The value of this node. This can be a any JS primitive, functions, array buffers or even three.js objects (vector, matrices, colors).
+	 * @param {any} value - The value of this node. This can be any JS primitive, functions, array buffers or even three.js objects (vector, matrices, colors).
 	 * @param {?string} nodeType - The node type. If no explicit type is defined, the node tries to derive the type from its value.
 	 */
 	constructor( value, nodeType = null ) {
@@ -34,7 +35,7 @@ class InputNode extends Node {
 		this.isInputNode = true;
 
 		/**
-		 * The value of this node. This can be a any JS primitive, functions, array buffers or even three.js objects (vector, matrices, colors).
+		 * The value of this node. This can be any JS primitive, functions, array buffers or even three.js objects (vector, matrices, colors).
 		 *
 		 * @type {any}
 		 */
@@ -126,7 +127,7 @@ class InputNode extends Node {
 
 	generate( /*builder, output*/ ) {
 
-		console.warn( 'Abstract function.' );
+		warn( 'Abstract function.' );
 
 	}
 

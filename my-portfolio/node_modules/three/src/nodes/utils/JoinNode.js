@@ -1,4 +1,5 @@
 import TempNode from '../core/TempNode.js';
+import { error } from '../../utils.js';
 
 /**
  * This module is part of the TSL core and usually not used in app level code.
@@ -56,21 +57,48 @@ class JoinNode extends TempNode {
 	generate( builder, output ) {
 
 		const type = this.getNodeType( builder );
+		const maxLength = builder.getTypeLength( type );
+
 		const nodes = this.nodes;
 
 		const primitiveType = builder.getComponentType( type );
 
 		const snippetValues = [];
 
+		let length = 0;
+
 		for ( const input of nodes ) {
 
-			let inputSnippet = input.build( builder );
+			if ( length >= maxLength ) {
 
-			const inputPrimitiveType = builder.getComponentType( input.getNodeType( builder ) );
+				error( `TSL: Length of parameters exceeds maximum length of function '${ type }()' type.`, this.stackTrace );
+				break;
+
+			}
+
+			let inputType = input.getNodeType( builder );
+			let inputTypeLength = builder.getTypeLength( inputType );
+			let inputSnippet;
+
+			if ( length + inputTypeLength > maxLength ) {
+
+				error( `TSL: Length of '${ type }()' data exceeds maximum length of output type.`, this.stackTrace );
+
+				inputTypeLength = maxLength - length;
+				inputType = builder.getTypeFromLength( inputTypeLength );
+
+			}
+
+			length += inputTypeLength;
+			inputSnippet = input.build( builder, inputType );
+
+			const inputPrimitiveType = builder.getComponentType( inputType );
 
 			if ( inputPrimitiveType !== primitiveType ) {
 
-				inputSnippet = builder.format( inputSnippet, inputPrimitiveType, primitiveType );
+				const targetType = builder.getTypeFromLength( inputTypeLength, primitiveType );
+
+				inputSnippet = builder.format( inputSnippet, inputType, targetType );
 
 			}
 

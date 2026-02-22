@@ -1,6 +1,7 @@
 import ArrayElementNode from '../utils/ArrayElementNode.js';
-import { nodeObject } from '../tsl/TSLCore.js';
 import Node from '../core/Node.js';
+import { warn } from '../../utils.js';
+import StackTrace from '../core/StackTrace.js';
 
 /**
  * Represents an element of a 'workgroup' scoped buffer.
@@ -116,19 +117,42 @@ class WorkgroupInfoNode extends Node {
 		 */
 		this.scope = scope;
 
+		/**
+		 * The name of the workgroup scoped buffer.
+		 *
+		 * @type {string}
+		 * @default ''
+		 */
+		this.name = '';
+
+	}
+
+	/**
+	 * Sets the name of this node.
+	 *
+	 * @param {string} name - The name to set.
+	 * @return {WorkgroupInfoNode} A reference to this node.
+	 */
+	setName( name ) {
+
+		this.name = name;
+
+		return this;
+
 	}
 
 	/**
 	 * Sets the name/label of this node.
 	 *
+	 * @deprecated
 	 * @param {string} name - The name to set.
 	 * @return {WorkgroupInfoNode} A reference to this node.
 	 */
 	label( name ) {
 
-		this.name = name;
+		warn( 'TSL: "label()" has been deprecated. Use "setName()" instead.', new StackTrace() ); // @deprecated r179
 
-		return this;
+		return this.setName( name );
 
 	}
 
@@ -179,13 +203,15 @@ class WorkgroupInfoNode extends Node {
 	 */
 	element( indexNode ) {
 
-		return nodeObject( new WorkgroupInfoElementNode( this, indexNode ) );
+		return new WorkgroupInfoElementNode( this, indexNode );
 
 	}
 
 	generate( builder ) {
 
-		return builder.getScopedArray( this.name || `${this.scope}Array_${this.id}`, this.scope.toLowerCase(), this.bufferType, this.bufferCount );
+		const name = ( this.name !== '' ) ? this.name : `${this.scope}Array_${this.id}`;
+
+		return builder.getScopedArray( name, this.scope.toLowerCase(), this.bufferType, this.bufferCount );
 
 	}
 
@@ -203,6 +229,6 @@ export default WorkgroupInfoNode;
  * @param {number} [count=0] - The number of elements in the buffer.
  * @returns {WorkgroupInfoNode}
  */
-export const workgroupArray = ( type, count ) => nodeObject( new WorkgroupInfoNode( 'Workgroup', type, count ) );
+export const workgroupArray = ( type, count ) => new WorkgroupInfoNode( 'Workgroup', type, count );
 
 

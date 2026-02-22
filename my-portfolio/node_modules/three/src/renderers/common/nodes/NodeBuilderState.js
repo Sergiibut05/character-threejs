@@ -14,9 +14,9 @@ class NodeBuilderState {
 	/**
 	 * Constructs a new node builder state.
 	 *
-	 * @param {?string} vertexShader - The native vertex shader code.
-	 * @param {?string} fragmentShader - The native fragment shader code.
-	 * @param {?string} computeShader - The native compute shader code.
+	 * @param {string} vertexShader - The native vertex shader code.
+	 * @param {string} fragmentShader - The native fragment shader code.
+	 * @param {string} computeShader - The native compute shader code.
 	 * @param {Array<NodeAttribute>} nodeAttributes - An array of node attributes.
 	 * @param {Array<BindGroup>} bindings - An array of bind groups.
 	 * @param {Array<Node>} updateNodes - An array of nodes that implement their `update()` method.
@@ -126,7 +126,7 @@ class NodeBuilderState {
 
 			if ( shared !== true ) {
 
-				const bindingsGroup = new BindGroup( instanceGroup.name, [], instanceGroup.index, instanceGroup );
+				const bindingsGroup = new BindGroup( instanceGroup.name, [], instanceGroup.index );
 				bindings.push( bindingsGroup );
 
 				for ( const instanceBinding of instanceGroup.bindings ) {

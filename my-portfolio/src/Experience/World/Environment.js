@@ -1,10 +1,8 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 
-export default class Environment
-{
-    constructor()
-    {
+export default class Environment {
+    constructor() {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.debug = this.experience.debug
@@ -13,14 +11,12 @@ export default class Environment
         this.setSunLight()
     }
 
-    setAmbientLight()
-    {
+    setAmbientLight() {
         this.ambientLight = new THREE.AmbientLight('#ffffff', 0.8)
         this.scene.add(this.ambientLight)
     }
 
-    setSunLight()
-    {
+    setSunLight() {
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 2.5)
         this.sunLight.castShadow = true
         this.sunLight.shadow.camera.far = 20

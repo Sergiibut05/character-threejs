@@ -4,7 +4,7 @@ import { screenUV } from './ScreenNode.js';
 
 import { DepthTexture } from '../../textures/DepthTexture.js';
 
-let sharedDepthbuffer = null;
+let _sharedDepthbuffer = null;
 
 /**
  * Represents the depth of the current viewport as a texture. This module
@@ -29,13 +29,25 @@ class ViewportDepthTextureNode extends ViewportTextureNode {
 	 */
 	constructor( uvNode = screenUV, levelNode = null ) {
 
-		if ( sharedDepthbuffer === null ) {
+		if ( _sharedDepthbuffer === null ) {
 
-			sharedDepthbuffer = new DepthTexture();
+			_sharedDepthbuffer = new DepthTexture();
 
 		}
 
-		super( uvNode, levelNode, sharedDepthbuffer );
+		super( uvNode, levelNode, _sharedDepthbuffer );
+
+	}
+
+	/**
+	 * Overwritten so the method always returns the unique shared
+	 * depth texture.
+	 *
+	 * @return {DepthTexture} The shared depth texture.
+	 */
+	getTextureForReference() {
+
+		return _sharedDepthbuffer;
 
 	}
 
@@ -48,8 +60,8 @@ export default ViewportDepthTextureNode;
  *
  * @tsl
  * @function
- * @param {Node} [uvNode=screenUV] - The uv node.
+ * @param {?Node} [uvNode=screenUV] - The uv node.
  * @param {?Node} [levelNode=null] - The level node.
  * @returns {ViewportDepthTextureNode}
  */
-export const viewportDepthTexture = /*@__PURE__*/ nodeProxy( ViewportDepthTextureNode );
+export const viewportDepthTexture = /*@__PURE__*/ nodeProxy( ViewportDepthTextureNode ).setParameterLength( 0, 2 );

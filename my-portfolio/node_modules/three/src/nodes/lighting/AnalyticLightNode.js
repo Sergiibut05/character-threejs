@@ -3,7 +3,6 @@ import { NodeUpdateType } from '../core/constants.js';
 import { uniform } from '../core/UniformNode.js';
 import { Color } from '../../math/Color.js';
 import { renderGroup } from '../core/UniformGroupNode.js';
-import { hash } from '../core/NodeUtils.js';
 import { shadow } from './ShadowNode.js';
 import { nodeObject } from '../tsl/TSLCore.js';
 import { lightViewPosition } from '../accessors/Lights.js';
@@ -97,17 +96,52 @@ class AnalyticLightNode extends LightingNode {
 		 */
 		this.updateType = NodeUpdateType.FRAME;
 
+		if ( light && light.shadow ) {
+
+			this._shadowDisposeListener = () => {
+
+				this.disposeShadow();
+
+			};
+
+			light.addEventListener( 'dispose', this._shadowDisposeListener );
+
+		}
+
+	}
+
+	dispose() {
+
+		if ( this._shadowDisposeListener ) {
+
+			this.light.removeEventListener( 'dispose', this._shadowDisposeListener );
+
+		}
+
+		super.dispose();
+
 	}
 
 	/**
-	 * Overwrites the default {@link Node#customCacheKey} implementation by including the
-	 * `light.id` and `light.castShadow` into the cache key.
-	 *
-	 * @return {number} The custom cache key.
+	 * Frees internal resources related to shadows.
 	 */
-	customCacheKey() {
+	disposeShadow() {
 
-		return hash( this.light.id, this.light.castShadow ? 1 : 0 );
+		if ( this.shadowNode !== null ) {
+
+			this.shadowNode.dispose();
+			this.shadowNode = null;
+
+		}
+
+		this.shadowColorNode = null;
+
+		if ( this.baseColorNode !== null ) {
+
+			this.colorNode = this.baseColorNode;
+			this.baseColorNode = null;
+
+		}
 
 	}
 
@@ -117,6 +151,13 @@ class AnalyticLightNode extends LightingNode {
 
 	}
 
+	/**
+	 * Returns a node representing a direction vector which points from the current
+	 * position in view space to the light's position in view space.
+	 *
+	 * @param {NodeBuilder} builder - The builder object used for setting up the light.
+	 * @return {Node<vec3>} The light vector node.
+	 */
 	getLightVector( builder ) {
 
 		return lightViewPosition( this.light ).sub( builder.context.positionView || positionView );
@@ -128,9 +169,17 @@ class AnalyticLightNode extends LightingNode {
 	 *
 	 * @abstract
 	 * @param {NodeBuilder} builder - The builder object used for setting up the light.
+	 * @return {Object|undefined} The direct light data (color and direction).
 	 */
 	setupDirect( /*builder*/ ) { }
 
+	/**
+	 * Sets up the direct rect area lighting for the analytic light node.
+	 *
+	 * @abstract
+	 * @param {NodeBuilder} builder - The builder object used for setting up the light.
+	 * @return {Object|undefined} The direct rect area light data.
+	 */
 	setupDirectRectArea( /*builder*/ ) { }
 
 	/**
@@ -172,7 +221,7 @@ class AnalyticLightNode extends LightingNode {
 
 			} else {
 
-				shadowNode = this.setupShadowNode( builder );
+				shadowNode = this.setupShadowNode();
 
 			}
 
@@ -185,6 +234,12 @@ class AnalyticLightNode extends LightingNode {
 		}
 
 		//
+
+		if ( builder.context.getShadow ) {
+
+			shadowColorNode = builder.context.getShadow( this, builder );
+
+		}
 
 		this.colorNode = shadowColorNode;
 

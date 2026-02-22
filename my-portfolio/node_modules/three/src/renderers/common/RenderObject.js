@@ -172,6 +172,16 @@ class RenderObject {
 		this.attributes = null;
 
 		/**
+		 * An object holding the version of the
+		 * attributes. The keys are the attribute names
+		 * and the values are the attribute versions.
+		 *
+		 * @type {?Object<string, number>}
+		 * @default null
+		 */
+		this.attributesId = null;
+
+		/**
 		 * A reference to a render pipeline the render
 		 * object is processed with.
 		 *
@@ -290,7 +300,7 @@ class RenderObject {
 
 		/**
 		 * An event listener which is executed when `dispose()` is called on
-		 * the render object's material.
+		 * the material of this render object.
 		 *
 		 * @method
 		 */
@@ -300,7 +310,23 @@ class RenderObject {
 
 		};
 
+		/**
+		 * An event listener which is executed when `dispose()` is called on
+		 * the geometry of this render object.
+		 *
+		 * @method
+		 */
+		this.onGeometryDispose = () => {
+
+			// clear geometry cache attributes
+
+			this.attributes = null;
+			this.attributesId = null;
+
+		};
+
 		this.material.addEventListener( 'dispose', this.onMaterialDispose );
+		this.geometry.addEventListener( 'dispose', this.onGeometryDispose );
 
 	}
 
@@ -419,6 +445,17 @@ class RenderObject {
 	}
 
 	/**
+	 * Returns the byte offset into the indirect attribute buffer.
+	 *
+	 * @return {number|Array<number>} The byte offset into the indirect attribute buffer.
+	 */
+	getIndirectOffset() {
+
+		return this._geometries.getIndirectOffset( this );
+
+	}
+
+	/**
 	 * Returns an array that acts as a key for identifying the render object in a chain map.
 	 *
 	 * @return {Array<Object>} An array with object references.
@@ -439,6 +476,7 @@ class RenderObject {
 
 		this.geometry = geometry;
 		this.attributes = null;
+		this.attributesId = null;
 
 	}
 
@@ -458,9 +496,24 @@ class RenderObject {
 		const attributes = [];
 		const vertexBuffers = new Set();
 
+		const attributesId = {};
+
 		for ( const nodeAttribute of nodeAttributes ) {
 
-			const attribute = nodeAttribute.node && nodeAttribute.node.attribute ? nodeAttribute.node.attribute : geometry.getAttribute( nodeAttribute.name );
+			let attribute;
+
+			if ( nodeAttribute.node && nodeAttribute.node.attribute ) {
+
+				// node attribute
+				attribute = nodeAttribute.node.attribute;
+
+			} else {
+
+				// geometry attribute
+				attribute = geometry.getAttribute( nodeAttribute.name );
+				attributesId[ nodeAttribute.name ] = attribute.id;
+
+			}
 
 			if ( attribute === undefined ) continue;
 
@@ -472,6 +525,7 @@ class RenderObject {
 		}
 
 		this.attributes = attributes;
+		this.attributesId = attributesId;
 		this.vertexBuffers = Array.from( vertexBuffers.values() );
 
 		return attributes;
@@ -494,7 +548,7 @@ class RenderObject {
 	/**
 	 * Returns the draw parameters for the render object.
 	 *
-	 * @return {{vertexCount: number, firstVertex: number, instanceCount: number, firstInstance: number}} The draw parameters.
+	 * @return {?{vertexCount: number, firstVertex: number, instanceCount: number, firstInstance: number}} The draw parameters.
 	 */
 	getDrawParameters() {
 
@@ -509,7 +563,18 @@ class RenderObject {
 
 		const index = this.getIndex();
 		const hasIndex = ( index !== null );
-		const instanceCount = geometry.isInstancedBufferGeometry ? geometry.instanceCount : ( object.count > 1 ? object.count : 1 );
+
+		let instanceCount = 1;
+
+		if ( geometry.isInstancedBufferGeometry === true ) {
+
+			instanceCount = geometry.instanceCount;
+
+		} else if ( object.count !== undefined ) {
+
+			instanceCount = Math.max( 0, object.count );
+
+		}
 
 		if ( instanceCount === 0 ) return null;
 
@@ -627,7 +692,7 @@ class RenderObject {
 	 */
 	getMaterialCacheKey() {
 
-		const { object, material } = this;
+		const { object, material, renderer } = this;
 
 		let cacheKey = material.customProgramCacheKey();
 
@@ -656,6 +721,18 @@ class RenderObject {
 					if ( value.isTexture ) {
 
 						valueKey += value.mapping;
+
+						// WebGPU must honor the sampler data because they are part of the bindings
+
+						if ( renderer.backend.isWebGPUBackend === true ) {
+
+							valueKey += value.magFilter;
+							valueKey += value.minFilter;
+							valueKey += value.wrapS;
+							valueKey += value.wrapT;
+							valueKey += value.wrapR;
+
+						}
 
 					}
 
@@ -703,13 +780,15 @@ class RenderObject {
 
 		}
 
-		if ( object.count > 1 ) {
+		if ( object.isInstancedMesh || object.count > 1 || Array.isArray( object.morphTargetInfluences ) ) {
 
 			// TODO: https://github.com/mrdoob/three.js/pull/29066#issuecomment-2269400850
 
 			cacheKey += object.uuid + ',';
 
 		}
+
+		cacheKey += this.context.id + ',';
 
 		cacheKey += object.receiveShadow + ',';
 
@@ -725,7 +804,27 @@ class RenderObject {
 	 */
 	get needsGeometryUpdate() {
 
-		return this.geometry.id !== this.object.geometry.id;
+		if ( this.geometry.id !== this.object.geometry.id ) return true;
+
+		if ( this.attributes !== null ) {
+
+			const attributesId = this.attributesId;
+
+			for ( const name in attributesId ) {
+
+				const attribute = this.geometry.getAttribute( name );
+
+				if ( attribute === undefined || attributesId[ name ] !== attribute.id ) {
+
+					return true;
+
+				}
+
+			}
+
+		}
+
+		return false;
 
 	}
 
@@ -782,6 +881,8 @@ class RenderObject {
 
 		}
 
+		cacheKey = hash( cacheKey, this.renderer.contextNode.id, this.renderer.contextNode.version );
+
 		return cacheKey;
 
 	}
@@ -803,6 +904,7 @@ class RenderObject {
 	dispose() {
 
 		this.material.removeEventListener( 'dispose', this.onMaterialDispose );
+		this.geometry.removeEventListener( 'dispose', this.onGeometryDispose );
 
 		this.onDispose();
 

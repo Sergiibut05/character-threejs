@@ -7,8 +7,9 @@ import { buffer } from './BufferNode.js';
 import { nodeObject } from '../tsl/TSLBase.js';
 import { uniformArray } from './UniformArrayNode.js';
 import ArrayElementNode from '../utils/ArrayElementNode.js';
+import { warn } from '../../utils.js';
 
-// TODO: Avoid duplicated code and ues only ReferenceBaseNode or ReferenceNode
+// TODO: Avoid duplicated code and use only ReferenceBaseNode or ReferenceNode
 
 /**
  * This class is only relevant if the referenced property is array-like.
@@ -197,7 +198,7 @@ class ReferenceNode extends Node {
 	 */
 	element( indexNode ) {
 
-		return nodeObject( new ReferenceElementNode( this, nodeObject( indexNode ) ) );
+		return new ReferenceElementNode( this, nodeObject( indexNode ) );
 
 	}
 
@@ -216,16 +217,31 @@ class ReferenceNode extends Node {
 	}
 
 	/**
+	 * Sets the name for the internal uniform.
+	 *
+	 * @param {string} name - The label to set.
+	 * @return {ReferenceNode} A reference to this node.
+	 */
+	setName( name ) {
+
+		this.name = name;
+
+		return this;
+
+	}
+
+	/**
 	 * Sets the label for the internal uniform.
 	 *
+	 * @deprecated
 	 * @param {string} name - The label to set.
 	 * @return {ReferenceNode} A reference to this node.
 	 */
 	label( name ) {
 
-		this.name = name;
+		warn( 'TSL: "label()" has been deprecated. Use "setName()" instead.' ); // @deprecated r179
 
-		return this;
+		return this.setName( name );
 
 	}
 
@@ -267,9 +283,9 @@ class ReferenceNode extends Node {
 
 		}
 
-		if ( this.name !== null ) node.label( this.name );
+		if ( this.name !== null ) node.setName( this.name );
 
-		this.node = node.getSelf();
+		this.node = node;
 
 	}
 
@@ -345,7 +361,7 @@ class ReferenceNode extends Node {
 	}
 
 	/**
-	 * Overwritten to to update the internal uniform value.
+	 * Overwritten to update the internal uniform value.
 	 *
 	 * @param {NodeFrame} frame - A reference to the current node frame.
 	 */
@@ -388,10 +404,10 @@ export default ReferenceNode;
  * @function
  * @param {string} name - The name of the property the node refers to.
  * @param {string} type - The uniform type that should be used to represent the property value.
- * @param {?Object} object - The object the property belongs to.
+ * @param {?Object} [object] - The object the property belongs to.
  * @returns {ReferenceNode}
  */
-export const reference = ( name, type, object ) => nodeObject( new ReferenceNode( name, type, object ) );
+export const reference = ( name, type, object ) => new ReferenceNode( name, type, object );
 
 /**
  * TSL function for creating a reference node. Use this function if you want need a reference
@@ -405,4 +421,4 @@ export const reference = ( name, type, object ) => nodeObject( new ReferenceNode
  * @param {Object} object - An array-like object the property belongs to.
  * @returns {ReferenceNode}
  */
-export const referenceBuffer = ( name, type, count, object ) => nodeObject( new ReferenceNode( name, type, object, count ) );
+export const referenceBuffer = ( name, type, count, object ) => new ReferenceNode( name, type, object, count );

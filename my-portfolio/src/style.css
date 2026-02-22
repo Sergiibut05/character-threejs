@@ -9,7 +9,7 @@ html,
 body
 {
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 .webgl
@@ -20,7 +20,183 @@ body
     outline: none;
 }
 
-/* Modal Styles */
+/* ═══════════════════════════════════
+   Loading Screen
+   ═══════════════════════════════════ */
+
+.loading-screen
+{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0a0a0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.loading-screen.is-hidden
+{
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-content
+{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    max-width: 320px;
+    width: 90%;
+}
+
+/* Animated logo */
+.loading-logo
+{
+    width: 56px;
+    height: 56px;
+    color: #7acc56;
+    animation: loadingPulse 2s ease-in-out infinite;
+}
+
+.loading-icon
+{
+    width: 100%;
+    height: 100%;
+}
+
+@keyframes loadingPulse
+{
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+}
+
+/* Loading text */
+.loading-text
+{
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Progress bar */
+.loading-bar-container
+{
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.loading-bar-track
+{
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.loading-bar-fill
+{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4B9B82, #7ACC56, #C9F547);
+    border-radius: 4px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.loading-bar-fill::after
+{
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -2px;
+    width: 7px;
+    height: 7px;
+    background: #C9F547;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(201, 245, 71, 0.6);
+}
+
+.loading-percentage
+{
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+}
+
+/* Enter button */
+.loading-enter-btn
+{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 36px;
+    background: transparent;
+    border: 1px solid rgba(122, 204, 86, 0.3);
+    border-radius: 100px;
+    color: #C9F547;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.loading-enter-btn.is-visible
+{
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.loading-enter-btn:hover
+{
+    background: rgba(122, 204, 86, 0.1);
+    border-color: rgba(122, 204, 86, 0.6);
+    box-shadow: 0 0 24px rgba(122, 204, 86, 0.15);
+    transform: translateY(-1px);
+}
+
+.loading-enter-btn:active
+{
+    transform: translateY(1px);
+}
+
+.loading-enter-btn svg
+{
+    transition: transform 0.3s ease;
+}
+
+.loading-enter-btn:hover svg
+{
+    transform: translateX(3px);
+}
+
+/* ═══════════════════════════════════
+   Modal Styles
+   ═══════════════════════════════════ */
+
 .modal-overlay
 {
     position: fixed;

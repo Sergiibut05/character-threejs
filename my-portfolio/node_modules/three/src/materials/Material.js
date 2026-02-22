@@ -2,6 +2,7 @@ import { Color } from '../math/Color.js';
 import { EventDispatcher } from '../core/EventDispatcher.js';
 import { FrontSide, NormalBlending, LessEqualDepth, AddEquation, OneMinusSrcAlphaFactor, SrcAlphaFactor, AlwaysStencilFunc, KeepStencilOp } from '../constants.js';
 import { generateUUID } from '../math/MathUtils.js';
+import { warn } from '../utils.js';
 
 let _materialId = 0;
 
@@ -151,7 +152,7 @@ class Material extends EventDispatcher {
 		 * Defines the blending equation.
 		 *
 		 * @type {(AddEquation|SubtractEquation|ReverseSubtractEquation|MinEquation|MaxEquation)}
-		 * @default OneMinusSrcAlphaFactor
+		 * @default AddEquation
 		 */
 		this.blendEquation = AddEquation;
 
@@ -174,8 +175,8 @@ class Material extends EventDispatcher {
 		/**
 		 * Defines the blending equation of the alpha channel.
 		 *
-		 * @type {(AddEquation|SubtractEquation|ReverseSubtractEquation|MinEquation|MaxEquation)}
-		 * @default OneMinusSrcAlphaFactor
+		 * @type {?(AddEquation|SubtractEquation|ReverseSubtractEquation|MinEquation|MaxEquation)}
+		 * @default null
 		 */
 		this.blendEquationAlpha = null;
 
@@ -428,6 +429,14 @@ class Material extends EventDispatcher {
 		this.forceSinglePass = false;
 
 		/**
+		 * Whether it's possible to override the material with {@link Scene#overrideMaterial} or not.
+		 *
+		 * @type {boolean}
+		 * @default true
+		 */
+		this.allowOverride = true;
+
+		/**
 		 * Defines whether 3D objects using this material are visible.
 		 *
 		 * @type {boolean}
@@ -514,7 +523,7 @@ class Material extends EventDispatcher {
 	 *
 	 * This method can only be used when rendering with {@link WebGLRenderer}. The
 	 * recommended approach when customizing materials is to use `WebGPURenderer` with the new
-	 * Node Material system and [TSL]{@link https://github.com/mrdoob/three.js/wiki/Three.js-Shading-Language}.
+	 * Node Material system and [TSL](https://github.com/mrdoob/three.js/wiki/Three.js-Shading-Language).
 	 *
 	 * @param {{vertexShader:string,fragmentShader:string,uniforms:Object}} shaderobject - The object holds the uniforms and the vertex and fragment shader source.
 	 * @param {WebGLRenderer} renderer - A reference to the renderer.
@@ -536,6 +545,13 @@ class Material extends EventDispatcher {
 
 	}
 
+	/**
+	 * This method can be used to set default values from parameter objects.
+	 * It is a generic implementation so it can be used with different types
+	 * of materials.
+	 *
+	 * @param {Object} [values] - The material values to set.
+	 */
 	setValues( values ) {
 
 		if ( values === undefined ) return;
@@ -546,7 +562,7 @@ class Material extends EventDispatcher {
 
 			if ( newValue === undefined ) {
 
-				console.warn( `THREE.Material: parameter '${ key }' has value of undefined.` );
+				warn( `Material: parameter '${ key }' has value of undefined.` );
 				continue;
 
 			}
@@ -555,7 +571,7 @@ class Material extends EventDispatcher {
 
 			if ( currentValue === undefined ) {
 
-				console.warn( `THREE.Material: '${ key }' is not a property of THREE.${ this.type }.` );
+				warn( `Material: '${ key }' is not a property of THREE.${ this.type }.` );
 				continue;
 
 			}
@@ -600,7 +616,7 @@ class Material extends EventDispatcher {
 
 		const data = {
 			metadata: {
-				version: 4.6,
+				version: 4.7,
 				type: 'Material',
 				generator: 'Material.toJSON'
 			}
@@ -646,6 +662,18 @@ class Material extends EventDispatcher {
 
 			data.clearcoatNormalMap = this.clearcoatNormalMap.toJSON( meta ).uuid;
 			data.clearcoatNormalScale = this.clearcoatNormalScale.toArray();
+
+		}
+
+		if ( this.sheenColorMap && this.sheenColorMap.isTexture ) {
+
+			data.sheenColorMap = this.sheenColorMap.toJSON( meta ).uuid;
+
+		}
+
+		if ( this.sheenRoughnessMap && this.sheenRoughnessMap.isTexture ) {
+
+			data.sheenRoughnessMap = this.sheenRoughnessMap.toJSON( meta ).uuid;
 
 		}
 
@@ -804,6 +832,7 @@ class Material extends EventDispatcher {
 		if ( this.alphaToCoverage === true ) data.alphaToCoverage = true;
 		if ( this.premultipliedAlpha === true ) data.premultipliedAlpha = true;
 		if ( this.forceSinglePass === true ) data.forceSinglePass = true;
+		if ( this.allowOverride === false ) data.allowOverride = false;
 
 		if ( this.wireframe === true ) data.wireframe = true;
 		if ( this.wireframeLinewidth > 1 ) data.wireframeLinewidth = this.wireframeLinewidth;
@@ -939,6 +968,7 @@ class Material extends EventDispatcher {
 		this.alphaToCoverage = source.alphaToCoverage;
 		this.premultipliedAlpha = source.premultipliedAlpha;
 		this.forceSinglePass = source.forceSinglePass;
+		this.allowOverride = source.allowOverride;
 
 		this.visible = source.visible;
 
@@ -979,12 +1009,6 @@ class Material extends EventDispatcher {
 	set needsUpdate( value ) {
 
 		if ( value === true ) this.version ++;
-
-	}
-
-	onBuild( /* shaderobject, renderer */ ) {
-
-		console.warn( 'Material: onBuild() has been removed.' ); // @deprecated, r166
 
 	}
 

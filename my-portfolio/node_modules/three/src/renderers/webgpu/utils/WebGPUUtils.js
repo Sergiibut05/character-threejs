@@ -34,17 +34,21 @@ class WebGPUUtils {
 
 		let format;
 
-		if ( renderContext.depthTexture !== null ) {
+		if ( renderContext.depth ) {
 
-			format = this.getTextureFormatGPU( renderContext.depthTexture );
+			if ( renderContext.depthTexture !== null ) {
 
-		} else if ( renderContext.depth && renderContext.stencil ) {
+				format = this.getTextureFormatGPU( renderContext.depthTexture );
 
-			format = GPUTextureFormat.Depth24PlusStencil8;
+			} else if ( renderContext.stencil ) {
 
-		} else if ( renderContext.depth ) {
+				format = GPUTextureFormat.Depth24PlusStencil8;
 
-			format = GPUTextureFormat.Depth24Plus;
+			} else {
+
+				format = GPUTextureFormat.Depth24Plus;
+
+			}
 
 		}
 
@@ -83,7 +87,7 @@ class WebGPUUtils {
 			const renderer = this.backend.renderer;
 			const renderTarget = renderer.getRenderTarget();
 
-			samples = renderTarget ? renderTarget.samples : renderer.samples;
+			samples = renderTarget ? renderTarget.samples : renderer.currentSamples;
 
 		} else if ( texture.renderTarget ) {
 
@@ -125,6 +129,26 @@ class WebGPUUtils {
 	}
 
 	/**
+	 * Returns the GPU formats of all color attachments of the current render context.
+	 *
+	 * @param {RenderContext} renderContext - The render context.
+	 * @return {Array<string>} The GPU texture formats of all color attachments.
+	 */
+	getCurrentColorFormats( renderContext ) {
+
+		if ( renderContext.textures !== null ) {
+
+			return renderContext.textures.map( t => this.getTextureFormatGPU( t ) );
+
+		} else {
+
+			return [ this.getPreferredCanvasFormat() ]; // default context format
+
+		}
+
+	}
+
+	/**
 	 * Returns the output color space of the current render context.
 	 *
 	 * @param {RenderContext} renderContext - The render context.
@@ -161,29 +185,14 @@ class WebGPUUtils {
 	/**
 	 * Returns a modified sample count from the given sample count value.
 	 *
-	 * That is required since WebGPU does not support arbitrary sample counts.
+	 * That is required since WebGPU only supports either 1 or 4.
 	 *
 	 * @param {number} sampleCount - The input sample count.
 	 * @return {number} The (potentially updated) output sample count.
 	 */
 	getSampleCount( sampleCount ) {
 
-		let count = 1;
-
-		if ( sampleCount > 1 ) {
-
-			// WebGPU only supports power-of-two sample counts and 2 is not a valid value
-			count = Math.pow( 2, Math.floor( Math.log2( sampleCount ) ) );
-
-			if ( count === 2 ) {
-
-				count = 4;
-
-			}
-
-		}
-
-		return count;
+		return sampleCount >= 4 ? 4 : 1;
 
 	}
 
@@ -201,7 +210,7 @@ class WebGPUUtils {
 
 		}
 
-		return this.getSampleCount( this.backend.renderer.samples );
+		return this.getSampleCount( this.backend.renderer.currentSamples );
 
 	}
 
@@ -215,23 +224,25 @@ class WebGPUUtils {
 	 */
 	getPreferredCanvasFormat() {
 
-		const outputType = this.backend.parameters.outputType;
+		const parameters = this.backend.parameters;
 
-		if ( outputType === undefined ) {
+		const bufferType = parameters.outputType;
+
+		if ( bufferType === undefined ) {
 
 			return navigator.gpu.getPreferredCanvasFormat();
 
-		} else if ( outputType === UnsignedByteType ) {
+		} else if ( bufferType === UnsignedByteType ) {
 
 			return GPUTextureFormat.BGRA8Unorm;
 
-		} else if ( outputType === HalfFloatType ) {
+		} else if ( bufferType === HalfFloatType ) {
 
 			return GPUTextureFormat.RGBA16Float;
 
 		} else {
 
-			throw new Error( 'Unsupported outputType' );
+			throw new Error( 'Unsupported output buffer type.' );
 
 		}
 
