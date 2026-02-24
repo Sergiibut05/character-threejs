@@ -3,7 +3,7 @@ import {
     Fn, float, vec2, vec3, vec4,
     uniform, attribute, uv, sin, cos,
     positionLocal, positionWorld, texture,
-    smoothstep, clamp, normalize, length, mix,
+    smoothstep, clamp, normalize, length, mix, pow, abs, max,
     If, Discard
 } from 'three/tsl'
 import Experience from '../Experience.js'
@@ -21,8 +21,10 @@ export default class Grass {
         this.count = options.count || 3000
         this.position = options.position || new THREE.Vector3(0, 0, 0)
         this.noiseScale = options.noiseScale || 0.3
-        this.bladeWidth = options.bladeWidth ?? 0.29
-        this.bladeHeight = options.bladeHeight ?? 0.4
+        this.bladeWidth = options.bladeWidth ?? 0.35
+        this.bladeHeight = options.bladeHeight ?? 0.38
+        this.spawnPositions = options.spawnPositions || null
+        this.spawnFunction = options.spawnFunction || null
 
         this.setGeometry()
         this.setMaterial()
@@ -35,122 +37,172 @@ export default class Grass {
 
     setGeometry() {
         if (this.geometry) this.geometry.dispose()
-        const segments = 2
-        this.geometry = new THREE.PlaneGeometry(this.bladeWidth, this.bladeHeight, 1, segments)
-        this.geometry.translate(0, this.bladeHeight * 0.5, 0)
+
+        // Crossed-planes: two quads at 90° for volumetric look
+        const hw = this.bladeWidth * 0.5
+        const h = this.bladeHeight
+
+        // Plane 1 (XY)
+        const positions = new Float32Array([
+            -hw, 0, 0, hw, 0, 0, hw, h, 0, -hw, h, 0,   // front quad
+            0, 0, -hw, 0, 0, hw, 0, h, hw, 0, h, -hw    // side quad (90°)
+        ])
+
+        const uvs = new Float32Array([
+            0, 0, 1, 0, 1, 1, 0, 1,  // front
+            0, 0, 1, 0, 1, 1, 0, 1   // side
+        ])
+
+        const indices = new Uint16Array([
+            0, 1, 2, 0, 2, 3,  // front face
+            4, 5, 6, 4, 6, 7   // side face
+        ])
+
+        this.geometry = new THREE.BufferGeometry()
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+        this.geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+        this.geometry.setIndex(new THREE.BufferAttribute(indices, 1))
+        this.geometry.computeVertexNormals()
     }
 
     setMaterial() {
-        const grassAtlas = this.resources.items.grassAtlas
+        const grassTex = this.resources.items.grassAtlas
 
-        grassAtlas.wrapS = THREE.ClampToEdgeWrapping
-        grassAtlas.wrapT = THREE.ClampToEdgeWrapping
-        grassAtlas.minFilter = THREE.LinearMipMapLinearFilter
-        grassAtlas.magFilter = THREE.LinearFilter
-        grassAtlas.flipY = true
-        // IMPORTANT: This is a data texture (alpha mask), NOT a color texture
-        // Using LinearSRGBColorSpace prevents gamma correction artifacts
-        grassAtlas.colorSpace = THREE.LinearSRGBColorSpace
-        grassAtlas.generateMipmaps = true
-        grassAtlas.needsUpdate = true
+        grassTex.wrapS = THREE.ClampToEdgeWrapping
+        grassTex.wrapT = THREE.ClampToEdgeWrapping
+        grassTex.minFilter = THREE.LinearMipMapLinearFilter
+        grassTex.magFilter = THREE.LinearFilter
+        grassTex.flipY = true
+        grassTex.colorSpace = THREE.SRGBColorSpace
+        grassTex.generateMipmaps = true
+        grassTex.needsUpdate = true
 
-        // TSL uniforms
+        // ─── Uniforms ────────────────────────────────────────────────────────
         this.uTime = uniform(0)
-        this.uColor0 = uniform(new THREE.Color(0x4B9B82))
-        this.uColor1 = uniform(new THREE.Color(0x7ACC56))
-        this.uColor2 = uniform(new THREE.Color(0xC9F547))
-        this.uColor3 = uniform(new THREE.Color(0xE6FF91))
-        this.uNoiseScale = uniform(0.2)
-        this.uRampStop1 = uniform(0.05)
-        this.uRampStop2 = uniform(0.8)
-        this.uEmissionStrength = uniform(0.49)
-        this.uBendStrength = uniform(0.09)
-        this.uAlphaCutoff = uniform(0.35)
-        this.uAlphaSoftness = uniform(0.25)
+
+        // Ghibli palette – root to tip gradient
+        this.uColorRoot = uniform(new THREE.Color(0x1A3D0E))   // deep dark earth moss
+        this.uColorMid = uniform(new THREE.Color(0x3D8A22))   // vivid forest green
+        this.uColorTip = uniform(new THREE.Color(0x8CCF3A))   // warm lime tip
+
+        // Patch-level noise color variation (world-space fBM)
+        this.uColor0 = uniform(new THREE.Color(0x245A14))
+        this.uColor1 = uniform(new THREE.Color(0x4EA52A))
+        this.uColor2 = uniform(new THREE.Color(0x7BC840))
+        this.uColor3 = uniform(new THREE.Color(0xA8E460))
+        this.uNoiseScale = uniform(0.22)
+        this.uRampStop1 = uniform(0.15)
+        this.uRampStop2 = uniform(0.70)
+
+        // Blade rendering
+        this.uEmissionStrength = uniform(0.75)
+        this.uAlphaCutoff = uniform(0.12)
+        this.uAlphaSoftness = uniform(0.22)
+
+        // Root AO
+        this.uAOMix = uniform(0.72)
+
+        // Backlighting: warm glow for subsurface scattering feel
+        this.uBacklightColor = uniform(new THREE.Color(0xFFEA60))
+        this.uBacklightStrength = uniform(0.3)
+
+        // Wind
+        this.uWindStrength = uniform(0.10)
+        this.uWindSpeed = uniform(1.0)
+
+        // Character grass parting
         this.uCharacterPosition = uniform(new THREE.Vector3(0, 0, 0))
         this.uDisplacementRadius = uniform(0.7)
         this.uDisplacementStrength = uniform(0.45)
 
-        // --- VERTEX POSITION (positionNode) ---
-        // Uses positionLocal + instance world position attribute for displacement
+        // ─── VERTEX SHADER ───────────────────────────────────────────────────
         const posNode = Fn(() => {
             const pos = positionLocal.toVar()
-
-            // Custom attributes
-            const aBendDirection = attribute('aBendDirection', 'float')
-            // Instance world position passed from JS (updated each frame)
-            const aInstanceWorldPos = attribute('aInstanceWorldPos', 'vec3')
             const uvCoord = uv()
+            const h = uvCoord.y  // 0=base, 1=tip
 
-            // Blade curvature
-            const bend = sin(uvCoord.y.mul(3.14159)).mul(this.uBendStrength).mul(aBendDirection)
-            pos.x.addAssign(bend)
+            const aInstanceWorldPos = attribute('aInstanceWorldPos', 'vec3')
+            const aRandomSeed = attribute('aRandomSeed', 'float')
 
-            // Character displacement — uses the instance's world position
+            // Character grass parting
             const toCharXZ = aInstanceWorldPos.xz.sub(this.uCharacterPosition.xz).toVar()
             const distToChar = length(toCharXZ)
-            const displaceFactor = float(1.0).sub(smoothstep(0.0, this.uDisplacementRadius, distToChar))
-            const pushDir = normalize(toCharXZ.add(vec2(0.0001, 0.0001))) // prevent zero-length normalize
-            const disp = displaceFactor.mul(this.uDisplacementStrength).mul(uvCoord.y)
+            const dispFactor = float(1.0).sub(smoothstep(0.0, this.uDisplacementRadius, distToChar))
+            const pushDir = normalize(toCharXZ.add(vec2(0.0001, 0.0001)))
+            const disp = dispFactor.mul(this.uDisplacementStrength).mul(h)
             pos.x.addAssign(pushDir.x.mul(disp))
             pos.z.addAssign(pushDir.y.mul(disp))
 
-            // Wind — world-space seeded waves for variation across instances
-            const wx = aInstanceWorldPos.x.add(pos.x)
-            const wz = aInstanceWorldPos.z.add(pos.z)
-            const wave1 = sin(this.uTime.mul(1.2).add(wx.mul(0.8)).add(wz.mul(0.6)))
-            const wave2 = cos(this.uTime.mul(0.9).add(wx.mul(0.6)).add(wz.mul(0.9)))
-            const wave3 = sin(this.uTime.mul(0.7).add(wx.mul(1.1)).add(wz.mul(0.5))).mul(0.5)
+            // Wind — 3 overlapping sine waves, seeded per-instance
+            const wx = aInstanceWorldPos.x.add(aRandomSeed.mul(6.28))
+            const wz = aInstanceWorldPos.z.add(aRandomSeed.mul(2.72))
+            const t = this.uTime.mul(this.uWindSpeed)
 
-            pos.x.addAssign(wave1.mul(0.12).add(wave3.mul(0.04)).mul(uvCoord.y))
-            pos.z.addAssign(wave2.mul(0.08).add(wave3.mul(0.03)).mul(uvCoord.y))
+            const wave1 = sin(t.mul(1.1).add(wx.mul(0.75)).add(wz.mul(0.5)))
+            const wave2 = cos(t.mul(0.7).add(wx.mul(0.5)).add(wz.mul(0.9)))
+            const wave3 = sin(t.mul(2.5).add(wx.mul(1.3))).mul(0.25)
+
+            // Quadratic height weight: base stays, tip sways
+            const hSq = h.mul(h)
+            const ws = this.uWindStrength
+            pos.x.addAssign(wave1.mul(ws).add(wave3.mul(ws.mul(0.25))).mul(hSq))
+            pos.z.addAssign(wave2.mul(ws.mul(0.6)).mul(hSq))
 
             return pos
         })()
 
-        // --- FRAGMENT SHADER ---
+        // ─── FRAGMENT SHADER ─────────────────────────────────────────────────
         const colorNode = Fn(() => {
-            const aTextureIndex = attribute('aTextureIndex', 'float')
             const uvCoord = uv()
+            const aColorVariant = attribute('aColorVariant', 'float')
             const worldPos = positionWorld
 
-            // Atlas UV mapping (2x2 grid)
-            const indexX = aTextureIndex.mod(2.0)
-            const indexY = aTextureIndex.div(2.0).floor()
-            const margin = float(0.002) // slightly larger margin to avoid bleeding
-            const cellSize = float(0.5).sub(margin.mul(2.0))
-            const offset = vec2(
-                indexX.mul(0.5).add(margin),
-                float(1.0).sub(indexY.add(1.0).mul(0.5)).add(margin)
-            )
-            const atlasUV = uvCoord.mul(cellSize).add(offset)
+            // Height factor: 0=base, 1=tip
+            const h = uvCoord.y
 
-            // Sample alpha from texture (R channel = blade shape)
-            const texSample = texture(grassAtlas, atlasUV)
+            // Texture alpha from the grass clump image
+            const texSample = texture(grassTex, uvCoord)
             const rawAlpha = texSample.r
 
-            // Hard alpha discard — removes transparent pixels cleanly
-            If(rawAlpha.lessThan(this.uAlphaCutoff), () => {
-                Discard()
-            })
+            // Discard transparent pixels
+            If(rawAlpha.lessThan(this.uAlphaCutoff), () => { Discard() })
+            const alpha = smoothstep(this.uAlphaCutoff, this.uAlphaCutoff.add(this.uAlphaSoftness), rawAlpha)
 
-            // Smooth alpha edges (Ghibli-style soft look)
-            const softMin = this.uAlphaCutoff
-            const softMax = this.uAlphaCutoff.add(this.uAlphaSoftness)
-            const alpha = smoothstep(softMin, softMax, rawAlpha)
-
-            // Noise-based color from shared fBM + ColorRamp
+            // ── 1. World-space patch color (large color blotches from fBM noise) ──
             const noiseVal = fbm(worldPos.mul(this.uNoiseScale))
-            const grassColor = colorRamp(
+            const patchColor = colorRamp(
                 noiseVal,
                 this.uColor0, this.uColor1, this.uColor2, this.uColor3,
                 this.uRampStop1, this.uRampStop2
             )
 
-            return vec4(grassColor.mul(this.uEmissionStrength), alpha)
+            // Slight individual variation (biodiversity)
+            const isAlt = smoothstep(0.45, 0.55, aColorVariant.mod(1.0))
+            const baseColor = mix(patchColor, this.uColorMid, isAlt.mul(0.2))
+
+            // ── 2. Root AO: blend toward dark root color at base ──
+            const aoWeight = float(1.0).sub(smoothstep(0.0, 0.5, h)).mul(this.uAOMix)
+            const aoColor = mix(baseColor, this.uColorRoot, aoWeight)
+
+            // ── 3. Tip brightening: blend toward bright lime at tip ──
+            const tipWeight = smoothstep(0.5, 1.0, h).mul(0.5)
+            const tipColor = mix(aoColor, this.uColorTip, tipWeight)
+
+            // ── 4. Backlighting — subsurface scattering at tip ──
+            const backlight = smoothstep(0.4, 1.0, h).mul(this.uBacklightStrength)
+            const backlightAdd = this.uBacklightColor.mul(backlight).mul(0.15)
+
+            // ── 5. Combine ──
+            const finalRGB = tipColor.add(backlightAdd).mul(this.uEmissionStrength)
+
+            // ── 6. Base fade: smoothly fade out at the root so blades merge with ground ──
+            const baseFade = smoothstep(0.0, 0.25, h)
+            const finalAlpha = alpha.mul(baseFade)
+
+            return vec4(finalRGB, finalAlpha)
         })()
 
-        // Build the material
+        // Material
         this.material = new THREE.MeshBasicNodeMaterial({
             side: THREE.DoubleSide,
             transparent: true,
@@ -160,7 +212,6 @@ export default class Grass {
         this.material.positionNode = posNode
         this.material.fragmentNode = colorNode
 
-        // Premultiplied-alpha blending for clean edges
         this.material.blending = THREE.CustomBlending
         this.material.blendSrc = THREE.SrcAlphaFactor
         this.material.blendDst = THREE.OneMinusSrcAlphaFactor
@@ -169,7 +220,6 @@ export default class Grass {
     }
 
     setMesh() {
-        // Remove existing mesh if recreating
         if (this.mesh) {
             this.scene.remove(this.mesh)
             this.mesh.dispose()
@@ -179,48 +229,54 @@ export default class Grass {
         this.mesh.frustumCulled = false
 
         const dummy = new THREE.Object3D()
-        const textureIndices = new Float32Array(this.count)
         const colorVariants = new Float32Array(this.count)
-        const bendDirections = new Float32Array(this.count)
-        // Store world positions of each instance for displacement calculation in shader
+        const randomSeeds = new Float32Array(this.count)
         this.instanceWorldPositions = new Float32Array(this.count * 3)
+
         const halfSize = this.size * 0.5
 
-        const getNoise = (x, z) => {
-            return Math.sin(x * this.noiseScale) * Math.cos(z * this.noiseScale) * 0.5 + 0.5
-        }
+        const getNoise = (x, z) =>
+            Math.sin(x * this.noiseScale) * Math.cos(z * this.noiseScale) * 0.5 + 0.5
 
         for (let i = 0; i < this.count; i++) {
-            const x = this.position.x + (Math.random() * this.size - halfSize)
-            const z = this.position.z + (Math.random() * this.size - halfSize)
-            const y = this.position.y
+            let x, y, z
 
-            const scaleY = 0.4 + Math.random() * 1.0
-            const scaleX = 0.7 + Math.random() * 0.5
+            if (this.spawnPositions && i < this.spawnPositions.length) {
+                x = this.spawnPositions[i].x
+                y = this.spawnPositions[i].y
+                z = this.spawnPositions[i].z
+            } else if (!this.spawnPositions) {
+                x = this.position.x + (Math.random() * this.size - halfSize)
+                z = this.position.z + (Math.random() * this.size - halfSize)
+                y = this.position.y
+            } else {
+                break
+            }
+
+            // Random scale and rotation for natural look
+            const scaleY = 0.6 + Math.random() * 0.8
+            const scaleX = 0.7 + Math.random() * 0.6
             const rotationY = Math.random() * Math.PI * 2
 
             dummy.position.set(x, y, z)
             dummy.rotation.set(0, rotationY, 0)
-            dummy.scale.set(scaleX, scaleY, 1)
+            dummy.scale.set(scaleX, scaleY, scaleX)
             dummy.updateMatrix()
 
             this.mesh.setMatrixAt(i, dummy.matrix)
-            textureIndices[i] = Math.floor(Math.random() * 4)
             colorVariants[i] = getNoise(x, z) * 2.0
-            bendDirections[i] = Math.random() > 0.5 ? 1.0 : -1.0
+            randomSeeds[i] = Math.random()
 
-            // Store instance world position
             this.instanceWorldPositions[i * 3] = x
             this.instanceWorldPositions[i * 3 + 1] = y
             this.instanceWorldPositions[i * 3 + 2] = z
         }
 
-        this.geometry.setAttribute('aTextureIndex', new THREE.InstancedBufferAttribute(textureIndices, 1))
         this.geometry.setAttribute('aColorVariant', new THREE.InstancedBufferAttribute(colorVariants, 1))
-        this.geometry.setAttribute('aBendDirection', new THREE.InstancedBufferAttribute(bendDirections, 1))
+        this.geometry.setAttribute('aRandomSeed', new THREE.InstancedBufferAttribute(randomSeeds, 1))
         this.geometry.setAttribute('aInstanceWorldPos', new THREE.InstancedBufferAttribute(this.instanceWorldPositions, 3))
-        this.mesh.instanceMatrix.needsUpdate = true
 
+        this.mesh.instanceMatrix.needsUpdate = true
         this.scene.add(this.mesh)
     }
 
@@ -228,8 +284,6 @@ export default class Grass {
         if (this.uTime) {
             this.uTime.value = this.time.elapsed * 0.001
         }
-
-        // Update character position for grass displacement
         if (this.uCharacterPosition && this.experience.world.character) {
             this.uCharacterPosition.value.copy(this.experience.world.character.position)
         }
@@ -237,105 +291,41 @@ export default class Grass {
 
     setDebug() {
         this.debugFolder = this.debug.ui.addFolder('Grass')
+        this.debugFolder.close()
 
-        this.debugFolder
-            .add(this, 'count')
-            .min(100)
-            .max(10000)
-            .step(100)
-            .name('Blade Count')
+        this.debugFolder.add(this, 'count').min(100).max(10000).step(100).name('Blade Count')
             .onChange(() => {
+                if (this.spawnFunction) {
+                    this.spawnPositions = this.spawnFunction(this.count)
+                    this.count = Math.min(this.count, this.spawnPositions.length)
+                }
                 this.setMesh()
             })
 
-        this.debugFolder
-            .add(this, 'bladeWidth')
-            .min(0.05)
-            .max(0.8)
-            .step(0.01)
-            .name('Anchura hoja')
-            .onChange(() => {
-                this.setGeometry()
-                this.setMesh()
-            })
+        this.debugFolder.add(this, 'bladeWidth').min(0.04).max(0.8).step(0.01).name('Clump Width')
+            .onChange(() => { this.setGeometry(); this.setMesh() })
 
-        this.debugFolder
-            .add(this, 'bladeHeight')
-            .min(0.2)
-            .max(1.5)
-            .step(0.05)
-            .name('Altura hoja')
-            .onChange(() => {
-                this.setGeometry()
-                this.setMesh()
-            })
+        this.debugFolder.add(this, 'bladeHeight').min(0.05).max(1.5).step(0.01).name('Clump Height')
+            .onChange(() => { this.setGeometry(); this.setMesh() })
 
-        this.debugFolder
-            .add(this.uEmissionStrength, 'value')
-            .min(0)
-            .max(3)
-            .step(0.01)
-            .name('Emission Strength (igual que suelo)')
+        this.debugFolder.add(this.uEmissionStrength, 'value', 0.1, 3.0, 0.01).name('Brightness')
+        this.debugFolder.add(this.uAlphaCutoff, 'value', 0.01, 0.6, 0.01).name('Alpha Cutoff')
+        this.debugFolder.add(this.uAlphaSoftness, 'value', 0.02, 0.5, 0.01).name('Alpha Softness')
+        this.debugFolder.add(this.uAOMix, 'value', 0.0, 1.0, 0.01).name('Root Darkness (AO)')
+        this.debugFolder.add(this.uBacklightStrength, 'value', 0.0, 1.5, 0.05).name('Backlight')
+        this.debugFolder.add(this.uWindStrength, 'value', 0.0, 0.4, 0.01).name('Wind Strength')
+        this.debugFolder.add(this.uWindSpeed, 'value', 0.1, 3.0, 0.1).name('Wind Speed')
+        this.debugFolder.add(this.uNoiseScale, 'value', 0.05, 5.0, 0.05).name('Patch Scale')
+        this.debugFolder.add(this.uDisplacementRadius, 'value', 0.3, 3.0, 0.1).name('Char Radius')
+        this.debugFolder.add(this.uDisplacementStrength, 'value', 0.0, 1.5, 0.05).name('Char Strength')
 
-        this.debugFolder
-            .add(this.uBendStrength, 'value')
-            .min(0)
-            .max(0.6)
-            .step(0.02)
-            .name('Curvatura hoja')
-
-        this.debugFolder
-            .add(this.uAlphaCutoff, 'value')
-            .min(0.05)
-            .max(0.6)
-            .step(0.01)
-            .name('Corte alpha (descartar transparente)')
-
-        this.debugFolder
-            .add(this.uAlphaSoftness, 'value')
-            .min(0.02)
-            .max(0.5)
-            .step(0.01)
-            .name('Difuminado bordes (estilo Ghibli)')
-
-        this.debugFolder
-            .add(this.uNoiseScale, 'value')
-            .min(0.1)
-            .max(10)
-            .step(0.05)
-            .name('Tamaño patrón (↓ más grande)')
-
-        this.debugFolder
-            .add(this.uRampStop1, 'value')
-            .min(0.05)
-            .max(0.95)
-            .step(0.01)
-            .name('ColorRamp Stop 1')
-
-        this.debugFolder
-            .add(this.uRampStop2, 'value')
-            .min(0.05)
-            .max(0.95)
-            .step(0.01)
-            .name('ColorRamp Stop 2')
-
-        this.debugFolder.addColor({ value: this.uColor0.value }, 'value').name('Color 0').onChange(v => this.uColor0.value.copy(v))
-        this.debugFolder.addColor({ value: this.uColor1.value }, 'value').name('Color 1').onChange(v => this.uColor1.value.copy(v))
-        this.debugFolder.addColor({ value: this.uColor2.value }, 'value').name('Color 2').onChange(v => this.uColor2.value.copy(v))
-        this.debugFolder.addColor({ value: this.uColor3.value }, 'value').name('Color 3').onChange(v => this.uColor3.value.copy(v))
-
-        this.debugFolder
-            .add(this.uDisplacementRadius, 'value')
-            .min(0.3)
-            .max(3.0)
-            .step(0.1)
-            .name('Radio desplazamiento')
-
-        this.debugFolder
-            .add(this.uDisplacementStrength, 'value')
-            .min(0.0)
-            .max(1.5)
-            .step(0.05)
-            .name('Fuerza desplazamiento')
+        this.debugFolder.addColor({ value: this.uColorRoot.value }, 'value').name('Root Color')
+            .onChange(v => this.uColorRoot.value.copy(v))
+        this.debugFolder.addColor({ value: this.uColorMid.value }, 'value').name('Mid Color')
+            .onChange(v => this.uColorMid.value.copy(v))
+        this.debugFolder.addColor({ value: this.uColorTip.value }, 'value').name('Tip Color')
+            .onChange(v => this.uColorTip.value.copy(v))
+        this.debugFolder.addColor({ value: this.uBacklightColor.value }, 'value').name('Backlight Color')
+            .onChange(v => this.uBacklightColor.value.copy(v))
     }
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
-import { pass, uniform, float } from 'three/tsl'
+import { pass, uniform, float, screenUV, mix, smoothstep, abs, vec2, max } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
+import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
 import Experience from './Experience.js'
 
 export default class Renderer {
@@ -50,7 +51,7 @@ export default class Renderer {
         // Scene pass — renders the main scene
         const scenePass = pass(this.scene, this.camera.instance)
 
-        // Outline pass — TSL version
+        // ─── Outline pass ─────────────────────────────────────────
         const edgeStrength = uniform(2.5)
         const visibleEdgeColor = uniform(new THREE.Color('#ffffff'))
         const hiddenEdgeColor = uniform(new THREE.Color('#ffffff'))
@@ -67,8 +68,31 @@ export default class Renderer {
             .add(hiddenEdge.mul(hiddenEdgeColor))
             .mul(edgeStrength)
 
-        // Final output: scene + outline overlay
-        this.renderPipeline.outputNode = outlineColor.add(scenePass)
+        // Scene + outline combined
+        const composited = outlineColor.add(scenePass)
+
+        // ─── Tilt-Shift Blur (Miniature/Diorama effect) ───────────
+        // Gaussian blur of the composited scene
+        const blurredScene = gaussianBlur(composited, vec2(1), 6, { resolutionScale: 0.5 })
+
+        // Tilt-shift mask: sharp in center, blurred at top/bottom edges
+        // screenUV.y goes 0..1 (bottom to top)
+        const centerY = float(0.5)
+        const distFromCenter = abs(screenUV.y.sub(centerY))
+
+        // Also add slight radial (vignette) blur from left/right edges
+        const distFromCenterX = abs(screenUV.x.sub(0.5))
+        const radialDist = max(distFromCenter, distFromCenterX.mul(0.5))
+
+        // Blur factor: 0 in center band, ramps up toward edges
+        // The "sharp zone" is roughly the central 40% of the screen
+        const blurFactor = smoothstep(0.15, 0.45, radialDist)
+
+        // Mix sharp and blurred
+        const finalOutput = mix(composited, blurredScene, blurFactor)
+
+        // Final output
+        this.renderPipeline.outputNode = finalOutput
     }
 
     // Add a single object to outline

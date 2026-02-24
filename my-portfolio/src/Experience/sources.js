@@ -7,6 +7,11 @@ export default [
     {
         name: 'grassAtlas',
         type: 'texture',
-        path: '/models/grass.png'
+        path: '/models/grass_clump.png'
+    },
+    {
+        name: 'patioModel',
+        type: 'gltfModel',
+        path: '/models/Patio/patio-draco.glb'
     }
 ]
