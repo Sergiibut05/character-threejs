@@ -187,6 +187,10 @@ export default class World {
             this.grass.update()
         }
 
+        if (this.environment) {
+            this.environment.update()
+        }
+
         // Update trees (wind animation)
         if (this.trees) {
             for (const tree of this.trees) {

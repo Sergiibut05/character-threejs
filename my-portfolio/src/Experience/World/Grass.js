@@ -72,7 +72,7 @@ export default class Grass {
         grassTex.wrapT = THREE.ClampToEdgeWrapping
         grassTex.minFilter = THREE.LinearMipMapLinearFilter
         grassTex.magFilter = THREE.LinearFilter
-        grassTex.flipY = true
+        grassTex.flipY = false
         grassTex.colorSpace = THREE.SRGBColorSpace
         grassTex.generateMipmaps = true
         grassTex.needsUpdate = true
@@ -154,6 +154,7 @@ export default class Grass {
         // ─── FRAGMENT SHADER ─────────────────────────────────────────────────
         const colorNode = Fn(() => {
             const uvCoord = uv()
+            const uvFlipped = vec2(uvCoord.x, float(1.0).sub(uvCoord.y))
             const aColorVariant = attribute('aColorVariant', 'float')
             const worldPos = positionWorld
 
@@ -161,7 +162,7 @@ export default class Grass {
             const h = uvCoord.y
 
             // Texture alpha from the grass clump image
-            const texSample = texture(grassTex, uvCoord)
+            const texSample = texture(grassTex, uvFlipped)
             const rawAlpha = texSample.r
 
             // Discard transparent pixels

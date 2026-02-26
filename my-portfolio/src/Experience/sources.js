@@ -8,8 +8,16 @@ export default [
     },
     {
         name: 'grassAtlas',
-        type: 'texture',
-        path: '/models/grass_clump.png'
+        type: 'textureKtx',
+        path: '/texture/grass/grass_clump.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+            texture.minFilter = THREE.LinearMipMapLinearFilter
+            texture.magFilter = THREE.LinearFilter
+            texture.flipY = false
+          }
     },
     {
         name: 'patioModel',
@@ -19,8 +27,8 @@ export default [
     // Foliage SDF texture fallback (PNG)
     {
         name: 'foliageTexture',
-        type: 'texture',
-        path: '/texture/foliage/foliageSDF.png',
+        type: 'textureKtx',
+        path: '/texture/foliage/foliageSDF.ktx2',
         modifier: (texture) => {
             texture.colorSpace = THREE.NoColorSpace
             texture.wrapS = THREE.ClampToEdgeWrapping

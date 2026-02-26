@@ -42,6 +42,7 @@ export default class Bushes {
 
         if (this.foliage) {
             this.debugFolder.add(this.foliage.material.shadowOffset, 'value', 0, 2, 0.001).name('Shadow Offset')
+            this.debugFolder.add(this.foliage.material.colorAPresence, 'value', 0, 1, 0.001).name('Color A Presence')
         }
     }
 }

@@ -8,9 +8,15 @@ export default class Camera {
         this.sizes = this.experience.sizes
         this.scene = this.experience.scene
         this.canvas = this.experience.canvas
+        this.debug = this.experience.debug
 
         this.setInstance()
         this.setOrbitControls()
+
+        this.mode = 'follow'
+        if (this.debug.active) {
+            this.setDebug()
+        }
     }
 
     setInstance() {
@@ -34,6 +40,7 @@ export default class Camera {
         this.controls.enableDamping = true
         this.controls.dampingFactor = 0.05
         this.controls.target.set(0, 0, 0)
+        this.controls.enabled = false
     }
 
     resize() {
@@ -52,7 +59,10 @@ export default class Camera {
 
 
     update() {
-        this.controls.update()
+        if (this.mode === 'free') {
+            this.controls.update()
+            return
+        }
 
         if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
@@ -64,5 +74,25 @@ export default class Camera {
             this.instance.position.copy(this.smoothPosition)
             this.instance.lookAt(this.smoothLookAt)
         }
+    }
+
+    setMode(mode) {
+        this.mode = mode
+        this.controls.enabled = this.mode === 'free'
+
+        if (this.mode === 'free') {
+            this.controls.target.copy(this.smoothLookAt)
+            this.controls.update()
+        }
+    }
+
+    setDebug() {
+        const folder = this.debug.ui.addFolder('Camera')
+        folder.close()
+
+        const params = { mode: this.mode }
+        folder.add(params, 'mode', ['follow', 'free']).name('Mode').onChange((v) => {
+            this.setMode(v)
+        })
     }
 }

@@ -153,6 +153,7 @@ export default class Trees {
             this.debugFolder.add(mat.threshold, 'value', 0, 1, 0.001).name('Threshold')
             this.debugFolder.add(mat.seeThroughEdgeMin, 'value', 0, 1, 0.001).name('See Through Min')
             this.debugFolder.add(mat.seeThroughEdgeMax, 'value', 0, 1, 0.001).name('See Through Max')
+            this.debugFolder.add(mat.colorAPresence, 'value', 0, 1, 0.001).name('Color A Presence')
         }
     }
 }

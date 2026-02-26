@@ -165,7 +165,7 @@ export default class PatioScene {
             uGrassRampStop2: uniform(0.72),
             // Grass micro-detail / Ghibli AO (NEW)
             uGrassMicroScale: uniform(1.4),             // micro-noise frequency (higher = finer)
-            uGrassAOStrength: uniform(0.45),            // how dark the valleys are
+            uGrassAOStrength: uniform(0),            // how dark the valleys are
             uGrassSunStrength: uniform(0.28),           // how bright the sunlit peaks are
             uGrassSoilColor: uniform(new THREE.Color(0x2C4A1A)),  // dark soil for AO mixing
             // Stylized Sand.001 — Voronoi-based

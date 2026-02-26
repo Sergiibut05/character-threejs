@@ -56,6 +56,7 @@ export default class Foliage {
             )
             const position = new THREE.Vector3().setFromSpherical(spherical)
 
+            // Match original foliage orientation logic
             plane.rotateZ(this.rng() * 9999)
             plane.rotateY(0)
             plane.translate(position.x, position.y, position.z)
@@ -101,6 +102,8 @@ export default class Foliage {
 
         // Shadow
         this.material.shadowOffset = uniform(1)
+        // 0.5 = neutral, > 0.5 = more Color A presence, < 0.5 = more Color B
+        this.material.colorAPresence = uniform(0.5)
 
         const foliageTexture = this.resources.items.foliageTexture
 
@@ -163,7 +166,9 @@ export default class Foliage {
         // Color: mix A/B based on how much the normal faces the sun
         const colorNode = Fn(() => {
             const mixStrength = normalWorld.dot(lightDir).smoothstep(0, 1)
-            return mix(this.colorANode, this.colorBNode, mixStrength)
+            const bias = float(0.5).sub(this.material.colorAPresence)
+            const shiftedMix = mixStrength.add(bias).clamp(0.0, 1.0)
+            return mix(this.colorANode, this.colorBNode, shiftedMix)
         })()
 
         // Build the node material
@@ -192,6 +197,7 @@ export default class Foliage {
             const size = _child.scale.x
             const object = new THREE.Object3D()
 
+            // Match original: random up, then face default camera direction
             const angle = Math.PI * 2 * this.rng()
             object.up.set(Math.sin(angle), Math.cos(angle), 0)
             object.lookAt(towardCamera)
