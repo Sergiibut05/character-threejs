@@ -95,12 +95,12 @@ export default class Grass {
         this.uRampStop2 = uniform(0.70)
 
         // Blade rendering
-        this.uEmissionStrength = uniform(0.75)
-        this.uAlphaCutoff = uniform(0.12)
-        this.uAlphaSoftness = uniform(0.22)
+        this.uEmissionStrength = uniform(1.15)
+        this.uAlphaCutoff = uniform(0.6)
+        this.uAlphaSoftness = uniform(0.02)
 
         // Root AO
-        this.uAOMix = uniform(0.72)
+        this.uAOMix = uniform(0.51)
 
         // Backlighting: warm glow for subsurface scattering feel
         this.uBacklightColor = uniform(new THREE.Color(0xFFEA60))

@@ -6,6 +6,8 @@ import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Grass from './Grass.js'
 import PatioScene from './PatioScene.js'
+import Trees from './Trees.js'
+import Bushes from './Bushes.js'
 
 export default class World {
     constructor() {
@@ -31,6 +33,12 @@ export default class World {
 
             // Grass — placed on grass regions from the ground mesh vertex colors
             this.setupGrass()
+
+            // Trees — instanced per type from reference models
+            this.setupTrees()
+
+            // Bushes (standalone, ready for future reference models)
+            this.bushes = new Bushes()
 
             // Initialize raycaster for mouse interactions
             this.raycaster = new Raycaster()
@@ -72,6 +80,53 @@ export default class World {
                 count: 3000,
                 position: new THREE.Vector3(0, 0, 0)
             })
+        }
+    }
+
+    setupTrees() {
+        const res = this.resources.items
+
+        // Each tree type: visual model scene, reference model children, leaf colors
+        const treeConfigs = [
+            {
+                name: 'Abedul',
+                visual: res.abedulTreeVisual?.scene,
+                references: res.abedulTreeReferences?.scene?.children,
+                colorA: '#ff4f2b',
+                colorB: '#ff903f'
+            },
+            {
+                name: 'Normal',
+                visual: res.normalTreeVisual?.scene,
+                references: res.normalTreeReferences?.scene?.children,
+                colorA: '#b4b536',
+                colorB: '#d8cf3b'
+            },
+            {
+                name: 'Old',
+                visual: res.oldTreeVisual?.scene,
+                references: res.oldTreeReferences?.scene?.children,
+                colorA: '#ff6d6d',
+                colorB: '#ff9990'
+            }
+        ]
+
+        this.trees = []
+        for (const cfg of treeConfigs) {
+            if (!cfg.visual || !cfg.references || cfg.references.length === 0) {
+                console.warn(`Trees: skipping "${cfg.name}" — missing visual or references`)
+                continue
+            }
+
+            // Filter only treeBody* references from the reference file
+            const bodyRefs = cfg.references.filter(c => c.name.startsWith('treeBody'))
+            if (bodyRefs.length === 0) {
+                console.warn(`Trees: skipping "${cfg.name}" — no treeBody* found in references`)
+                continue
+            }
+
+            const tree = new Trees(cfg.name, cfg.visual, bodyRefs, cfg.colorA, cfg.colorB)
+            this.trees.push(tree)
         }
     }
 
@@ -130,6 +185,17 @@ export default class World {
         // Update grass
         if (this.grass) {
             this.grass.update()
+        }
+
+        // Update trees (wind animation)
+        if (this.trees) {
+            for (const tree of this.trees) {
+                tree.update()
+            }
+        }
+
+        if (this.bushes) {
+            this.bushes.update()
         }
 
         // Update patio scene (water animation)

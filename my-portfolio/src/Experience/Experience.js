@@ -65,6 +65,10 @@ export default class Experience {
             this.rendererReady = true
             const backendName = this.renderer.instance?.backend?.constructor?.name || 'Unknown'
             console.log('✅ Renderer backend ready:', backendName)
+
+            // KTX2 textures need the renderer for GPU feature detection
+            this.resources.setRenderer(this.renderer.instance)
+
             this.checkAllReady()
         })
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx vite build"
+    "build": "npx vite build",
+    "postinstall": "node -e \"const fs=require('fs');const s='src/stubs/zstddec.module.js';const d='node_modules/three/examples/jsm/libs/zstddec.module.js';if(fs.existsSync(s))fs.copyFileSync(s,d)\""
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.4",
