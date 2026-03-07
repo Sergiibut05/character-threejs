@@ -23,6 +23,8 @@ export default class Environment {
     }
 
     setSunLight() {
+        const quality = this.experience.quality
+
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 1.6)
         this.sunLight.castShadow = true
         this.sunLight.shadow.camera.near = 0.5
@@ -31,10 +33,10 @@ export default class Environment {
         this.sunLight.shadow.camera.right = 20
         this.sunLight.shadow.camera.top = 20
         this.sunLight.shadow.camera.bottom = -20
-        this.sunLight.shadow.mapSize.set(1024, 1024)
+        this.sunLight.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize)
         this.sunLight.shadow.bias = -0.0001
         this.sunLight.shadow.normalBias = 0.04
-        this.sunLight.shadow.radius = 6
+        this.sunLight.shadow.radius = quality.shadowRadius
         this.sunLight.position.set(4, 5, -3)
         this.sunLight.target.position.set(0, 0, 0)
         this.scene.add(this.sunLight.target)
