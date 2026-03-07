@@ -7,6 +7,16 @@ export default [
         path: '/models/human/human-walk-draco.glb'
     },
     {
+        name: 'humanAtlas',
+        type: 'textureKtx',
+        path: '/models/human/human-atlas.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+        }
+    },
+    {
         name: 'grassAtlas',
         type: 'textureKtx',
         path: '/texture/grass/grass_clump.ktx2',

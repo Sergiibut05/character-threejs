@@ -120,15 +120,15 @@ export default class MobileControls
         // Button 1
         this.button1 = document.createElement('button')
         this.button1.id = 'action-button-1'
-        this.button1.textContent = 'A'
+        this.button1.textContent = '\u{1F3C3}'
         this.button1.style.cssText = `
             width: 60px;
             height: 60px;
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.8);
-            background: rgba(0, 150, 255, 0.7);
+            background: rgba(255, 180, 50, 0.7);
             color: white;
-            font-size: 18px;
+            font-size: 24px;
             font-weight: bold;
             cursor: pointer;
             user-select: none;
@@ -158,14 +158,14 @@ export default class MobileControls
             e.preventDefault()
             this.actions.button1 = true
             this.button1.style.transform = 'scale(0.9)'
-            this.button1.style.background = 'rgba(0, 150, 255, 0.9)'
+            this.button1.style.background = 'rgba(255, 180, 50, 0.9)'
         })
 
         this.button1.addEventListener('touchend', (e) => {
             e.preventDefault()
             this.actions.button1 = false
             this.button1.style.transform = 'scale(1)'
-            this.button1.style.background = 'rgba(0, 150, 255, 0.7)'
+            this.button1.style.background = 'rgba(255, 180, 50, 0.7)'
         })
 
         this.button2.addEventListener('touchstart', (e) => {

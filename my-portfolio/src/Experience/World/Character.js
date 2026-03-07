@@ -10,314 +10,342 @@ export default class Character {
         this.physics = this.experience.world.physics
         this.debug = this.experience.debug
 
-        // Capsule dimensions and initial center position
+        // Capsule dimensions
         this.capsuleHalfHeight = 0.5
         this.capsuleRadius = 0.32
         this.capsuleCenterY = this.capsuleHalfHeight + this.capsuleRadius
         this.spawnOffsetY = 0.15
 
-        // Character state - start slightly above ground to avoid falling through
+        // Position & velocity
         this.position = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
-        this.previousPosition = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
-        this.moveSpeed = 2.0
-        this.angularVelocity = 0
-        this.rotationAcceleration = 12.0
-        this.rotationGain = 6.0
+        this.previousPosition = this.position.clone()
         this.gravity = -9.81
         this.verticalVelocity = 0
         this.isGrounded = false
 
-        // Input state
-        this.keys = {
-            w: false,
-            a: false,
-            s: false,
-            d: false
-        }
+        // Movement tuning
+        this.walkSpeed = 1.3
+        this.runSpeed = 2.8
+        this.rotationSpeed = 12.0
+
+        // State machine: idle | walking | running | resting
+        this.state = 'idle'
+        this.runDuration = 0
+        this.restAfterRunThreshold = 2.0
+        this.isSprinting = false
+
+        // Blinking
+        this.blinkTimer = 0
+        this.nextBlinkTime = this._randomBlinkInterval()
+        this.isBlinking = false
+        this.blinkDuration = 0.12
+
+        // Atlas UV offsets (2x2 grid)
+        this._uvOpen = new THREE.Vector2(0, 0)
+        this._uvClosed = new THREE.Vector2(0, 0.5)
+        this._uvRest = new THREE.Vector2(0.5, 0)
+
+        // Input
+        this.keys = { w: false, a: false, s: false, d: false, shift: false }
 
         this.setModel()
         this.setAnimation()
         this.setInput()
 
-        // Physics will be set up after model loads and physics initializes
-        setTimeout(() => {
-            this.setPhysics()
-        }, 200)
+        setTimeout(() => this.setPhysics(), 200)
+
+        if (this.debug.active) this.setDebug()
     }
+
+    _randomBlinkInterval() {
+        return 2.0 + Math.random() * 4.0
+    }
+
+    // ─── Model & Atlas ──────────────────────────────────────────────────
 
     setModel() {
         this.resource = this.resources.items.humanModel
 
-        // Create a container Group - this will be moved
         this.container = new THREE.Group()
         this.container.name = 'CharacterContainer'
         this.container.position.copy(this.position)
 
-        // Use the original scene directly (clone doesn't work properly)
         this.model = this.resource.scene
         this.model.name = 'CharacterModel'
-
-        // Adjust scale - the Armature has 0.01, so we compensate
         this.model.scale.set(1, 1, 1)
 
-        // Calculate bounding box to find the bottom of the model
         const box = new THREE.Box3().setFromObject(this.model)
-        const modelHeight = box.max.y - box.min.y
-        const modelBottomY = box.min.y
-
-        // Adjust model position so its bottom touches ground when container is at capsule center
-        // Container is at capsule center, we want model bottom at world y=0
-        // worldY = container.y + model.y + modelBottomY
-        // 0 = capsuleCenterY + model.y + modelBottomY
-        // model.y = -capsuleCenterY - modelBottomY
-        const modelOffsetY = -this.capsuleCenterY - modelBottomY - 0.01
-
+        const modelOffsetY = -this.capsuleCenterY - box.min.y - 0.01
         this.model.position.set(0, modelOffsetY, 0)
 
-        // Enable shadows
-        this.model.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                child.castShadow = true
-                child.receiveShadow = true
-
-                if (child.material && child.material.map) {
-                    child.material.map.generateMipmaps = false;
-                    child.material.map.minFilter = THREE.LinearFilter;
-                }
-            }
-        })
+        this._applyAtlas()
 
         this.container.add(this.model)
         this.scene.add(this.container)
     }
 
-    setAnimation() {
-        if (!this.resource?.animations?.length) {
-            console.warn('Character: No animations found')
-            return
-        }
+    _applyAtlas() {
+        const atlas = this.resources.items.humanAtlas
+        if (!atlas) return
 
-        this.animation = {}
-        this.animation.mixer = new THREE.AnimationMixer(this.model)
+        this.atlas = atlas
+        this.atlas.repeat.set(0.5, 0.5)
+        this.atlas.offset.copy(this._uvOpen)
 
-        const walkClip = this.resource.animations[0]
-        const idleClip = this.resource.animations[1]
+        this.model.traverse((child) => {
+            if (!child.isMesh) return
+            child.castShadow = true
+            child.receiveShadow = true
 
-        this.animation.walkAction = this.animation.mixer.clipAction(walkClip)
-        this.animation.idleAction = idleClip ? this.animation.mixer.clipAction(idleClip) : null
-
-        // Set up animations
-        this.animation.walkAction.setLoop(THREE.LoopRepeat)
-        this.animation.walkAction.reset()
-        this.animation.walkAction.play()
-
-        if (this.animation.idleAction) {
-            this.animation.idleAction.setLoop(THREE.LoopRepeat)
-            this.animation.idleAction.reset()
-            this.animation.idleAction.play()
-        }
-
-        // Start with idle visible (if available)
-        this.animation.walkAction.setEffectiveWeight(0)
-        if (this.animation.idleAction) {
-            this.animation.idleAction.setEffectiveWeight(1)
-        }
-
-        this.animation.targetWalkWeight = 0
-        this.animation.fadeDuration = 0.3 // Transition duration in seconds
+            if (!child.material) child.material = new THREE.MeshStandardMaterial()
+            child.material.map = this.atlas
+            child.material.metalness = 0
+            child.material.roughness = 1
+            child.material.needsUpdate = true
+        })
     }
+
+    // ─── Animations ─────────────────────────────────────────────────────
+
+    setAnimation() {
+        const clips = this.resource?.animations
+        if (!clips?.length) return
+
+        this.mixer = new THREE.AnimationMixer(this.model)
+        this.actions = {}
+
+        for (const clip of clips) {
+            const n = clip.name.toLowerCase()
+            if (n.includes('walk')) this.actions.walk = this.mixer.clipAction(clip)
+            else if (n.includes('happy')) this.actions.happy = this.mixer.clipAction(clip)
+            else if (n.includes('run')) this.actions.running = this.mixer.clipAction(clip)
+            else if (n.includes('rest')) this.actions.rest = this.mixer.clipAction(clip)
+        }
+
+        for (const [key, action] of Object.entries(this.actions)) {
+            if (key === 'rest') {
+                action.setLoop(THREE.LoopOnce)
+                action.clampWhenFinished = true
+            } else {
+                action.setLoop(THREE.LoopRepeat)
+            }
+            action.play()
+            action.setEffectiveWeight(0)
+        }
+
+        this.activeAction = this.actions.happy ?? Object.values(this.actions)[0]
+        if (this.activeAction) this.activeAction.setEffectiveWeight(1)
+
+        this.mixer.addEventListener('finished', (e) => {
+            if (e.action === this.actions.rest) this._transitionTo('idle')
+        })
+    }
+
+    _transitionTo(newState) {
+        const map = { idle: 'happy', walking: 'walk', running: 'running', resting: 'rest' }
+        const newAction = this.actions?.[map[newState]]
+        if (!newAction) return
+        if (newAction === this.activeAction) { this.state = newState; return }
+
+        const fade = newState === 'resting' ? 0.4 : 0.25
+        newAction.reset()
+        newAction.setEffectiveTimeScale(1)
+        newAction.setEffectiveWeight(1)
+        if (this.activeAction) newAction.crossFadeFrom(this.activeAction, fade, true)
+
+        this.activeAction = newAction
+        this.state = newState
+    }
+
+    // ─── Input ──────────────────────────────────────────────────────────
 
     setInput() {
-        window.addEventListener('keydown', (event) => {
-            this.handleKeyDown(event)
-        })
-
-        window.addEventListener('keyup', (event) => {
-            this.handleKeyUp(event)
-        })
+        this._onKeyDownBound = (e) => this._onKeyChange(e, true)
+        this._onKeyUpBound = (e) => this._onKeyChange(e, false)
+        window.addEventListener('keydown', this._onKeyDownBound)
+        window.addEventListener('keyup', this._onKeyUpBound)
     }
 
-    handleKeyDown(event) {
+    _onKeyChange(event, pressed) {
         const key = event.key.toLowerCase()
-        if (key in this.keys) {
-            this.keys[key] = true
-        }
+        if (key in this.keys) this.keys[key] = pressed
     }
 
-    handleKeyUp(event) {
-        const key = event.key.toLowerCase()
-        if (key in this.keys) {
-            this.keys[key] = false
-        }
-    }
+    // ─── Physics ────────────────────────────────────────────────────────
 
     setPhysics() {
         if (!this.physics.world) return
-
         const RAPIER = this.physics.RAPIER
 
-        // Capsule dimensions
-        const halfHeight = this.capsuleHalfHeight
-        const radius = this.capsuleRadius
-
-        // Start slightly above ground to avoid falling through floor
         this.position.y = this.capsuleCenterY + this.spawnOffsetY
 
-        // Create kinematic rigid body for character
-        const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+        const rbDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
             .setTranslation(this.position.x, this.position.y, this.position.z)
-        this.rigidBody = this.physics.world.createRigidBody(rigidBodyDesc)
+        this.rigidBody = this.physics.world.createRigidBody(rbDesc)
 
-        // Create capsule collider with proper collision types
-        // KINEMATIC_FIXED enables collisions between kinematic and fixed (static) bodies
-        const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius)
+        const colDesc = RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius)
             .setActiveCollisionTypes(
                 RAPIER.ActiveCollisionTypes.DEFAULT |
                 RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED
             )
-        this.collider = this.physics.world.createCollider(colliderDesc, this.rigidBody)
+        this.collider = this.physics.world.createCollider(colDesc, this.rigidBody)
 
-        // Create Rapier's built-in Character Controller
-        // The offset (0.01) is a skin width that prevents getting stuck in geometry
         this.characterController = this.physics.world.createCharacterController(0.01)
-
-        // Configure character controller
-        this.characterController.setApplyImpulsesToDynamicBodies(true) // Push dynamic objects
-        this.characterController.setMaxSlopeClimbAngle(Math.PI * 0.25) // ~45 degrees
-        this.characterController.setMinSlopeSlideAngle(Math.PI * 0.3)  // ~54 degrees
-        // Allow stepping over small ledges and keep feet snapped to ground
+        this.characterController.setApplyImpulsesToDynamicBodies(true)
+        this.characterController.setMaxSlopeClimbAngle(Math.PI * 0.25)
+        this.characterController.setMinSlopeSlideAngle(Math.PI * 0.3)
         this.characterController.enableAutostep(0.25, 0.2, false)
         this.characterController.enableSnapToGround(0.1)
 
-        // Store previous position
         this.previousPosition = this.position.clone()
-
-        // Ensure initial sync
         this.container.position.copy(this.position)
     }
 
-    update() {
-        const deltaTime = this.time.delta * 0.001
+    // ─── Per-frame helpers ──────────────────────────────────────────────
 
+    _updateState(deltaTime, isMoving) {
+        const mobileActions = this.experience.mobileControls?.getActions()
+        this.isSprinting = this.keys.shift || (mobileActions?.button1 ?? false)
+
+        if (this.state === 'running') this.runDuration += deltaTime
+
+        // Allow interrupting rest by moving
+        if (this.state === 'resting') {
+            if (isMoving) this._transitionTo(this.isSprinting ? 'running' : 'walking')
+            return
+        }
+
+        if (isMoving) {
+            if (this.isSprinting) {
+                if (this.state !== 'running') this._transitionTo('running')
+            } else {
+                if (this.state !== 'walking') this._transitionTo('walking')
+            }
+        } else {
+            if (this.runDuration >= this.restAfterRunThreshold) {
+                this._transitionTo('resting')
+            } else if (this.state !== 'idle') {
+                this._transitionTo('idle')
+            }
+            this.runDuration = 0
+        }
+    }
+
+    _updateBlinking(deltaTime) {
+        if (!this.atlas) return
+
+        if (this.state === 'resting') {
+            this.atlas.offset.copy(this._uvRest)
+            return
+        }
+
+        this.blinkTimer += deltaTime
+
+        if (this.isBlinking) {
+            if (this.blinkTimer >= this.blinkDuration) {
+                this.isBlinking = false
+                this.blinkTimer = 0
+                this.nextBlinkTime = this._randomBlinkInterval()
+                this.atlas.offset.copy(this._uvOpen)
+            }
+        } else {
+            if (this.blinkTimer >= this.nextBlinkTime) {
+                this.isBlinking = true
+                this.blinkTimer = 0
+                this.atlas.offset.copy(this._uvClosed)
+            }
+        }
+    }
+
+    // ─── Main update ────────────────────────────────────────────────────
+
+    update() {
+        const dt = this.time.delta * 0.001
         if (!this.container) return
 
-        // Calculate movement from keyboard
-        const moveDirection = new THREE.Vector3(0, 0, 0)
-        if (this.keys.w) moveDirection.z -= 1
-        if (this.keys.s) moveDirection.z += 1
-        if (this.keys.a) moveDirection.x -= 1
-        if (this.keys.d) moveDirection.x += 1
+        // Gather input direction
+        const dir = new THREE.Vector3()
+        if (this.keys.w) dir.z -= 1
+        if (this.keys.s) dir.z += 1
+        if (this.keys.a) dir.x -= 1
+        if (this.keys.d) dir.x += 1
 
-        // Add mobile controls input
         if (this.experience.mobileControls?.isActive()) {
-            const mobileMovement = this.experience.mobileControls.getMovement()
-            moveDirection.x += mobileMovement.x * mobileMovement.force
-            moveDirection.z -= mobileMovement.y * mobileMovement.force // Invert Y axis for correct forward/backward movement
+            const m = this.experience.mobileControls.getMovement()
+            dir.x += m.x * m.force
+            dir.z -= m.y * m.force
         }
 
-        const isMoving = moveDirection.length() > 0.01
+        const isMoving = dir.lengthSq() > 0.0001
 
-        // Handle animation transitions
-        if (this.animation?.walkAction && this.animation?.mixer) {
-            // Determine target weight based on movement
-            this.animation.targetWalkWeight = isMoving ? 1.0 : 0.0
+        // State machine
+        this._updateState(dt, isMoving)
 
-            // Smoothly interpolate weight
-            const currentWeight = this.animation.walkAction.getEffectiveWeight()
-            const weightDiff = this.animation.targetWalkWeight - currentWeight
+        // Blinking
+        this._updateBlinking(dt)
 
-            if (Math.abs(weightDiff) > 0.01) {
-                const weightChangeSpeed = 1.0 / this.animation.fadeDuration
-                const newWeight = currentWeight + Math.sign(weightDiff) * Math.min(Math.abs(weightDiff), weightChangeSpeed * deltaTime)
-                this.animation.walkAction.setEffectiveWeight(newWeight)
-            }
-            else {
-                this.animation.walkAction.setEffectiveWeight(this.animation.targetWalkWeight)
-            }
+        // Animation mixer
+        if (this.mixer) this.mixer.update(dt)
 
-            if (this.animation.idleAction) {
-                const idleWeight = 1.0 - this.animation.walkAction.getEffectiveWeight()
-                this.animation.idleAction.setEffectiveWeight(idleWeight)
-            }
+        // Speed
+        const speed = (this.isSprinting && isMoving) ? this.runSpeed : this.walkSpeed
 
-            // Always update mixer (critical for animations to work)
-            this.animation.mixer.update(deltaTime)
-        }
-
-        // Move character using Rapier's built-in Character Controller
+        // Physics movement
         if (this.characterController && this.collider && this.rigidBody) {
-            if (this.isGrounded && this.verticalVelocity < 0) {
-                this.verticalVelocity = 0
+            if (this.isGrounded && this.verticalVelocity < 0) this.verticalVelocity = 0
+            this.verticalVelocity += this.gravity * dt
+
+            if (isMoving) dir.normalize()
+
+            const desired = {
+                x: isMoving ? dir.x * speed * dt : 0,
+                y: this.verticalVelocity * dt,
+                z: isMoving ? dir.z * speed * dt : 0
             }
 
-            this.verticalVelocity += this.gravity * deltaTime
+            this.characterController.computeColliderMovement(this.collider, desired)
+            const corrected = this.characterController.computedMovement()
 
-            if (isMoving) {
-                moveDirection.normalize()
+            const cur = this.rigidBody.translation()
+            const next = {
+                x: cur.x + corrected.x,
+                y: cur.y + corrected.y,
+                z: cur.z + corrected.z
             }
 
-            // Calculate desired movement
-            const desiredMovement = {
-                x: isMoving ? moveDirection.x * this.moveSpeed * deltaTime : 0,
-                y: this.verticalVelocity * deltaTime,
-                z: isMoving ? moveDirection.z * this.moveSpeed * deltaTime : 0
-            }
-
-            // Use Rapier's Character Controller to compute corrected movement
-            // This handles collisions with both static and dynamic objects
-            this.characterController.computeColliderMovement(
-                this.collider,
-                desiredMovement
-            )
-
-            // Get the corrected movement (after collision resolution)
-            const correctedMovement = this.characterController.computedMovement()
-
-            // Apply corrected movement to position
-            const currentPos = this.rigidBody.translation()
-            const newPos = {
-                x: currentPos.x + correctedMovement.x,
-                y: currentPos.y + correctedMovement.y,
-                z: currentPos.z + correctedMovement.z
-            }
-
-            // Update rigid body position
-            this.rigidBody.setNextKinematicTranslation(newPos)
-
-            // Update our position tracking
-            this.position.set(newPos.x, newPos.y, newPos.z)
-
-            // Update container position
+            this.rigidBody.setNextKinematicTranslation(next)
+            this.position.set(next.x, next.y, next.z)
             this.container.position.copy(this.position)
 
             this.isGrounded = this.characterController.computedGrounded()
-            if (this.isGrounded && this.verticalVelocity < 0) {
-                this.verticalVelocity = 0
-            }
+            if (this.isGrounded && this.verticalVelocity < 0) this.verticalVelocity = 0
 
+            // Smooth rotation — exponential decay, shortest path, no overshoot
             if (isMoving) {
-                const targetRotation = Math.atan2(moveDirection.x, moveDirection.z)
-                let rotationDiff = targetRotation - this.container.rotation.y
-                if (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2
-                if (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2
-
-                const desiredAngularVelocity = rotationDiff * this.rotationGain
-                this.angularVelocity += (desiredAngularVelocity - this.angularVelocity) * this.rotationAcceleration * deltaTime
-                this.container.rotation.y += this.angularVelocity * deltaTime
+                const target = Math.atan2(dir.x, dir.z)
+                const diff = Math.atan2(Math.sin(target - this.container.rotation.y),
+                                        Math.cos(target - this.container.rotation.y))
+                this.container.rotation.y += diff * (1.0 - Math.exp(-this.rotationSpeed * dt))
             }
-            else {
-                this.angularVelocity *= Math.max(0, 1 - 8.0 * deltaTime)
-                if (Math.abs(this.angularVelocity) > 0.01)
-                    this.container.rotation.y += this.angularVelocity * deltaTime
-            }
-        }
-        else {
-            // Not moving - sync position from physics
+        } else {
             if (this.rigidBody) {
-                const translation = this.rigidBody.translation()
-                this.position.set(translation.x, translation.y, translation.z)
+                const t = this.rigidBody.translation()
+                this.position.set(t.x, t.y, t.z)
             }
             this.container.position.copy(this.position)
         }
+    }
+
+    // ─── Debug GUI ──────────────────────────────────────────────────────
+
+    setDebug() {
+        const f = this.debug.ui.addFolder('Character')
+        f.close()
+
+        f.add(this, 'walkSpeed', 0.5, 3.0, 0.1).name('Walk Speed')
+        f.add(this, 'runSpeed', 1.5, 5.0, 0.1).name('Run Speed')
+        f.add(this, 'rotationSpeed', 2.0, 30.0, 0.5).name('Rotation Smoothing')
+        f.add(this, 'restAfterRunThreshold', 0.5, 5.0, 0.1).name('Rest After Run (s)')
+        f.add(this, 'blinkDuration', 0.05, 0.5, 0.01).name('Blink Duration')
     }
 }
