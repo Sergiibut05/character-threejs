@@ -56,7 +56,8 @@ export default class World {
 
     setupGrass() {
         // Get grass spawn positions from the patio ground meshes
-        const spawnPositions = this.patioScene.getGrassSpawnPositions(10000)
+        const grassCount = this.experience.quality.grassCount
+        const spawnPositions = this.patioScene.getGrassSpawnPositions(grassCount)
 
         if (spawnPositions.length > 0) {
             // Calculate bounding box of spawn positions
@@ -69,6 +70,7 @@ export default class World {
             const size = new THREE.Vector3()
             bbox.getSize(size)
 
+            const isLow = this.experience.quality.isLow
             this.grass = new Grass({
                 size: Math.max(size.x, size.z),
                 count: spawnPositions.length,
@@ -76,7 +78,7 @@ export default class World {
                 spawnPositions: spawnPositions,
                 bladeWidth: 0.35,
                 bladeHeight: 0.38,
-                // Callback so Grass can re-sample when count changes in GUI
+                cullAspectX: isLow ? 1.8 : 1.0,
                 spawnFunction: (count) => this.patioScene.getGrassSpawnPositions(count)
             })
         } else {

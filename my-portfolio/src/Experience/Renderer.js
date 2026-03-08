@@ -39,11 +39,12 @@ export default class Renderer {
     }
 
     setPostProcessing() {
+        if (this.quality.isLow) return
+
         this.renderPipeline = new THREE.RenderPipeline(this.instance)
 
         const scenePass = pass(this.scene, this.camera.instance)
 
-        // Outline pass
         const edgeStrength = uniform(2.5)
         const visibleEdgeColor = uniform(new THREE.Color('#ffffff'))
         const hiddenEdgeColor = uniform(new THREE.Color('#ffffff'))
@@ -61,12 +62,7 @@ export default class Renderer {
 
         const composited = outlineColor.add(scenePass)
 
-        if (this.quality.isLow) {
-            this.renderPipeline.outputNode = composited
-            return
-        }
-
-        // Tilt-Shift Blur (desktop only — too expensive on mobile)
+        // Tilt-Shift Blur (desktop only)
         const blurredScene = gaussianBlur(composited, vec2(1), 6, { resolutionScale: 0.5 })
 
         const centerY = float(0.5)

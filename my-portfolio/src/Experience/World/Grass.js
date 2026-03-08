@@ -29,6 +29,7 @@ export default class Grass {
         this.cullRadius = options.cullRadius ?? 18
         this.cullEdgeSoftness = options.cullEdgeSoftness ?? 3.0
         this.cullOffsetZ = options.cullOffsetZ ?? 3.0
+        this.cullAspectX = options.cullAspectX ?? 1.0
 
         this.setGeometry()
         this.setMaterial()
@@ -119,11 +120,12 @@ export default class Grass {
         this.uDisplacementRadius = uniform(0.7)
         this.uDisplacementStrength = uniform(0.45)
 
-        // GPU circle culling
+        // GPU ellipse culling (aspect > 1 = narrower horizontally)
         this.uCharacterCullEnabled = uniform(this.enableCharacterCulling ? 1 : 0)
         this.uCullRadius = uniform(this.cullRadius)
         this.uCullEdgeSoftness = uniform(this.cullEdgeSoftness)
         this.uCullOffsetZ = uniform(this.cullOffsetZ)
+        this.uCullAspectX = uniform(this.cullAspectX)
 
         // ─── VERTEX SHADER ───────────────────────────────────────────────────
         const posNode = Fn(() => {
@@ -152,7 +154,6 @@ export default class Grass {
             const wave2 = cos(t.mul(0.7).add(wx.mul(0.5)).add(wz.mul(0.9)))
             const wave3 = sin(t.mul(2.5).add(wx.mul(1.3))).mul(0.25)
 
-            // Quadratic height weight: base stays, tip sways
             const hSq = h.mul(h)
             const ws = this.uWindStrength
             pos.x.addAssign(wave1.mul(ws).add(wave3.mul(ws.mul(0.25))).mul(hSq))
@@ -209,9 +210,11 @@ export default class Grass {
             // ── 6. Base fade: smoothly fade out at the root so blades merge with ground ──
             const baseFade = smoothstep(0.0, 0.25, h)
 
-            // ── 7. GPU circle culling around character (offset center forward) ──
+            // ── 7. GPU ellipse culling around character (offset center forward) ──
             const cullCenter = this.uCharacterPosition.xz.add(vec2(0, this.uCullOffsetZ))
-            const distToChar = length(worldPos.xz.sub(cullCenter))
+            const cullDiff = worldPos.xz.sub(cullCenter)
+            const scaledDiff = vec2(cullDiff.x.mul(this.uCullAspectX), cullDiff.y)
+            const distToChar = length(scaledDiff)
             const edgeStart = max(float(0.0), this.uCullRadius.sub(this.uCullEdgeSoftness))
             const cullMask = float(1.0).sub(smoothstep(edgeStart, this.uCullRadius, distToChar))
             const visibilityMask = mix(float(1.0), cullMask, this.uCharacterCullEnabled)
@@ -311,6 +314,7 @@ export default class Grass {
         this.uCullRadius.value = this.cullRadius
         this.uCullEdgeSoftness.value = this.cullEdgeSoftness
         this.uCullOffsetZ.value = this.cullOffsetZ
+        this.uCullAspectX.value = this.cullAspectX
     }
 
     setDebug() {
@@ -346,6 +350,7 @@ export default class Grass {
         this.debugFolder.add(this, 'cullRadius', 1.0, 40.0, 0.5).name('Cull Radius')
         this.debugFolder.add(this, 'cullEdgeSoftness', 0.05, 10.0, 0.1).name('Cull Edge Softness')
         this.debugFolder.add(this, 'cullOffsetZ', -10.0, 10.0, 0.5).name('Cull Offset Z')
+        this.debugFolder.add(this, 'cullAspectX', 1.0, 3.0, 0.1).name('Cull Aspect X')
 
         this.debugFolder.addColor({ value: this.uColorRoot.value }, 'value').name('Root Color')
             .onChange(v => this.uColorRoot.value.copy(v))

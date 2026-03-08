@@ -43,7 +43,7 @@ export default class Foliage {
     }
 
     setGeometry() {
-        const count = 80
+        const count = this.experience.quality?.foliagePlanes ?? 80
         const planes = []
 
         for (let i = 0; i < count; i++) {

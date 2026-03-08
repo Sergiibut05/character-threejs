@@ -10,5 +10,7 @@ export default class Quality {
     get shadowRadius() { return this.isLow ? 2 : 6 }
     get shadowCameraSize() { return this.isLow ? 15 : 20 }
     get antialias() { return this.isLow ? false : (Math.min(window.devicePixelRatio, 2) < 2) }
-    get pixelRatio() { return this.isLow ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2) }
+    get pixelRatio() { return this.isLow ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 2) }
+    get grassCount() { return this.isLow ? 7000 : 10000 }
+    get foliagePlanes() { return this.isLow ? 36 : 80 }
 }
