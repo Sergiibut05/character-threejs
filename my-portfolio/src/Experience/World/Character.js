@@ -97,11 +97,9 @@ export default class Character {
             child.castShadow = true
             child.receiveShadow = true
 
-            if (!child.material) child.material = new THREE.MeshStandardMaterial()
-            child.material.map = this.atlas
-            child.material.metalness = 0
-            child.material.roughness = 1
-            child.material.needsUpdate = true
+            child.material = new THREE.MeshLambertMaterial({
+                map: this.atlas
+            })
         })
     }
 

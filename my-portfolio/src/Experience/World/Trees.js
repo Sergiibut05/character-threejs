@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import * as RAPIER from '@dimforge/rapier3d'
 import { color, uniform } from 'three/tsl'
 import Foliage from './Foliage.js'
 import Experience from '../Experience.js'
@@ -58,9 +57,15 @@ export default class Trees {
         if (!this.modelParts.body) return
 
         const body = this.modelParts.body
+        const oldMat = body.material
+        const mat = new THREE.MeshLambertMaterial({
+            map: oldMat?.map || null,
+            color: oldMat?.color || 0x8B6914
+        })
+
         this.bodies = new THREE.InstancedMesh(
             body.geometry,
-            body.material,
+            mat,
             this.references.length
         )
         this.bodies.instanceMatrix.setUsage(THREE.StaticDrawUsage)
@@ -100,8 +105,9 @@ export default class Trees {
     }
 
     setPhysical() {
-        if (!this.physics || !this.physics.world) return
+        if (!this.physics || !this.physics.world || !this.physics.RAPIER) return
 
+        const RAPIER = this.physics.RAPIER
         this.colliders = []
         const trunkHeight = 2.5
         const trunkRadius = 0.15

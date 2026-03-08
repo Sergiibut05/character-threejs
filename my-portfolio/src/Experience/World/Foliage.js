@@ -171,21 +171,16 @@ export default class Foliage {
             return mix(this.colorANode, this.colorBNode, shiftedMix)
         })()
 
-        // Build the node material
-        this.material.instance = new THREE.MeshStandardNodeMaterial({
-            side: THREE.DoubleSide,
-            roughness: 1.0,
-            metalness: 0.0
+        this.material.instance = new THREE.MeshLambertNodeMaterial({
+            side: THREE.DoubleSide
         })
         this.material.instance.colorNode = colorNode
-        // Force a tighter cutout to avoid dark fringes on card edges
         this.material.instance.opacityNode = smoothstep(0.0, 0.03, alphaNode)
         this.material.instance.alphaTestNode = uniform(0.5)
         this.material.instance.transparent = false
         this.material.instance.depthWrite = true
         this.material.instance.alphaTest = 0.5
 
-        // Hook shadow offset so GUI control actually affects foliage shading
         this.material.instance.receivedShadowPositionNode = positionLocal.add(lightDir.mul(this.material.shadowOffset))
     }
 
