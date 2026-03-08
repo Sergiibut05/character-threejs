@@ -25,6 +25,10 @@ export default class Grass {
         this.bladeHeight = options.bladeHeight ?? 0.38
         this.spawnPositions = options.spawnPositions || null
         this.spawnFunction = options.spawnFunction || null
+        this.enableCharacterCulling = options.enableCharacterCulling ?? true
+        this.cullRadius = options.cullRadius ?? 18
+        this.cullEdgeSoftness = options.cullEdgeSoftness ?? 3.0
+        this.cullOffsetZ = options.cullOffsetZ ?? 3.0
 
         this.setGeometry()
         this.setMaterial()
@@ -115,6 +119,12 @@ export default class Grass {
         this.uDisplacementRadius = uniform(0.7)
         this.uDisplacementStrength = uniform(0.45)
 
+        // GPU circle culling
+        this.uCharacterCullEnabled = uniform(this.enableCharacterCulling ? 1 : 0)
+        this.uCullRadius = uniform(this.cullRadius)
+        this.uCullEdgeSoftness = uniform(this.cullEdgeSoftness)
+        this.uCullOffsetZ = uniform(this.cullOffsetZ)
+
         // ─── VERTEX SHADER ───────────────────────────────────────────────────
         const posNode = Fn(() => {
             const pos = positionLocal.toVar()
@@ -198,7 +208,16 @@ export default class Grass {
 
             // ── 6. Base fade: smoothly fade out at the root so blades merge with ground ──
             const baseFade = smoothstep(0.0, 0.25, h)
-            const finalAlpha = alpha.mul(baseFade)
+
+            // ── 7. GPU circle culling around character (offset center forward) ──
+            const cullCenter = this.uCharacterPosition.xz.add(vec2(0, this.uCullOffsetZ))
+            const distToChar = length(worldPos.xz.sub(cullCenter))
+            const edgeStart = max(float(0.0), this.uCullRadius.sub(this.uCullEdgeSoftness))
+            const cullMask = float(1.0).sub(smoothstep(edgeStart, this.uCullRadius, distToChar))
+            const visibilityMask = mix(float(1.0), cullMask, this.uCharacterCullEnabled)
+            const finalAlpha = alpha.mul(baseFade).mul(visibilityMask)
+
+            If(finalAlpha.lessThan(0.001), () => { Discard() })
 
             return vec4(finalRGB, finalAlpha)
         })()
@@ -288,6 +307,10 @@ export default class Grass {
         if (this.uCharacterPosition && this.experience.world.character) {
             this.uCharacterPosition.value.copy(this.experience.world.character.position)
         }
+        this.uCharacterCullEnabled.value = this.enableCharacterCulling ? 1 : 0
+        this.uCullRadius.value = this.cullRadius
+        this.uCullEdgeSoftness.value = this.cullEdgeSoftness
+        this.uCullOffsetZ.value = this.cullOffsetZ
     }
 
     setDebug() {
@@ -319,6 +342,10 @@ export default class Grass {
         this.debugFolder.add(this.uNoiseScale, 'value', 0.05, 5.0, 0.05).name('Patch Scale')
         this.debugFolder.add(this.uDisplacementRadius, 'value', 0.3, 3.0, 0.1).name('Char Radius')
         this.debugFolder.add(this.uDisplacementStrength, 'value', 0.0, 1.5, 0.05).name('Char Strength')
+        this.debugFolder.add(this, 'enableCharacterCulling').name('Circle Culling')
+        this.debugFolder.add(this, 'cullRadius', 1.0, 40.0, 0.5).name('Cull Radius')
+        this.debugFolder.add(this, 'cullEdgeSoftness', 0.05, 10.0, 0.1).name('Cull Edge Softness')
+        this.debugFolder.add(this, 'cullOffsetZ', -10.0, 10.0, 0.5).name('Cull Offset Z')
 
         this.debugFolder.addColor({ value: this.uColorRoot.value }, 'value').name('Root Color')
             .onChange(v => this.uColorRoot.value.copy(v))

@@ -50,7 +50,7 @@ export default class World {
 
     setupGrass() {
         // Get grass spawn positions from the patio ground meshes
-        const spawnPositions = this.patioScene.getGrassSpawnPositions(5000)
+        const spawnPositions = this.patioScene.getGrassSpawnPositions(10000)
 
         if (spawnPositions.length > 0) {
             // Calculate bounding box of spawn positions

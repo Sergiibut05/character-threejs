@@ -34,6 +34,16 @@ export default [
         type: 'gltfModel',
         path: '/models/Patio/patio-draco.glb'
     },
+    {
+        name: 'houseTexture',
+        type: 'textureKtx',
+        path: '/models/Patio/house-texture.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+        }
+    },
     // Foliage SDF texture fallback (PNG)
     {
         name: 'foliageTexture',

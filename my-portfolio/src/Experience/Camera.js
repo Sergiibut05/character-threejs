@@ -25,14 +25,13 @@ export default class Camera {
         this.instance.lookAt(0, 0, 0)
         this.scene.add(this.instance)
 
-        // Check if mobile and adjust camera offset
         const isMobile = this.checkIfMobile()
         this.cameraOffset = isMobile
-            ? new THREE.Vector3(0, 3, 7)  // Further back on mobile
-            : new THREE.Vector3(0, 2, 5)  // Closer on desktop
+            ? new THREE.Vector3(0, 2.5, 9)
+            : new THREE.Vector3(0, 2.5, 7)
         this.smoothPosition = this.instance.position.clone()
         this.smoothLookAt = new THREE.Vector3(0, 0, 0)
-        this.lerpFactor = 0.12
+        this.lerpFactor = isMobile ? 0.78 : 0.12
     }
 
     setOrbitControls() {

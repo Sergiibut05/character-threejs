@@ -58,6 +58,8 @@ export default class PatioScene {
         this.processGround()
         this.processWater()
         this.processClouds()
+        this.processHouse()
+        this.processRocks()
 
         // Add the entire model to scene
         this.scene.add(this.model)
@@ -360,6 +362,42 @@ export default class PatioScene {
      */
     getGroundMeshes() {
         return this.groundMeshes
+    }
+
+    // ─── HOUSE TEXTURE ────────────────────────────────────────────
+    processHouse() {
+        const tex = this.resources.items.houseTexture
+        if (!tex) return
+
+        this.model.traverse((child) => {
+            if (!child.isMesh) return
+            if (child.name !== 'material') return
+
+            if (!child.material) child.material = new THREE.MeshStandardMaterial()
+            child.material.map = tex
+            child.material.metalness = 0
+            child.material.roughness = 1
+            child.material.needsUpdate = true
+        })
+    }
+
+    // ─── ROCKS ────────────────────────────────────────────────────
+    processRocks() {
+        const rockMat = new THREE.MeshStandardMaterial({
+            color: 0x8a8a8a,
+            roughness: 0.85,
+            metalness: 0.0,
+            flatShading: true
+        })
+
+        this.model.traverse((child) => {
+            if (!child.isMesh) return
+            if (!child.name.toLowerCase().includes('rock')) return
+
+            child.material = rockMat
+            child.castShadow = true
+            child.receiveShadow = true
+        })
     }
 
     /**
