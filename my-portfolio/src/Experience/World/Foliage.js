@@ -181,7 +181,9 @@ export default class Foliage {
         this.material.instance.depthWrite = true
         this.material.instance.alphaTest = 0.5
 
-        this.material.instance.receivedShadowPositionNode = positionLocal.add(lightDir.mul(this.material.shadowOffset))
+        if (!this.experience.quality?.isLow) {
+            this.material.instance.receivedShadowPositionNode = positionLocal.add(lightDir.mul(this.material.shadowOffset))
+        }
     }
 
     setFromReferences() {
@@ -215,8 +217,9 @@ export default class Foliage {
         if (count === 0) return
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material.instance, count)
-        this.mesh.receiveShadow = true
-        this.mesh.castShadow = true
+        const isLow = this.experience.quality?.isLow
+        this.mesh.receiveShadow = !isLow
+        this.mesh.castShadow = !isLow
         this.mesh.frustumCulled = false
 
         for (let i = 0; i < count; i++) {

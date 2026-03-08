@@ -69,8 +69,9 @@ export default class Trees {
             this.references.length
         )
         this.bodies.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-        this.bodies.castShadow = true
-        this.bodies.receiveShadow = true
+        const isLow = this.experience.quality?.isLow
+        this.bodies.castShadow = !isLow
+        this.bodies.receiveShadow = !isLow
 
         for (let i = 0; i < this.references.length; i++) {
             this.bodies.setMatrixAt(i, this.references[i].matrix)

@@ -27,7 +27,7 @@ export default class Renderer {
         this.instance.outputColorSpace = THREE.SRGBColorSpace
         this.instance.toneMapping = THREE.ACESFilmicToneMapping
         this.instance.toneMappingExposure = 1.1
-        this.instance.shadowMap.enabled = true
+        this.instance.shadowMap.enabled = !this.quality.isLow
         this.instance.shadowMap.type = THREE.PCFShadowMap
         this.instance.setSize(this.sizes.width, this.sizes.height)
         this.instance.setPixelRatio(this.quality.pixelRatio)

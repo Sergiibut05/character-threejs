@@ -94,8 +94,9 @@ export default class Character {
 
         this.model.traverse((child) => {
             if (!child.isMesh) return
-            child.castShadow = true
-            child.receiveShadow = true
+            const isLow = this.experience.quality?.isLow
+            child.castShadow = !isLow
+            child.receiveShadow = !isLow
 
             child.material = new THREE.MeshLambertMaterial({
                 map: this.atlas

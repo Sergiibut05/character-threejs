@@ -8,6 +8,7 @@ import Grass from './Grass.js'
 import PatioScene from './PatioScene.js'
 import Trees from './Trees.js'
 import Bushes from './Bushes.js'
+import FakeShadow from './FakeShadow.js'
 
 export default class World {
     constructor() {
@@ -39,6 +40,11 @@ export default class World {
 
             // Bushes (standalone, ready for future reference models)
             this.bushes = new Bushes()
+
+            // Fake shadows on mobile (real shadow maps disabled for Mali compat)
+            if (this.experience.quality.isLow) {
+                this.setupFakeShadows()
+            }
 
             // Initialize raycaster for mouse interactions
             this.raycaster = new Raycaster()
@@ -130,6 +136,18 @@ export default class World {
         }
     }
 
+    setupFakeShadows() {
+        this.fakeShadow = new FakeShadow(this.scene)
+
+        this.fakeShadow.createCharacterShadow(0.55)
+
+        if (this.trees) {
+            for (const tree of this.trees) {
+                this.fakeShadow.createTreeShadows(tree.references, 1.0)
+            }
+        }
+    }
+
     setupModal() {
         const modalOverlay = document.querySelector('.modal-overlay')
         const closeButton = document.querySelector('.modal-close')
@@ -180,6 +198,14 @@ export default class World {
             for (const obj of this.interactiveObjects) {
                 obj.update(characterPos)
             }
+        }
+
+        // Update fake shadows (mobile only)
+        if (this.fakeShadow && this.character) {
+            this.fakeShadow.updateCharacter(
+                this.character.position,
+                this.character.capsuleCenterY
+            )
         }
 
         // Update grass

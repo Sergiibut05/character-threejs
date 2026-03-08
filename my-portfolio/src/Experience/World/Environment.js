@@ -26,7 +26,7 @@ export default class Environment {
         const quality = this.experience.quality
 
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 1.6)
-        this.sunLight.castShadow = true
+        this.sunLight.castShadow = !quality.isLow
         this.sunLight.shadow.camera.near = 0.5
         this.sunLight.shadow.camera.far = quality.isLow ? 40 : 60
         const sc = quality.shadowCameraSize

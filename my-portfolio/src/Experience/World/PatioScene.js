@@ -52,8 +52,8 @@ export default class PatioScene {
                     map: oldMat?.map || null,
                     color: oldMat?.color || 0xffffff
                 })
-                child.castShadow = true
-                child.receiveShadow = true
+                child.castShadow = !this.isLow
+                child.receiveShadow = !this.isLow
             }
         })
 
@@ -188,7 +188,7 @@ export default class PatioScene {
             groundMaterial.colorNode = groundColorNode
 
             mesh.material = groundMaterial
-            mesh.receiveShadow = true
+            mesh.receiveShadow = !this.isLow
             mesh.castShadow = false
 
             this.groundMeshes.push(mesh)
@@ -346,8 +346,8 @@ export default class PatioScene {
                 map: tex || null,
                 color: tex ? 0xffffff : 0xc8b89a
             })
-            child.castShadow = true
-            child.receiveShadow = true
+            child.castShadow = !this.isLow
+            child.receiveShadow = !this.isLow
         })
     }
 
@@ -363,8 +363,8 @@ export default class PatioScene {
             if (!child.name.toLowerCase().includes('rock')) return
 
             child.material = rockMat
-            child.castShadow = true
-            child.receiveShadow = true
+            child.castShadow = !this.isLow
+            child.receiveShadow = !this.isLow
         })
     }
 
