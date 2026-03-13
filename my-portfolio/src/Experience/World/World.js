@@ -4,11 +4,14 @@ import Environment from './Environment.js'
 import Character from './Character.js'
 import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
+import Ground from './Ground.js'
 import Grass from './Grass.js'
 import PatioScene from './PatioScene.js'
 import Trees from './Trees.js'
 import Bushes from './Bushes.js'
 import FakeShadow from './FakeShadow.js'
+import ActivityPrompt from './ActivityPrompt.js'
+import FrisbeeMinigame from './FrisbeeMinigame.js'
 
 export default class World {
     constructor() {
@@ -21,10 +24,22 @@ export default class World {
 
         // Interactive objects list
         this.interactiveObjects = []
+        this.isDevLightMode = import.meta.env.VITE_DEV_LIGHT_MODE === 'true'
 
         // Wait for resources to be ready
         this.resources.on('ready', () => {
             this.environment = new Environment()
+
+            if (this.isDevLightMode) {
+                this.ground = new Ground()
+                this.character = new Character()
+                this.activityPrompt = new ActivityPrompt()
+                this.frisbeeMinigame = new FrisbeeMinigame()
+                this.raycaster = new Raycaster()
+                this.setupModal()
+                console.info('World: VITE_DEV_LIGHT_MODE enabled (minimal world)')
+                return
+            }
 
             // Load the patio scene (GLB model with colliders, ground, water)
             this.patioScene = new PatioScene()
@@ -48,6 +63,8 @@ export default class World {
 
             // Initialize raycaster for mouse interactions
             this.raycaster = new Raycaster()
+            this.activityPrompt = new ActivityPrompt()
+            this.frisbeeMinigame = new FrisbeeMinigame()
 
             // Setup modal close functionality
             this.setupModal()
@@ -178,14 +195,20 @@ export default class World {
     }
 
     update() {
+        const deltaTime = this.experience.time.delta * 0.001
+
         // Update character
         if (this.character) {
             this.character.update()
         }
 
+        // Frisbee minigame (includes pre-physics forces)
+        if (this.frisbeeMinigame) {
+            this.frisbeeMinigame.update()
+        }
+
         // Update physics
         if (this.physics && this.physics.world) {
-            const deltaTime = this.experience.time.delta * 0.001
             this.physics.update(deltaTime)
         }
 
@@ -219,6 +242,10 @@ export default class World {
             this.environment.update()
         }
 
+        if (this.ground?.update) {
+            this.ground.update()
+        }
+
         // Update trees (wind animation)
         if (this.trees) {
             for (const tree of this.trees) {
@@ -233,6 +260,10 @@ export default class World {
         // Update patio scene (water animation)
         if (this.patioScene) {
             this.patioScene.update()
+        }
+
+        if (this.activityPrompt) {
+            this.activityPrompt.update()
         }
     }
 }

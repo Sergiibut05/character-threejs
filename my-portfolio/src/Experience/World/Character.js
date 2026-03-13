@@ -48,6 +48,11 @@ export default class Character {
         // Input
         this.keys = { w: false, a: false, s: false, d: false, shift: false }
 
+        // Throw support
+        this.movementLocked = false
+        this.throwPaused = false
+        this.throwPauseTime = null
+
         this.setModel()
         this.setAnimation()
         this.setInput()
@@ -115,14 +120,17 @@ export default class Character {
 
         for (const clip of clips) {
             const n = clip.name.toLowerCase()
-            if (n.includes('walk')) this.actions.walk = this.mixer.clipAction(clip)
+            if (n.includes('freesby') || n.includes('frisbee') || n.includes('throw')) {
+                this.actions.throw = this.mixer.clipAction(clip)
+                this.throwClipDuration = clip.duration
+            } else if (n.includes('walk')) this.actions.walk = this.mixer.clipAction(clip)
             else if (n.includes('happy')) this.actions.happy = this.mixer.clipAction(clip)
             else if (n.includes('run')) this.actions.running = this.mixer.clipAction(clip)
             else if (n.includes('rest')) this.actions.rest = this.mixer.clipAction(clip)
         }
 
         for (const [key, action] of Object.entries(this.actions)) {
-            if (key === 'rest') {
+            if (key === 'rest' || key === 'throw') {
                 action.setLoop(THREE.LoopOnce)
                 action.clampWhenFinished = true
             } else {
@@ -200,6 +208,46 @@ export default class Character {
         this.container.position.copy(this.position)
     }
 
+    // ─── Throw animation ─────────────────────────────────────────────────
+
+    startThrowAnimation(pauseAtTime) {
+        if (!this.actions.throw) return false
+        this.movementLocked = true
+        this.throwPaused = false
+        this.throwPauseTime = pauseAtTime ?? this.throwClipDuration
+
+        const action = this.actions.throw
+        action.reset()
+        action.setEffectiveWeight(1)
+        action.setEffectiveTimeScale(1)
+        action.paused = false
+
+        if (this.activeAction && this.activeAction !== action) {
+            action.crossFadeFrom(this.activeAction, 0.2, true)
+        }
+
+        this.activeAction = action
+        this.state = 'throwing'
+        return true
+    }
+
+    continueThrowAnimation() {
+        if (!this.actions.throw) return
+        this.actions.throw.paused = false
+        this.throwPaused = false
+        this.throwPauseTime = null
+    }
+
+    resetAfterThrow() {
+        this.movementLocked = false
+        this.throwPaused = false
+        this.throwPauseTime = null
+        if (this.actions.throw) {
+            this.actions.throw.paused = false
+        }
+        this._transitionTo('idle')
+    }
+
     // ─── Per-frame helpers ──────────────────────────────────────────────
 
     _updateState(deltaTime, isMoving) {
@@ -261,6 +309,21 @@ export default class Character {
     update() {
         const dt = this.time.delta * 0.001
         if (!this.container) return
+
+        // Check throw pause
+        if (this.state === 'throwing' && this.throwPauseTime != null && this.actions.throw) {
+            if (this.actions.throw.time >= this.throwPauseTime && !this.throwPaused) {
+                this.actions.throw.paused = true
+                this.throwPaused = true
+            }
+        }
+
+        // When movement is locked (minigame), only update mixer
+        if (this.movementLocked) {
+            this._updateBlinking(dt)
+            if (this.mixer) this.mixer.update(dt)
+            return
+        }
 
         // Gather input direction
         const dir = new THREE.Vector3()

@@ -6,7 +6,7 @@
 import {
     Fn, float, vec2, vec4,
     uniform, positionWorld, cameraPosition,
-    floor, fract, abs, smoothstep, clamp, min, mix,
+    floor, fract, abs, smoothstep, clamp, min, max, mix,
     fwidth, distance
 } from 'three/tsl'
 

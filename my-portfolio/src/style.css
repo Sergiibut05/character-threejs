@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+
 *
 {
     margin: 0;
@@ -18,179 +20,180 @@ body
     top: 0;
     left: 0;
     outline: none;
+    background: #0a0a0f;
 }
 
 /* ═══════════════════════════════════
-   Loading Screen
+   Initial Cover
+   Dark overlay that fades out when
+   the 3D preloader starts rendering
    ═══════════════════════════════════ */
 
-.loading-screen
+.initial-cover
 {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background: #0a0a0f;
+    z-index: 3000;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+}
+
+.initial-cover.fade-out
+{
+    opacity: 0;
+}
+
+/* ═══════════════════════════════════
+   Cloud Transition Overlay
+   ═══════════════════════════════════ */
+
+.cloud-transition
+{
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
-    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.loading-screen.is-hidden
-{
-    opacity: 0;
-    visibility: hidden;
     pointer-events: none;
+    background: #f8f8f7;
 }
 
-.loading-content
+.cloud-transition-content
 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 28px;
-    max-width: 320px;
-    width: 90%;
-}
-
-/* Animated logo */
-.loading-logo
-{
-    width: 56px;
-    height: 56px;
-    color: #7acc56;
-    animation: loadingPulse 2s ease-in-out infinite;
-}
-
-.loading-icon
-{
-    width: 100%;
-    height: 100%;
-}
-
-@keyframes loadingPulse
-{
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.08); }
-}
-
-/* Loading text */
-.loading-text
-{
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.5);
-}
-
-/* Progress bar */
-.loading-bar-container
-{
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-}
-
-.loading-bar-track
-{
-    width: 100%;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-}
-
-.loading-bar-fill
-{
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #4B9B82, #7ACC56, #C9F547);
-    border-radius: 4px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-}
-
-.loading-bar-fill::after
-{
-    content: '';
-    position: absolute;
-    right: 0;
-    top: -2px;
-    width: 7px;
-    height: 7px;
-    background: #C9F547;
-    border-radius: 50%;
-    box-shadow: 0 0 12px rgba(201, 245, 71, 0.6);
-}
-
-.loading-percentage
-{
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.35);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.05em;
-}
-
-/* Enter button */
-.loading-enter-btn
-{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 36px;
-    background: transparent;
-    border: 1px solid rgba(122, 204, 86, 0.3);
-    border-radius: 100px;
-    color: #C9F547;
-    font-family: inherit;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    cursor: pointer;
+    gap: 44px;
     opacity: 0;
     transform: translateY(12px);
-    pointer-events: none;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.7s ease 0.35s, transform 0.7s ease 0.35s;
 }
 
-.loading-enter-btn.is-visible
+.cloud-transition.visible .cloud-transition-content
 {
     opacity: 1;
     transform: translateY(0);
-    pointer-events: auto;
 }
 
-.loading-enter-btn:hover
+/* ── Title ── */
+
+.cloud-title
 {
-    background: rgba(122, 204, 86, 0.1);
-    border-color: rgba(122, 204, 86, 0.6);
-    box-shadow: 0 0 24px rgba(122, 204, 86, 0.15);
-    transform: translateY(-1px);
+    font-size: 34px;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(18, 30, 45, 0.6);
+    margin: 0;
 }
 
-.loading-enter-btn:active
+/* ── Button with horizontal fill ── */
+
+.cloud-btn
 {
-    transform: translateY(1px);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 240px;
+    padding: 20px 68px;
+    border: 1.5px solid rgba(50, 130, 95, 0.18);
+    border-radius: 60px;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+    color: rgba(25, 45, 55, 0.4);
+    cursor: default;
+    overflow: hidden;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.loading-enter-btn svg
+.cloud-btn-fill
 {
-    transition: transform 0.3s ease;
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg,
+        rgba(65, 160, 110, 0.07),
+        rgba(100, 190, 80, 0.11)
+    );
+    border-radius: inherit;
+    pointer-events: none;
+    transition: width 0.12s linear;
 }
 
-.loading-enter-btn:hover svg
+.cloud-btn-text
 {
-    transform: translateX(3px);
+    position: relative;
+    z-index: 1;
+}
+
+.cloud-btn.ready
+{
+    cursor: pointer;
+    color: #1a6b4a;
+    border-color: rgba(50, 140, 95, 0.35);
+    background: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-variant-numeric: normal;
+    animation: btnPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes btnPulse
+{
+    0%, 100% { box-shadow: 0 0 0 0 rgba(65, 160, 110, 0); }
+    50% { box-shadow: 0 0 28px 4px rgba(65, 160, 110, 0.12); }
+}
+
+.cloud-btn.ready:hover
+{
+    animation: none;
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(50, 140, 95, 0.5);
+    box-shadow: 0 8px 36px rgba(55, 150, 100, 0.14);
+    transform: translateY(-2px);
+}
+
+.cloud-btn.ready:active
+{
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(55, 150, 100, 0.1);
+}
+
+/* Arrow — appears on ready */
+.cloud-btn-arrow
+{
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    width: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.4s ease 0.12s, transform 0.4s ease 0.12s, width 0.4s ease 0.12s;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.cloud-btn.ready .cloud-btn-arrow
+{
+    opacity: 1;
+    width: 20px;
+    transform: translateX(0);
+}
+
+.cloud-btn.ready:hover .cloud-btn-arrow
+{
+    transform: translateX(5px);
 }
 
 /* ═══════════════════════════════════
@@ -298,4 +301,151 @@ body
 .modal-body a:hover
 {
     color: #938ccf;
+}
+
+/* Activity prompt (freesby point) */
+.activity-prompt
+{
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1200;
+    pointer-events: auto;
+    transform: translate3d(-9999px, -9999px, 0);
+    transition: opacity 0.2s ease;
+}
+
+.activity-prompt.is-hidden
+{
+    opacity: 0;
+}
+
+.activity-prompt-badge
+{
+    min-width: 64px;
+    height: 64px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    background: linear-gradient(180deg, #c9f6e2 0%, #9be4ca 100%);
+    color: #2a5a4c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: 'Fredoka', 'Nunito', 'Quicksand', 'Avenir Next Rounded', 'Trebuchet MS', 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow:
+        0 8px 18px rgba(0, 0, 0, 0.18),
+        0 2px 0 rgba(35, 96, 79, 0.28);
+    user-select: none;
+    cursor: pointer;
+    transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.activity-prompt-icon
+{
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    transform: scale(1);
+    opacity: 1;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.activity-prompt-icon-img
+{
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55));
+}
+
+.activity-prompt-key
+{
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width 0.25s ease, opacity 0.25s ease;
+}
+
+.activity-prompt.is-active .activity-prompt-badge
+{
+    animation: activityPromptPop 0.28s ease;
+}
+
+.activity-prompt-badge:hover
+{
+    filter: brightness(1.05) saturate(1.08);
+}
+
+.activity-prompt.is-active .activity-prompt-icon
+{
+    opacity: 1;
+}
+
+.activity-prompt.is-active .activity-prompt-key
+{
+    max-width: 120px;
+    opacity: 1;
+}
+
+.activity-prompt-badge.is-pressed
+{
+    transform: scale(0.88);
+}
+
+@keyframes activityPromptPop
+{
+    0% { transform: scale(0.84); }
+    70% { transform: scale(1.07); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════════════════════
+   Frisbee Power Bar
+   ═══════════════════════════════════ */
+
+.frisbee-power-bar
+{
+    position: fixed;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 260px;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.frisbee-power-fill
+{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6ee786 0%, #ffe04a 55%, #ff5e5e 100%);
+    border-radius: 10px;
+    transition: width 0.05s linear;
+}
+
+.frisbee-power-sweet
+{
+    position: absolute;
+    left: 65%;
+    width: 12%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.15);
+    border-left: 2px solid rgba(255, 255, 255, 0.4);
+    border-right: 2px solid rgba(255, 255, 255, 0.4);
+    pointer-events: none;
 }

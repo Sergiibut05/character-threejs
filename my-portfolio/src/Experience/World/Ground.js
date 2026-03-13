@@ -24,9 +24,9 @@ export default class Ground {
             crossDensity: 5.0,
             crossSizeX: 0.08,
             crossSizeY: 0.02,
-            lineColor: '#ffffff',
-            crossColor: '#938ccf',
-            baseColor: '#18181B',
+            lineColor: '#8fd3ff',
+            crossColor: '#ffd166',
+            baseColor: '#223028',
             fadeDistance: 20.0
         }
 

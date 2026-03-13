@@ -14,6 +14,25 @@ export default class Camera {
         this.setOrbitControls()
 
         this.mode = 'follow'
+        this.frisbeeTarget = null
+        this.baseFov = 35
+        this._throwYaw = 0
+
+        // frisbeeAim camera tuning
+        this.aimBehindDist = 4.6
+        this.aimHeight = 0.2
+        this.aimLookHeight = 0.1
+        this.aimLerp = 0.15
+
+        // frisbeeFlight camera tuning — camera stays near character
+        this.flightForwardNudge = 2.0
+        this.flightHeight = 1.6
+        this.flightPosLerp = 0.06
+        this.flightLookLerp = 0.1
+        this.flightFovMin = 22
+        this.flightFovMax = 35
+        this.flightZoomDist = 30
+
         if (this.debug.active) {
             this.setDebug()
         }
@@ -63,6 +82,16 @@ export default class Camera {
             return
         }
 
+        if (this.mode === 'frisbeeAim') {
+            this.updateFrisbeeAim()
+            return
+        }
+
+        if (this.mode === 'frisbeeFlight') {
+            this.updateFrisbeeFlight()
+            return
+        }
+
         if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
             const desiredPosition = new THREE.Vector3()
@@ -75,6 +104,53 @@ export default class Camera {
         }
     }
 
+    updateFrisbeeAim() {
+        const character = this.experience.world?.character
+        if (!character) return
+
+        const yaw = character.container.rotation.y
+        const pos = character.position.clone()
+        pos.x -= Math.sin(yaw) * this.aimBehindDist
+        pos.y += this.aimHeight
+        pos.z -= Math.cos(yaw) * this.aimBehindDist
+
+        const lookTarget = character.position.clone()
+        lookTarget.y += this.aimLookHeight
+
+        this.smoothPosition.lerp(pos, this.aimLerp)
+        this.smoothLookAt.lerp(lookTarget, this.aimLerp)
+        this.instance.position.copy(this.smoothPosition)
+        this.instance.lookAt(this.smoothLookAt)
+    }
+
+    updateFrisbeeFlight() {
+        const frisbeePos = this.frisbeeTarget
+        const character = this.experience.world?.character
+        if (!frisbeePos || !character) return
+
+        // Camera stays near character, nudged slightly forward in throw direction
+        const yaw = this._throwYaw
+        const desiredPos = character.position.clone()
+        desiredPos.x += Math.sin(yaw) * this.flightForwardNudge
+        desiredPos.y += this.flightHeight
+        desiredPos.z += Math.cos(yaw) * this.flightForwardNudge
+
+        this.smoothPosition.lerp(desiredPos, this.flightPosLerp)
+
+        // LookAt tracks the frisbee
+        this.smoothLookAt.lerp(frisbeePos, this.flightLookLerp)
+
+        this.instance.position.copy(this.smoothPosition)
+        this.instance.lookAt(this.smoothLookAt)
+
+        // Auto-zoom: narrow FOV as frisbee gets farther away
+        const dist = this.smoothPosition.distanceTo(frisbeePos)
+        const t = THREE.MathUtils.clamp(dist / this.flightZoomDist, 0, 1)
+        const targetFov = THREE.MathUtils.lerp(this.flightFovMax, this.flightFovMin, t)
+        this.instance.fov += (targetFov - this.instance.fov) * 0.08
+        this.instance.updateProjectionMatrix()
+    }
+
     setMode(mode) {
         this.mode = mode
         this.controls.enabled = this.mode === 'free'
@@ -82,6 +158,20 @@ export default class Camera {
         if (this.mode === 'free') {
             this.controls.target.copy(this.smoothLookAt)
             this.controls.update()
+        }
+
+        if (this.mode === 'follow') {
+            this.instance.fov = this.baseFov
+            this.instance.updateProjectionMatrix()
+            if (this.experience.world?.character) {
+                const cp = this.experience.world.character.position
+                this.smoothLookAt.copy(cp)
+                this.smoothPosition.copy(cp).add(this.cameraOffset)
+            }
+        }
+
+        if (this.mode === 'frisbeeFlight') {
+            this._throwYaw = this.experience.world?.character?.container?.rotation.y ?? 0
         }
     }
 

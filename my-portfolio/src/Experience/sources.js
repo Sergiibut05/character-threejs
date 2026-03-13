@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export default [
+const allSources = [
     {
         name: 'humanModel',
         type: 'gltfModel',
@@ -14,6 +14,9 @@ export default [
             texture.colorSpace = THREE.SRGBColorSpace
             texture.wrapS = THREE.ClampToEdgeWrapping
             texture.wrapT = THREE.ClampToEdgeWrapping
+            texture.minFilter = THREE.LinearFilter
+            texture.magFilter = THREE.LinearFilter
+            texture.generateMipmaps = false
         }
     },
     {
@@ -33,6 +36,26 @@ export default [
         name: 'patioModel',
         type: 'gltfModel',
         path: '/models/Patio/patio-draco.glb'
+    },
+    {
+        name: 'activitiesPointsModel',
+        type: 'gltfModel',
+        path: '/models/activities/activities-points-compressed.glb'
+    },
+    {
+        name: 'frisbeeModel',
+        type: 'gltfModel',
+        path: '/models/frisbee/frisbee-draco.glb'
+    },
+    {
+        name: 'frisbeeTexture',
+        type: 'textureKtx',
+        path: '/models/frisbee/novea-texture.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+        }
     },
     {
         name: 'houseTexture',
@@ -91,3 +114,15 @@ export default [
         path: '/models/trees/Old-tree/Old-tree-references-compressed.glb'
     }
 ]
+
+const devLightMode = import.meta.env.VITE_DEV_LIGHT_MODE === 'true'
+
+const devLightSources = allSources.filter((source) => {
+    return source.name === 'humanModel' ||
+        source.name === 'humanAtlas' ||
+        source.name === 'activitiesPointsModel' ||
+        source.name === 'frisbeeModel' ||
+        source.name === 'frisbeeTexture'
+})
+
+export default devLightMode ? devLightSources : allSources
