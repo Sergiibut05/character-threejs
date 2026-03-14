@@ -89,6 +89,16 @@ export default class Character {
         this.scene.add(this.container)
     }
 
+    getRightHandBone() {
+        if (this._rightHandBone) return this._rightHandBone
+        this.model.traverse((child) => {
+            if (child.isBone && child.name === 'mixamorigRightHand') {
+                this._rightHandBone = child
+            }
+        })
+        return this._rightHandBone
+    }
+
     _applyAtlas() {
         const atlas = this.resources.items.humanAtlas
         if (!atlas) return

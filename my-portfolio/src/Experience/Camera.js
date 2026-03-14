@@ -32,6 +32,9 @@ export default class Camera {
         this.flightFovMin = 22
         this.flightFovMax = 35
         this.flightZoomDist = 30
+        this.flightExtraZoomTime = 2.0
+        this.flightExtraZoomFov = 14
+        this._flightTimer = 0
 
         if (this.debug.active) {
             this.setDebug()
@@ -128,7 +131,9 @@ export default class Camera {
         const character = this.experience.world?.character
         if (!frisbeePos || !character) return
 
-        // Camera stays near character, nudged slightly forward in throw direction
+        const dt = this.experience.time.delta * 0.001
+        this._flightTimer += dt
+
         const yaw = this._throwYaw
         const desiredPos = character.position.clone()
         desiredPos.x += Math.sin(yaw) * this.flightForwardNudge
@@ -146,7 +151,13 @@ export default class Camera {
         // Auto-zoom: narrow FOV as frisbee gets farther away
         const dist = this.smoothPosition.distanceTo(frisbeePos)
         const t = THREE.MathUtils.clamp(dist / this.flightZoomDist, 0, 1)
-        const targetFov = THREE.MathUtils.lerp(this.flightFovMax, this.flightFovMin, t)
+        let targetFov = THREE.MathUtils.lerp(this.flightFovMax, this.flightFovMin, t)
+
+        // Extra zoom kick after 2 seconds of flight
+        if (this._flightTimer >= this.flightExtraZoomTime) {
+            targetFov = Math.min(targetFov, this.flightExtraZoomFov)
+        }
+
         this.instance.fov += (targetFov - this.instance.fov) * 0.08
         this.instance.updateProjectionMatrix()
     }
@@ -172,6 +183,7 @@ export default class Camera {
 
         if (this.mode === 'frisbeeFlight') {
             this._throwYaw = this.experience.world?.character?.container?.rotation.y ?? 0
+            this._flightTimer = 0
         }
     }
 

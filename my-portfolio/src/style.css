@@ -421,7 +421,7 @@ body
     background: rgba(0, 0, 0, 0.55);
     border: 2px solid rgba(255, 255, 255, 0.7);
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
     z-index: 1300;
     display: flex;
     align-items: center;
@@ -431,6 +431,9 @@ body
 
 .frisbee-power-fill
 {
+    position: absolute;
+    left: 0;
+    top: 0;
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, #6ee786 0%, #ffe04a 55%, #ff5e5e 100%);
@@ -448,4 +451,46 @@ body
     border-left: 2px solid rgba(255, 255, 255, 0.4);
     border-right: 2px solid rgba(255, 255, 255, 0.4);
     pointer-events: none;
+}
+
+/* Tilt indicator — diamond marker below the bar */
+.frisbee-tilt-indicator
+{
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border: 2px solid rgba(0, 0, 0, 0.4);
+    border-radius: 2px;
+    transform: translateX(-50%) rotate(45deg);
+    transition: left 0.06s linear;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Tilt arrows on sides of the bar */
+.frisbee-tilt-arrow
+{
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    transition: opacity 0.1s ease, color 0.1s ease;
+    user-select: none;
+}
+
+.frisbee-tilt-arrow.left
+{
+    left: -20px;
+    color: #6eaaff;
+}
+
+.frisbee-tilt-arrow.right
+{
+    right: -20px;
+    color: #ff8e6e;
 }

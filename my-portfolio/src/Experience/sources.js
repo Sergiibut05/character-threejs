@@ -58,6 +58,11 @@ const allSources = [
         }
     },
     {
+        name: 'dogModel',
+        type: 'gltfModel',
+        path: '/models/dog/dog-draco.glb'
+    },
+    {
         name: 'houseTexture',
         type: 'textureKtx',
         path: '/models/Patio/house-texture.ktx2',
@@ -122,7 +127,8 @@ const devLightSources = allSources.filter((source) => {
         source.name === 'humanAtlas' ||
         source.name === 'activitiesPointsModel' ||
         source.name === 'frisbeeModel' ||
-        source.name === 'frisbeeTexture'
+        source.name === 'frisbeeTexture' ||
+        source.name === 'dogModel'
 })
 
 export default devLightMode ? devLightSources : allSources
