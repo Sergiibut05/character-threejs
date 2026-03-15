@@ -9,6 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export default {
     root: 'src/', // Sources files (typically where index.html is)
     publicDir: '../static/', // Path from "root" to static assets
+    envDir: '../', // Load .env from project root (not from src/)
     resolve:
     {
         alias:

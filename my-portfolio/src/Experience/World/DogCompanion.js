@@ -183,6 +183,26 @@ export default class DogCompanion {
         this._playAction('walk')
     }
 
+    /**
+     * @param {number} cameraYaw — the throw yaw so the dog walks perpendicular to the camera view
+     */
+    startPostCatchWalk(cameraYaw) {
+        // Walk roughly perpendicular to the camera (left or right)
+        // Pick the side closest to the dog's current facing
+        const dogYaw = this.container.rotation.y
+        const perpL = cameraYaw + Math.PI * 0.5
+        const perpR = cameraYaw - Math.PI * 0.5
+        const diffL = Math.abs(Math.atan2(Math.sin(perpL - dogYaw), Math.cos(perpL - dogYaw)))
+        const diffR = Math.abs(Math.atan2(Math.sin(perpR - dogYaw), Math.cos(perpR - dogYaw)))
+        const walkYaw = diffL < diffR ? perpL : perpR
+
+        const dir = new THREE.Vector3(Math.sin(walkYaw), 0, Math.cos(walkYaw))
+        this.returnTarget.copy(this.position).addScaledVector(dir, 2.5)
+        this.returnTarget.y = 0
+        this.state = 'postWalk'
+        this._playAction('walk')
+    }
+
     // ─── Per-frame ──────────────────────────────────────────────────────
 
     update(dt) {
@@ -193,6 +213,7 @@ export default class DogCompanion {
             case 'chasing': this._updateChasing(dt); break
             case 'catching': this._updateCatching(dt); break
             case 'returning': this._updateReturning(dt); break
+            case 'postWalk': this._updatePostWalk(dt); break
         }
     }
 
@@ -288,6 +309,24 @@ export default class DogCompanion {
         this.position.addScaledVector(toTarget, this.walkSpeed * dt)
         this.position.y = 0
 
+        this._rotateToward(toTarget, dt)
+        this.container.position.copy(this.position)
+    }
+
+    _updatePostWalk(dt) {
+        const toTarget = _v3.subVectors(this.returnTarget, this.position)
+        toTarget.y = 0
+        const dist = toTarget.length()
+
+        if (dist < 0.3) {
+            this.state = 'done'
+            this._playAction('idle')
+            return
+        }
+
+        toTarget.normalize()
+        this.position.addScaledVector(toTarget, this.walkSpeed * dt)
+        this.position.y = 0
         this._rotateToward(toTarget, dt)
         this.container.position.copy(this.position)
     }

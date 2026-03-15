@@ -63,6 +63,16 @@ const allSources = [
         path: '/models/dog/dog-draco.glb'
     },
     {
+        name: 'objectiveArrowTexture',
+        type: 'texture',
+        path: '/models/dog/dog-objective-sign.png'
+    },
+    {
+        name: 'checkTexture',
+        type: 'texture',
+        path: '/models/dog/check.png'
+    },
+    {
         name: 'houseTexture',
         type: 'textureKtx',
         path: '/models/Patio/house-texture.ktx2',
@@ -128,7 +138,9 @@ const devLightSources = allSources.filter((source) => {
         source.name === 'activitiesPointsModel' ||
         source.name === 'frisbeeModel' ||
         source.name === 'frisbeeTexture' ||
-        source.name === 'dogModel'
+        source.name === 'dogModel' ||
+        source.name === 'objectiveArrowTexture' ||
+        source.name === 'checkTexture'
 })
 
 export default devLightMode ? devLightSources : allSources

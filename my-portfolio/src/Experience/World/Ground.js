@@ -27,7 +27,7 @@ export default class Ground {
             lineColor: '#8fd3ff',
             crossColor: '#ffd166',
             baseColor: '#223028',
-            fadeDistance: 20.0
+            fadeDistance: 55.0
         }
 
         this.setGeometry()

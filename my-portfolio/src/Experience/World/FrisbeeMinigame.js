@@ -2,6 +2,18 @@ import * as THREE from 'three'
 import Experience from '../Experience.js'
 import FrisbeeFlightController from './FrisbeeFlightController.js'
 import DogCompanion from './DogCompanion.js'
+import ObjectiveMarker from './ObjectiveMarker.js'
+import ScoreFeedback from './ScoreFeedback.js'
+import Balloon from './Balloon.js'
+
+const TARGET_SPOTS = [
+    { forward: 15, lateral: 0 },
+    { forward: 12, lateral: 4 },
+    { forward: 12, lateral: -4 },
+    { forward: 18, lateral: 2 },
+    { forward: 18, lateral: -2 },
+    { forward: 10, lateral: 0 }
+]
 
 export default class FrisbeeMinigame {
     constructor() {
@@ -10,7 +22,6 @@ export default class FrisbeeMinigame {
 
         // Tuning
         this.throwReleaseTime = 32 / 24
-        this.powerHoldMaxMs = 1200
         this.launchSpeedMin = 8
         this.launchSpeedMax = 18
         this.aimSensitivity = 1.5
@@ -20,17 +31,32 @@ export default class FrisbeeMinigame {
         this.catchTriggerRadius = 2.5
         this.catchMinFlightTime = 1.5
 
+        // Power oscillator
+        this._powerPhase = 0
+        this._powerDir = 1
+        this._powerSpeed = 1.2
+        this._chargeLocked = false
+        this._prevMobileHold = false
+
         // Runtime
         this.aimYaw = 0
         this.tiltAngle = 0
         this.power = 0
-        this.isCharging = false
-        this.chargeStartTime = 0
         this.enterHeld = false
         this.endTimer = 0
 
+        // Scoring
+        this.targetCenter = new THREE.Vector3()
+        this.dogCatchPosition = new THREE.Vector3()
+        this._catchSequenceTimer = -1
+        this._bullseyeShown = false
+        this._scoreShown = false
+
         this.flightController = new FrisbeeFlightController()
         this.dog = new DogCompanion()
+        this.objectiveMarker = new ObjectiveMarker()
+        this.scoreFeedback = new ScoreFeedback()
+        this.balloon = new Balloon()
         this.setupUI()
         this.setupInput()
     }
@@ -78,18 +104,28 @@ export default class FrisbeeMinigame {
 
     setupInput() {
         this._onKeyDown = (e) => {
-            if (e.key === 'Enter') this.enterHeld = true
+            if (e.key === 'Enter') {
+                this.enterHeld = true
+                if (this.state === 'charge') {
+                    this._handleChargePress()
+                }
+            }
         }
         this._onKeyUp = (e) => {
-            if (e.key === 'Enter') {
-                if (this.isCharging && this.state === 'charge') {
-                    this.releaseThrow()
-                }
-                this.enterHeld = false
-            }
+            if (e.key === 'Enter') this.enterHeld = false
         }
         window.addEventListener('keydown', this._onKeyDown)
         window.addEventListener('keyup', this._onKeyUp)
+    }
+
+    _handleChargePress() {
+        if (!this._chargeLocked) {
+            this._chargeLocked = true
+            this.powerBarContainer.style.display = 'flex'
+            this._updateTiltUI()
+        } else {
+            this.releaseThrow()
+        }
     }
 
     _isMobileHolding() {
@@ -111,19 +147,25 @@ export default class FrisbeeMinigame {
         this.aimYaw = character.container.rotation.y
         this.tiltAngle = 0
         this.power = 0
-        this.isCharging = false
+        this._powerPhase = 0
+        this._powerDir = 1
+        this._chargeLocked = false
         this.enterHeld = false
 
         const prompt = this.experience.world.activityPrompt
         if (prompt?.el) prompt.el.style.display = 'none'
+
+        // Pick a semi-random target
+        this._pickTarget(character)
 
         const handBone = character.getRightHandBone()
         if (handBone) {
             this.flightController.attachToHand(handBone)
         }
 
-        // Show dog next to the player before the iris opens
         this.dog.show(character.position, this.aimYaw)
+
+        this.objectiveMarker.createAimLine()
 
         const renderer = this.experience.renderer
         renderer.setIrisTransitionEnabled(true)
@@ -142,8 +184,41 @@ export default class FrisbeeMinigame {
         )
         renderer.setIrisTransitionEnabled(false)
 
+        this.objectiveMarker.showArrow(this.targetCenter)
+        this.objectiveMarker.showAimLine()
+        this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
+
+        this._placeBalloon(character)
+
         this.state = 'windUp'
         character.startThrowAnimation(this.throwReleaseTime)
+    }
+
+    _placeBalloon(character) {
+        const yaw = this.aimYaw
+        const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
+        const rt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+
+        // Place balloon to one side so the player needs curve to reach it
+        const side = Math.random() < 0.5 ? 1 : -1
+        const pos = character.position.clone()
+        pos.addScaledVector(fw, 11 + Math.random() * 4)
+        pos.addScaledVector(rt, side * (5 + Math.random() * 2))
+        pos.y = 2.2 + Math.random() * 1.0
+
+        this.balloon.show(pos)
+    }
+
+    _pickTarget(character) {
+        const spot = TARGET_SPOTS[Math.floor(Math.random() * TARGET_SPOTS.length)]
+        const yaw = this.aimYaw
+        const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
+        const rt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+
+        this.targetCenter.copy(character.position)
+        this.targetCenter.addScaledVector(fw, spot.forward)
+        this.targetCenter.addScaledVector(rt, spot.lateral)
+        this.targetCenter.y = 0
     }
 
     _snapCameraBehindCharacter() {
@@ -175,11 +250,12 @@ export default class FrisbeeMinigame {
         const character = this.experience.world.character
         if (!character) return
 
-        // Dog mixer ticks in every active state
+        // Tick objective marker and balloon every active frame
+        this.objectiveMarker.update(dt)
+        this.balloon.update(dt)
+
         if (this.state !== 'flight' && this.state !== 'dogChasing' &&
             this.state !== 'dogCatch' && this.state !== 'dogReturn') {
-            // In these states the dog update is called explicitly below;
-            // for others just tick the mixer so idle animation plays
             if (this.dog && this.dog.state !== 'hidden') {
                 this.dog.update(dt)
             }
@@ -187,10 +263,13 @@ export default class FrisbeeMinigame {
 
         if (this.state === 'windUp') {
             this.updateAim(dt, character)
+            this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
             if (character.throwPaused) {
                 this.state = 'charge'
-                this.powerBarContainer.style.display = 'flex'
-                this._updateTiltUI()
+                this._powerPhase = 0
+                this._powerDir = 1
+                this._chargeLocked = false
+                this._prevMobileHold = false
             }
             return
         }
@@ -222,7 +301,8 @@ export default class FrisbeeMinigame {
 
         if (this.state === 'ending') {
             this.endTimer += dt
-            if (this.endTimer > 1.0) {
+            this._updateCatchSequence(dt)
+            if (this.endTimer > 3.0) {
                 this.exitMinigame()
             }
             return
@@ -238,6 +318,11 @@ export default class FrisbeeMinigame {
         const frisbeePos = this.flightController.getPosition()
         this.experience.camera.frisbeeTarget = frisbeePos
 
+        // Balloon collision
+        if (this.balloon.checkCollision(frisbeePos)) {
+            this.balloon.pop()
+        }
+
         // Check catch trigger only after minimum flight time
         const flightTime = this.flightController.flightTime
         if (flightTime > this.catchMinFlightTime &&
@@ -250,8 +335,10 @@ export default class FrisbeeMinigame {
 
             if (frisbeePos.y < this.catchTriggerHeight && hDist < this.catchTriggerRadius) {
                 this.flightController.active = false
+                this.dogCatchPosition.copy(dogPos)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
                 this.state = 'dogCatch'
+                this._onDogCatchStart()
                 return
             }
         }
@@ -259,8 +346,10 @@ export default class FrisbeeMinigame {
         // Frisbee landed without dog catching in the air
         if (!this.flightController.active) {
             if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
+                this.dogCatchPosition.copy(this.dog.position)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
                 this.state = 'dogCatch'
+                this._onDogCatchStart()
             } else {
                 this.state = 'dogChasing'
             }
@@ -271,7 +360,6 @@ export default class FrisbeeMinigame {
         this.dog.update(dt)
         this.experience.camera.frisbeeTarget = this.dog.position
 
-        // Check catch trigger while still running
         const frisbeePos = this.flightController.getPosition()
         const dogPos = this.dog.position
         const hDist = Math.sqrt(
@@ -279,25 +367,54 @@ export default class FrisbeeMinigame {
             (frisbeePos.z - dogPos.z) ** 2
         )
         if (hDist < this.catchTriggerRadius * 1.5) {
+            this.dogCatchPosition.copy(dogPos)
             this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
             this.state = 'dogCatch'
+            this._onDogCatchStart()
             return
         }
 
         if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
+            this.dogCatchPosition.copy(dogPos)
             this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
             this.state = 'dogCatch'
+            this._onDogCatchStart()
+        }
+    }
+
+    _onDogCatchStart() {
+        this.objectiveMarker.hideArrow()
+        this.objectiveMarker.showCheck(this.dogCatchPosition)
+        this._catchSequenceTimer = 0
+        this._bullseyeShown = false
+        this._scoreShown = false
+        this.experience.camera._catchSmoothLook = true
+    }
+
+    _updateCatchSequence(dt) {
+        if (this._catchSequenceTimer < 0) return
+        this._catchSequenceTimer += dt
+
+            if (!this._bullseyeShown && this._catchSequenceTimer >= 2.0) {
+                this._bullseyeShown = true
+                this.objectiveMarker.hideCheck()
+                this.objectiveMarker.showBullseye(this.targetCenter)
+            }
+
+            if (!this._scoreShown && this._catchSequenceTimer >= 2.5) {
+            this._scoreShown = true
+            this.scoreFeedback.evaluate(this.dogCatchPosition, this.targetCenter)
         }
     }
 
     _updateDogCatch(dt) {
         this.dog.update(dt)
         this.experience.camera.frisbeeTarget = this.dog.position
-        this.experience.camera._flightTimer = 0
+        this._updateCatchSequence(dt)
 
         if (this.dog.state === 'caught') {
-            const character = this.experience.world.character
-            this.dog.startReturn(character.position)
+            const cameraYaw = this.experience.camera._throwYaw
+            this.dog.startPostCatchWalk(cameraYaw)
             this.state = 'dogReturn'
         }
     }
@@ -305,6 +422,7 @@ export default class FrisbeeMinigame {
     _updateDogReturn(dt) {
         this.dog.update(dt)
         this.experience.camera.frisbeeTarget = this.dog.position
+        this._updateCatchSequence(dt)
 
         if (this.dog.state === 'done') {
             this.state = 'ending'
@@ -323,7 +441,7 @@ export default class FrisbeeMinigame {
 
         if (this.experience.mobileControls?.isActive()) {
             const m = this.experience.mobileControls.getMovement()
-            aimDelta += m.x * this.aimSensitivity * dt
+            aimDelta -= m.x * this.aimSensitivity * dt
         }
 
         this.aimYaw += aimDelta
@@ -331,19 +449,16 @@ export default class FrisbeeMinigame {
     }
 
     updateCharge(dt, character) {
-        const holding = this.enterHeld || this._isMobileHolding()
-        const keys = character.keys
+        // Auto-oscillate the power marker (always running)
+        this._powerPhase += dt * this._powerSpeed * this._powerDir
+        if (this._powerPhase >= 1) { this._powerPhase = 1; this._powerDir = -1 }
+        if (this._powerPhase <= 0) { this._powerPhase = 0; this._powerDir = 1 }
+        this.power = this._powerPhase
+        this.powerBarFill.style.left = `${this.power * 100}%`
 
-        if (holding && !this.isCharging) {
-            this.isCharging = true
-            this.chargeStartTime = performance.now()
-        }
-
-        if (this.isCharging && holding) {
-            const elapsed = performance.now() - this.chargeStartTime
-            this.power = Math.min(elapsed / this.powerHoldMaxMs, 1)
-            this.powerBarFill.style.width = `${this.power * 100}%`
-
+        if (this._chargeLocked) {
+            // Phase 2: tilt control (A/D or joystick)
+            const keys = character.keys
             let tiltDelta = 0
             if (keys.a) tiltDelta -= this.tiltSensitivity * dt
             if (keys.d) tiltDelta += this.tiltSensitivity * dt
@@ -356,13 +471,17 @@ export default class FrisbeeMinigame {
             this.tiltAngle = THREE.MathUtils.clamp(this.tiltAngle + tiltDelta, -1, 1)
             this.flightController.setTilt(this.tiltAngle)
             this._updateTiltUI()
-        } else if (!this.isCharging) {
+            this.objectiveMarker.updateAimLine(this.tiltAngle, 1, character.container.position, this.aimYaw)
+        } else {
+            // Phase 1: aiming (A/D rotates character)
             this.updateAim(dt, character)
+            this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
         }
 
+        // Mobile single-press detection (mirrors keyboard two-step)
         const mobileNow = this._isMobileHolding()
-        if (this.isCharging && this._prevMobileHold && !mobileNow) {
-            this.releaseThrow()
+        if (mobileNow && !this._prevMobileHold) {
+            this._handleChargePress()
         }
         this._prevMobileHold = mobileNow
     }
@@ -402,6 +521,7 @@ export default class FrisbeeMinigame {
         this.flightController.launch(launchPos, direction, speed, this.tiltAngle)
 
         this.powerBarContainer.style.display = 'none'
+        this.objectiveMarker.hideAimLine()
 
         this.experience.camera.frisbeeTarget = this.flightController.getPosition()
         this.experience.camera.setMode('frisbeeFlight')
@@ -424,13 +544,16 @@ export default class FrisbeeMinigame {
             (v) => renderer.setIrisTransitionSize(v)
         )
 
-        // Detach frisbee from dog before resetting flight controller
         this.dog.detachFrisbee()
 
         const character = this.experience.world.character
         character.resetAfterThrow()
         this.flightController.reset()
         this.dog.reset()
+        this.objectiveMarker.reset()
+        this.scoreFeedback.hide()
+        this.balloon.hide()
+        this._catchSequenceTimer = -1
 
         this.experience.camera.setMode('follow')
         this.experience.camera.frisbeeTarget = null
@@ -438,12 +561,14 @@ export default class FrisbeeMinigame {
         const prompt = this.experience.world.activityPrompt
         if (prompt?.el) prompt.el.style.display = ''
 
-        this.powerBarFill.style.width = '0%'
+        this.powerBarFill.style.left = '0%'
         this.tiltIndicator.style.left = '50%'
         this.aimYaw = 0
         this.tiltAngle = 0
         this.power = 0
-        this.isCharging = false
+        this._powerPhase = 0
+        this._powerDir = 1
+        this._chargeLocked = false
         this.enterHeld = false
 
         await this.experience.waitMs(300)
@@ -464,6 +589,9 @@ export default class FrisbeeMinigame {
         window.removeEventListener('keyup', this._onKeyUp)
         this.flightController.destroy()
         this.dog.destroy()
+        this.objectiveMarker.destroy()
+        this.scoreFeedback.destroy()
+        this.balloon.destroy()
         this.powerBarContainer?.remove()
     }
 }

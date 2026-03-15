@@ -62,7 +62,7 @@ export default class MobileControls
         this.joystickArea.style.cssText = `
             position: absolute;
             left: 20px;
-            bottom: 20px;
+            bottom: 60px;
             width: 150px;
             height: 150px;
             pointer-events: auto;
@@ -74,7 +74,7 @@ export default class MobileControls
         this.buttonsArea.style.cssText = `
             position: absolute;
             right: 20px;
-            bottom: 20px;
+            bottom: 60px;
             display: flex;
             flex-direction: column;
             gap: 10px;

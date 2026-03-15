@@ -19,13 +19,14 @@ export default class Camera {
         this._throwYaw = 0
 
         // frisbeeAim camera tuning
-        this.aimBehindDist = 4.6
+        const isMobileAim = this.checkIfMobile()
+        this.aimBehindDist = isMobileAim ? 6.2 : 4.6
         this.aimHeight = 0.2
         this.aimLookHeight = 0.1
         this.aimLerp = 0.15
 
         // frisbeeFlight camera tuning — camera stays near character
-        this.flightForwardNudge = 2.0
+        this.flightForwardNudge = isMobileAim ? 3.0 : 2.0
         this.flightHeight = 1.6
         this.flightPosLerp = 0.06
         this.flightLookLerp = 0.1
@@ -35,6 +36,7 @@ export default class Camera {
         this.flightExtraZoomTime = 2.0
         this.flightExtraZoomFov = 14
         this._flightTimer = 0
+        this._catchSmoothLook = false
 
         if (this.debug.active) {
             this.setDebug()
@@ -142,8 +144,8 @@ export default class Camera {
 
         this.smoothPosition.lerp(desiredPos, this.flightPosLerp)
 
-        // LookAt tracks the frisbee
-        this.smoothLookAt.lerp(frisbeePos, this.flightLookLerp)
+        const lookLerp = this._catchSmoothLook ? 0.035 : this.flightLookLerp
+        this.smoothLookAt.lerp(frisbeePos, lookLerp)
 
         this.instance.position.copy(this.smoothPosition)
         this.instance.lookAt(this.smoothLookAt)
@@ -153,7 +155,6 @@ export default class Camera {
         const t = THREE.MathUtils.clamp(dist / this.flightZoomDist, 0, 1)
         let targetFov = THREE.MathUtils.lerp(this.flightFovMax, this.flightFovMin, t)
 
-        // Extra zoom kick after 2 seconds of flight
         if (this._flightTimer >= this.flightExtraZoomTime) {
             targetFov = Math.min(targetFov, this.flightExtraZoomFov)
         }
@@ -172,6 +173,7 @@ export default class Camera {
         }
 
         if (this.mode === 'follow') {
+            this._catchSmoothLook = false
             this.instance.fov = this.baseFov
             this.instance.updateProjectionMatrix()
             if (this.experience.world?.character) {
