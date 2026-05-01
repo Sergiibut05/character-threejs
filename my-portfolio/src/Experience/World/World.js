@@ -96,6 +96,8 @@ export default class World {
                 bladeWidth: 0.35,
                 bladeHeight: 0.38,
                 cullAspectX: isLow ? 1.8 : 1.0,
+                viewRadius: this.experience.quality.grassViewRadius,
+                viewFadeBand: 4.0,
                 spawnFunction: (count) => this.patioScene.getGrassSpawnPositions(count)
             })
         } else {

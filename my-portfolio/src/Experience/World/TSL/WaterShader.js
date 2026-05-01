@@ -1,33 +1,28 @@
 /**
- * Water Shader – TSL
- * Exact replication of the Blender node graph:
+ * Water Shader – TSL (Anime / Cel-Shaded Voronoi)
+ * Port of cortiz2894/water-anime-shader to Three.js TSL.
  *
- * Flow:
- *   1. Object XZ → Separate X (keep), Z (= Blender Y, flow direction)
- *   2. Noise on coords*2, scale=1.8, detail=0 → Color Ramp [0.935, 1.0]
- *   3. Z_distorted = Z + ramp_value
- *   4. Mapping: Location Y=0.176, Scale Y=3.0 → stretches cells 3x in flow direction
- *   5. Two Voronoi SMOOTH_F1 (scale=12, smoothness=0.54) → subtract → edge detection
- *   6. Color Ramp threshold (0.0454 → 0.0818) → sharp caustic boundaries
- *   7. Invert → Mix: Emission (white, str=1.5) ↔ Transparent (cyan)
- *   8. Depth intersection → white contours where objects cut the water plane
+ * Algorithm:
+ *   1. World XZ → fBm noise distortion → Voronoi UV
+ *   2. Voronoi F1 (nearest cell) and SmoothF1 (polynomial smooth-min)
+ *   3. Edge = F1 − SmoothF1 → cel-shaded threshold → 3-stop color ramp
+ *   4. Camera distance fade for infinite-floor illusion
  *
  * Shadow variant (agua001/agua002):
- *   - Same Voronoi but wider Color Ramp (0.0454 → 0.1636)
- *   - Black emission, blue transparent
- *   - No depth intersection
+ *   - Same Voronoi, wider threshold
+ *   - Black + blue transparent, no distance fade
  */
 import {
     Fn, float, vec2, vec3, vec4,
-    uniform,
-    positionWorld, positionLocal, uv, vertexStage,
-    sin, cos, abs, floor, fract,
+    positionWorld, positionView, vertexStage,
+    sin, abs, floor, fract, exp,
     smoothstep, clamp, mix, dot, length,
-    normalize, min, max, sqrt
+    min, max, step, pow,
+    viewportDepthTexture, perspectiveDepthToViewZ,
+    cameraNear, cameraFar
 } from 'three/tsl'
-import * as THREE from 'three'
 
-// --- 2D hash for Voronoi ---
+// ── 2D hash for Voronoi cell seeds ──────────────────────────────────────────
 const hash2 = Fn(([p]) => {
     const px = dot(p, vec2(127.1, 311.7))
     const py = dot(p, vec2(269.5, 183.3))
@@ -37,12 +32,46 @@ const hash2 = Fn(([p]) => {
     )
 })
 
-// --- Smooth Voronoi F1 (Blender SMOOTH_F1) ---
-// Returns smoothed distance to nearest cell point
-const voronoiSmooth = Fn(([p, smoothness_param]) => {
-    const pi = floor(p).toVar()
-    const pf = fract(p).toVar()
+// ── Polynomial smooth-min (k = blend radius) ───────────────────────────────
+const smin = Fn(([a, b, k]) => {
+    const h = max(k.sub(abs(a.sub(b))), 0.0).div(k)
+    return min(a, b).sub(h.mul(h).mul(h).mul(k).div(6.0))
+})
 
+// ── Animated cell position (same random offset in both F1 and SF1) ──────────
+const cellPt = Fn(([seed, time, cellSpeed]) => {
+    const phaseX = time.mul(cellSpeed).add(float(6.2831).mul(seed.x))
+    const phaseY = time.mul(cellSpeed).add(float(6.2831).mul(seed.y))
+    return vec2(
+        float(0.5).add(float(0.5).mul(sin(phaseX))),
+        float(0.5).add(float(0.5).mul(sin(phaseY)))
+    )
+})
+
+// ── Voronoi F1: nearest-cell Euclidean distance ─────────────────────────────
+const voronoiF1 = Fn(([p, time, cellSpeed]) => {
+    const i = floor(p)
+    const f = fract(p)
+    const md = float(8.0).toVar()
+
+    const offsets = [
+        vec2(-1, -1), vec2(0, -1), vec2(1, -1),
+        vec2(-1, 0), vec2(0, 0), vec2(1, 0),
+        vec2(-1, 1), vec2(0, 1), vec2(1, 1)
+    ]
+
+    for (const n of offsets) {
+        const pt = cellPt(hash2(i.add(n)), time, cellSpeed)
+        md.assign(min(md, length(n.add(pt).sub(f))))
+    }
+
+    return md
+})
+
+// ── Voronoi SmoothF1: smooth-min over all cell distances ────────────────────
+const voronoiSF1 = Fn(([p, time, cellSpeed, smoothness]) => {
+    const i = floor(p)
+    const f = fract(p)
     const res = float(8.0).toVar()
 
     const offsets = [
@@ -51,182 +80,169 @@ const voronoiSmooth = Fn(([p, smoothness_param]) => {
         vec2(-1, 1), vec2(0, 1), vec2(1, 1)
     ]
 
-    for (const offset of offsets) {
-        const point = hash2(pi.add(offset)).toVar()
-        const diff = offset.add(point).sub(pf)
-        const dist = dot(diff, diff)
-
-        const h = clamp(
-            float(0.5).add(float(0.5).mul(res.sub(dist)).div(smoothness_param)),
-            0.0, 1.0
-        )
-        res.assign(
-            mix(res, dist, h).sub(smoothness_param.mul(h).mul(float(1.0).sub(h)))
-        )
+    for (const n of offsets) {
+        const pt = cellPt(hash2(i.add(n)), time, cellSpeed)
+        res.assign(smin(res, length(n.add(pt).sub(f)), smoothness))
     }
 
     return res
 })
 
-// --- Simple 2D value noise (for distortion) ---
-const hash21 = Fn(([p]) => {
-    return fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453123))
+// ── Scalar hash for value noise ─────────────────────────────────────────────
+const nHash = Fn(([p_in]) => {
+    const p = fract(p_in.mul(vec2(127.1, 311.7)))
+    const pp = p.add(dot(p, p.add(45.32)))
+    return fract(pp.x.mul(pp.y))
 })
 
-const valueNoise = Fn(([p]) => {
-    const i = floor(p).toVar()
-    const f = fract(p).toVar()
+// ── Value noise (smoothstep interpolated) ───────────────────────────────────
+const vnoise = Fn(([p]) => {
+    const i = floor(p)
+    const f = fract(p)
     const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0)))
 
-    const a = hash21(i)
-    const b = hash21(i.add(vec2(1.0, 0.0)))
-    const c = hash21(i.add(vec2(0.0, 1.0)))
-    const d = hash21(i.add(vec2(1.0, 1.0)))
+    const a = nHash(i)
+    const b = nHash(i.add(vec2(1.0, 0.0)))
+    const c = nHash(i.add(vec2(0.0, 1.0)))
+    const d = nHash(i.add(vec2(1.0, 1.0)))
 
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y)
 })
 
-/**
- * Core function that computes the Voronoi caustics pattern.
- * Shared between the main water and shadow shaders.
- */
-const computeVoronoi = Fn(([wp, time, voronoiScale, mappingScaleY, mappingOffsetY, smoothness_v, distortionStrength]) => {
-    // ── Step 1: Separate XYZ ──
-    const objX = wp.x.toVar()
-    const objY = wp.z.toVar() // Blender Y = Three.js Z
+// ── 2-octave fBm ───────────────────────────────────────────────────────────
+const fbm = Fn(([p]) => {
+    return float(0.5).mul(vnoise(p)).add(float(0.25).mul(vnoise(p.mul(2.0))))
+})
 
-    // ── Step 2: Noise distortion on Y ──
-    const noiseInput = wp.xz.mul(2.0).mul(1.8)
-    const noiseVal = valueNoise(noiseInput.add(time.mul(0.08)))
+// ── Core: noise distortion + Voronoi F1−SF1 edge detection ─────────────────
+const computeAnimeVoronoi = Fn(([
+    wp, time, scale, smoothness, cellSpeed,
+    flowX, flowZ, noiseScale, noiseFlowSpeed, distortAmount
+]) => {
+    const noiseUV = wp.mul(noiseScale).add(vec2(time.mul(noiseFlowSpeed), 0.0))
+    const noiseFac = fbm(noiseUV)
+    const dv = noiseFac.sub(0.5).mul(distortAmount)
+    const distort = vec2(dv, dv)
 
-    // Color Ramp.001: maps [0,1] → [0.935, 1.0]
-    const rampValue = mix(float(0.935), float(1.0), noiseVal)
+    const vuv = wp.mul(scale)
+        .add(vec2(flowX, flowZ).mul(time))
+        .add(distort)
 
-    // Math.001: Y + ramp_value
-    const distortedY = objY.add(rampValue.mul(distortionStrength))
+    const f1 = voronoiF1(vuv, time, cellSpeed)
+    const sf1 = voronoiSF1(vuv, time, cellSpeed, smoothness)
 
-    // ── Step 3: Mapping ──
-    const mappedX = objX
-    const mappedY = distortedY.add(mappingOffsetY).mul(mappingScaleY)
-
-    // ── Step 4: Voronoi ──
-    const voronoiUV = vec2(mappedX, mappedY).mul(voronoiScale).toVar()
-
-    // Animation: gentle flow
-    voronoiUV.y.addAssign(time.mul(0.25))
-
-    // ── Step 5: Two Voronoi SMOOTH_F1, subtract → edge detection ──
-    const v1 = voronoiSmooth(voronoiUV, smoothness_v)
-    const v2 = voronoiSmooth(voronoiUV.add(vec2(0.5, 0.5)), smoothness_v)
-    const diff = v1.sub(v2)
-
-    return diff
+    return f1.sub(sf1)
 })
 
 /**
- * Creates the water caustics color node for the main water plane (agua).
- * Replicates the exact Blender node graph, with depth-based intersection contours.
+ * Anime water surface — 3-stop color ramp with cel-shaded edges
+ * and screen-space depth intersection (white line + soft glow where
+ * geometry crosses the water plane).
  */
 export function createWaterColorNode(uniforms) {
     const {
-        uTime,
-        uVoronoiScale,
-        uMappingScaleY,
-        uMappingOffsetY,
-        uSmoothness,
-        uEmissionStrength,
-        uWaterColor,
-        uCausticsThresholdLow,
-        uCausticsThresholdHigh,
-        uDistortionStrength,
-        uIntersectionWidth,     // depth comparison distance for contour
-        uIntersectionStrength   // intensity of the white contour
+        uTime, uScale, uSmoothness, uEdgeThreshold, uEdgeSoftness,
+        uFlowX, uFlowZ, uCellSpeed,
+        uNoiseScale, uNoiseFlowSpeed, uDistortAmount,
+        uDeepColor, uMidColor, uMidPos, uHighlight,
+        uOpacity, uDeepOpacity,
+        uFadeDistance, uFadeStrength, uCamXZ,
+        uLineWidth, uGlowWidth,
+        uLineColor, uLineOpacity,
+        uGlowColor, uGlowOpacity
     } = uniforms
 
     const worldPos = vertexStage(positionWorld)
+    const viewPos = vertexStage(positionView)
 
-    const colorNode = Fn(() => {
-        const wp = worldPos
+    return Fn(() => {
+        const wp = worldPos.xz
 
-        // ── Voronoi caustics ──
-        const diff = computeVoronoi(
-            wp, uTime, uVoronoiScale, uMappingScaleY,
-            uMappingOffsetY, uSmoothness, uDistortionStrength
+        const edge = computeAnimeVoronoi(
+            wp, uTime, uScale, uSmoothness, uCellSpeed,
+            uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
         )
 
-        // ── Color Ramp (0.0454 → 0.0818) ──
-        // diff < 0.0454 → 0 (black), diff > 0.0818 → 1 (white)
-        const caustics = smoothstep(uCausticsThresholdLow, uCausticsThresholdHigh, diff)
+        const t = smoothstep(
+            uEdgeThreshold.sub(uEdgeSoftness),
+            uEdgeThreshold.add(uEdgeSoftness),
+            edge
+        )
 
-        // ── Blender Mix Shader logic ──
-        // Blender: Invert(colorRamp) → Factor for Mix(Emission_white, Transparent_cyan)
-        // Result: (1-inverted)*white + inverted*cyan = caustics*white + (1-caustics)*cyan
-        // So: caustics=1 (large diff, cell borders) → WHITE emission
-        //     caustics=0 (small diff, cell interiors) → TEAL transparent
-        const emissionColor = vec3(1.0, 1.0, 1.0).mul(uEmissionStrength)
-        const transparentColor = uWaterColor
-        const baseColor = mix(transparentColor, emissionColor, caustics)
+        const safeMP = max(uMidPos, float(0.0001))
+        const seg0 = clamp(t.div(safeMP), 0.0, 1.0)
+        const seg1 = clamp(
+            t.sub(safeMP).div(max(float(1.0).sub(safeMP), float(0.0001))),
+            0.0, 1.0
+        )
+        const inSeg1 = step(safeMP, t)
+        const color = mix(
+            mix(uDeepColor, uMidColor, seg0),
+            mix(uMidColor, uHighlight, seg1),
+            inSeg1
+        ).toVar()
 
-        // ── Depth-based intersection contour ──
-        // Approximation using UV spherical gradient (like Blender's AO node)
-        const uvCoord = uv()
-        const center = vec2(0.5, 0.5)
-        const distFromCenter = length(uvCoord.sub(center)).mul(2.0)
+        // ── Depth intersection ──────────────────────────────────────────
+        // Compare viewport depth buffer (opaque objects already rendered)
+        // against the water surface depth → white line + blue glow where
+        // geometry crosses the water plane.
+        const sceneViewZ = perspectiveDepthToViewZ(viewportDepthTexture(), cameraNear, cameraFar)
+        const waterViewZ = viewPos.z
+        const depthDiff = abs(sceneViewZ.sub(waterViewZ))
 
-        // AO Color Ramp: 0.55 → white (inside), 0.923 → black (edge)
-        const aoFactor = float(1.0).sub(smoothstep(0.55, 0.923, distFromCenter))
+        const line = float(1.0).sub(smoothstep(float(0.0), uLineWidth, depthDiff))
+        const glow = exp(depthDiff.negate().div(max(uGlowWidth, float(0.001))))
 
-        // Where AO is dark (near edges/rocks) → blend in white emission
-        const edgeGlow = float(1.0).sub(aoFactor).mul(uIntersectionStrength)
-        const edgeEmission = vec3(1.0, 1.0, 1.0).mul(2.0)
+        const lineContrib = line.mul(uLineOpacity)
+        const glowContrib = glow.mul(uGlowOpacity)
+        const intersectionAlpha = max(lineContrib, glowContrib)
+        const intersectionColor = mix(uGlowColor, uLineColor, line)
 
-        const finalColor = mix(baseColor, edgeEmission, edgeGlow)
+        color.assign(color.add(intersectionColor.mul(intersectionAlpha)))
 
-        // Alpha: cell borders (high caustics) opaque, interiors semi-transparent
-        const alpha = mix(float(0.15), float(0.85), caustics).add(edgeGlow.mul(0.5))
+        // ── Distance fade ───────────────────────────────────────────────
+        const dist = length(wp.sub(uCamXZ))
+        const fade = float(1.0).sub(
+            pow(clamp(dist.div(uFadeDistance), 0.0, 1.0), uFadeStrength)
+        )
 
-        return vec4(finalColor, clamp(alpha, 0.0, 1.0))
+        const alpha = clamp(
+            mix(uDeepOpacity, float(1.0), t).mul(uOpacity).mul(fade).add(intersectionAlpha),
+            0.0, 1.0
+        )
+
+        return vec4(color, alpha)
     })()
-
-    return colorNode
 }
 
 /**
- * Creates the water shadow color node for agua001/agua002.
+ * Shadow layer — same Voronoi, wider threshold, dark tones.
  */
 export function createWaterShadowColorNode(uniforms) {
     const {
-        uTime,
-        uVoronoiScale,
-        uMappingScaleY,
-        uMappingOffsetY,
-        uSmoothness,
-        uDistortionStrength
+        uTime, uScale, uSmoothness, uCellSpeed,
+        uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
     } = uniforms
 
     const worldPos = vertexStage(positionWorld)
 
-    const colorNode = Fn(() => {
-        const wp = worldPos
+    return Fn(() => {
+        const wp = worldPos.xz
 
-        const diff = computeVoronoi(
-            wp, uTime, uVoronoiScale, uMappingScaleY,
-            uMappingOffsetY, uSmoothness, uDistortionStrength
+        const edge = computeAnimeVoronoi(
+            wp, uTime, uScale, uSmoothness, uCellSpeed,
+            uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
         )
 
-        // Wider threshold: 0.0454 → 0.1636
-        const caustics = smoothstep(float(0.0454), float(0.1636), diff)
-        const invertedCaustics = float(1.0).sub(caustics)
+        const t = smoothstep(float(0.04), float(0.16), edge)
+        const invT = float(1.0).sub(t)
 
-        // Black emission for shadows + blue transparent
         const shadowColor = vec3(0.0, 0.0, 0.0)
         const transparentColor = vec3(0.057, 0.561, 1.0)
 
-        const finalColor = mix(transparentColor, shadowColor, invertedCaustics)
-        const alpha = mix(float(0.05), float(0.6), invertedCaustics)
+        const finalColor = mix(transparentColor, shadowColor, invT)
+        const alpha = mix(float(0.05), float(0.6), invT)
 
         return vec4(finalColor, clamp(alpha, 0.0, 1.0))
     })()
-
-    return colorNode
 }

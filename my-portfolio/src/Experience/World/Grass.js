@@ -31,6 +31,9 @@ export default class Grass {
         this.cullOffsetZ = options.cullOffsetZ ?? 3.0
         this.cullAspectX = options.cullAspectX ?? 1.0
 
+        this.viewRadius = options.viewRadius ?? 20
+        this.viewFadeBand = options.viewFadeBand ?? 4.0
+
         this.setGeometry()
         this.setMaterial()
         this.setMesh()
@@ -127,6 +130,10 @@ export default class Grass {
         this.uCullOffsetZ = uniform(this.cullOffsetZ)
         this.uCullAspectX = uniform(this.cullAspectX)
 
+        // View distance culling — collapse blades beyond radius for GPU savings
+        this.uGrassViewRadius = uniform(this.viewRadius)
+        this.uGrassViewFadeBand = uniform(this.viewFadeBand)
+
         // ─── VERTEX SHADER ───────────────────────────────────────────────────
         const posNode = Fn(() => {
             const pos = positionLocal.toVar()
@@ -158,6 +165,11 @@ export default class Grass {
             const ws = this.uWindStrength
             pos.x.addAssign(wave1.mul(ws).add(wave3.mul(ws.mul(0.25))).mul(hSq))
             pos.z.addAssign(wave2.mul(ws.mul(0.6)).mul(hSq))
+
+            // View distance — collapse blades beyond radius (degenerate → GPU skips fragments)
+            const viewDist = length(aInstanceWorldPos.xz.sub(this.uCharacterPosition.xz))
+            const viewFade = smoothstep(this.uGrassViewRadius, this.uGrassViewRadius.sub(this.uGrassViewFadeBand), viewDist)
+            pos.mulAssign(viewFade)
 
             return pos
         })()
@@ -218,7 +230,12 @@ export default class Grass {
             const edgeStart = max(float(0.0), this.uCullRadius.sub(this.uCullEdgeSoftness))
             const cullMask = float(1.0).sub(smoothstep(edgeStart, this.uCullRadius, distToChar))
             const visibilityMask = mix(float(1.0), cullMask, this.uCharacterCullEnabled)
-            const finalAlpha = alpha.mul(baseFade).mul(visibilityMask)
+
+            // View distance alpha fade for smooth edge
+            const viewDistFrag = length(worldPos.xz.sub(this.uCharacterPosition.xz))
+            const viewAlphaFade = smoothstep(this.uGrassViewRadius, this.uGrassViewRadius.sub(this.uGrassViewFadeBand), viewDistFrag)
+
+            const finalAlpha = alpha.mul(baseFade).mul(visibilityMask).mul(viewAlphaFade)
 
             If(finalAlpha.lessThan(0.001), () => { Discard() })
 
@@ -315,6 +332,8 @@ export default class Grass {
         this.uCullEdgeSoftness.value = this.cullEdgeSoftness
         this.uCullOffsetZ.value = this.cullOffsetZ
         this.uCullAspectX.value = this.cullAspectX
+        this.uGrassViewRadius.value = this.viewRadius
+        this.uGrassViewFadeBand.value = this.viewFadeBand
     }
 
     setDebug() {
@@ -351,6 +370,8 @@ export default class Grass {
         this.debugFolder.add(this, 'cullEdgeSoftness', 0.05, 10.0, 0.1).name('Cull Edge Softness')
         this.debugFolder.add(this, 'cullOffsetZ', -10.0, 10.0, 0.5).name('Cull Offset Z')
         this.debugFolder.add(this, 'cullAspectX', 1.0, 3.0, 0.1).name('Cull Aspect X')
+        this.debugFolder.add(this, 'viewRadius', 5.0, 40.0, 0.5).name('View Radius')
+        this.debugFolder.add(this, 'viewFadeBand', 0.5, 10.0, 0.5).name('View Fade Band')
 
         this.debugFolder.addColor({ value: this.uColorRoot.value }, 'value').name('Root Color')
             .onChange(v => this.uColorRoot.value.copy(v))

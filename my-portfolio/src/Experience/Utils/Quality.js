@@ -12,5 +12,6 @@ export default class Quality {
     get antialias() { return this.isLow ? false : (Math.min(window.devicePixelRatio, 2) < 2) }
     get pixelRatio() { return this.isLow ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 2) }
     get grassCount() { return this.isLow ? 7000 : 10000 }
+    get grassViewRadius() { return this.isLow ? 13 : 20 }
     get foliagePlanes() { return this.isLow ? 36 : 80 }
 }

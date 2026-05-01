@@ -151,12 +151,12 @@ export default class PatioScene {
         this.groundUniforms = {
             uScale: uniform(0.2),
             uEmissionStrength: uniform(0.75),
-            uGrassColor0: uniform(new THREE.Color(0x3A7A30)),
-            uGrassColor1: uniform(new THREE.Color(0x62B83A)),
-            uGrassColor2: uniform(new THREE.Color(0xB8E840)),
-            uGrassColor3: uniform(new THREE.Color(0xE2FF8A)),
-            uGrassRampStop1: uniform(0.10),
-            uGrassRampStop2: uniform(0.72),
+            uGrassColor0: uniform(new THREE.Color(0x3E7E32)),
+            uGrassColor1: uniform(new THREE.Color(0x5FB538)),
+            uGrassColor2: uniform(new THREE.Color(0x8FCC3A)),
+            uGrassColor3: uniform(new THREE.Color(0xBDE868)),
+            uGrassRampStop1: uniform(0.18),
+            uGrassRampStop2: uniform(0.68),
             uGrassMicroScale: uniform(1.4),
             uGrassAOStrength: uniform(0),
             uGrassSunStrength: uniform(0.28),
@@ -201,26 +201,44 @@ export default class PatioScene {
     processWater() {
         this.waterUniforms = {
             uTime: this.uTime,
-            uVoronoiScale: uniform(12.0),
-            uMappingScaleY: uniform(3.0),
-            uMappingOffsetY: uniform(0.176),
-            uSmoothness: uniform(0.54),
-            uEmissionStrength: uniform(1.5),
-            uWaterColor: uniform(new THREE.Color(0.028, 0.829, 1.0)),
-            uCausticsThresholdLow: uniform(0.0454),
-            uCausticsThresholdHigh: uniform(0.0818),
-            uDistortionStrength: uniform(1.0),
-            uIntersectionWidth: uniform(0.5),
-            uIntersectionStrength: uniform(1.0)
+            uScale: uniform(1.17),
+            uSmoothness: uniform(0.53),
+            uEdgeThreshold: uniform(0.09),
+            uEdgeSoftness: uniform(0.10),
+            uFlowX: uniform(0.07),
+            uFlowZ: uniform(-0.23),
+            uCellSpeed: uniform(0.55),
+            uNoiseScale: uniform(2.58),
+            uNoiseFlowSpeed: uniform(0.11),
+            uDistortAmount: uniform(0.26),
+            uDeepColor: uniform(new THREE.Color('#27a3d8')),
+            uMidColor: uniform(new THREE.Color('#59c0e8')),
+            uMidPos: uniform(0.31),
+            uHighlight: uniform(new THREE.Color('#ffffff')),
+            uOpacity: uniform(1.0),
+            uDeepOpacity: uniform(0.78),
+            uFadeDistance: uniform(275),
+            uFadeStrength: uniform(1.3),
+            uCamXZ: uniform(new THREE.Vector2(0, 0)),
+            // Depth intersection
+            uLineWidth: uniform(0.25),
+            uGlowWidth: uniform(1.2),
+            uLineColor: uniform(new THREE.Color('#ffffff')),
+            uLineOpacity: uniform(1.0),
+            uGlowColor: uniform(new THREE.Color('#88ccff')),
+            uGlowOpacity: uniform(0.25)
         }
 
         const shadowUniforms = {
             uTime: this.uTime,
-            uVoronoiScale: this.waterUniforms.uVoronoiScale,
-            uMappingScaleY: this.waterUniforms.uMappingScaleY,
-            uMappingOffsetY: this.waterUniforms.uMappingOffsetY,
+            uScale: this.waterUniforms.uScale,
             uSmoothness: this.waterUniforms.uSmoothness,
-            uDistortionStrength: this.waterUniforms.uDistortionStrength
+            uCellSpeed: this.waterUniforms.uCellSpeed,
+            uFlowX: this.waterUniforms.uFlowX,
+            uFlowZ: this.waterUniforms.uFlowZ,
+            uNoiseScale: this.waterUniforms.uNoiseScale,
+            uNoiseFlowSpeed: this.waterUniforms.uNoiseFlowSpeed,
+            uDistortAmount: this.waterUniforms.uDistortAmount
         }
 
         const waterColorNode = createWaterColorNode(this.waterUniforms)
@@ -372,7 +390,12 @@ export default class PatioScene {
         const positions = []
         if (this.groundMeshes.length === 0) return positions
 
-        const countPerMesh = Math.ceil(count / this.groundMeshes.length)
+        const meshData = []
+        let grandTotalArea = 0
+
+        const vA = new THREE.Vector3()
+        const vB = new THREE.Vector3()
+        const vC = new THREE.Vector3()
 
         for (const mesh of this.groundMeshes) {
             const geometry = mesh.geometry
@@ -389,10 +412,6 @@ export default class PatioScene {
 
             const grassTriangles = []
             let totalArea = 0
-
-            const vA = new THREE.Vector3()
-            const vB = new THREE.Vector3()
-            const vC = new THREE.Vector3()
 
             for (let f = 0; f < faceCount; f++) {
                 let iA, iB, iC
@@ -421,35 +440,35 @@ export default class PatioScene {
                 const area = ab.cross(ac).length() * 0.5
 
                 if (area > 0.0001) {
-                    grassTriangles.push({
-                        a: vA.clone(), b: vB.clone(), c: vC.clone(),
-                        area
-                    })
+                    grassTriangles.push({ a: vA.clone(), b: vB.clone(), c: vC.clone(), area })
                     totalArea += area
                 }
             }
 
-            if (grassTriangles.length === 0 || totalArea === 0) continue
+            if (grassTriangles.length > 0 && totalArea > 0) {
+                meshData.push({ mesh, grassTriangles, totalArea })
+                grandTotalArea += totalArea
+            }
+        }
 
-            console.log(`🌿 ${mesh.name}: ${grassTriangles.length} grass triangles, total area: ${totalArea.toFixed(2)}`)
+        if (grandTotalArea === 0) return positions
 
-            for (let i = 0; i < countPerMesh; i++) {
+        for (const { mesh, grassTriangles, totalArea } of meshData) {
+            const meshCount = Math.round(count * (totalArea / grandTotalArea))
+
+            console.log(`🌿 ${mesh.name}: ${grassTriangles.length} tris, area ${totalArea.toFixed(2)} m², ${meshCount} blades`)
+
+            for (let i = 0; i < meshCount; i++) {
                 let r = Math.random() * totalArea
                 let chosenTri = grassTriangles[0]
                 for (const tri of grassTriangles) {
                     r -= tri.area
-                    if (r <= 0) {
-                        chosenTri = tri
-                        break
-                    }
+                    if (r <= 0) { chosenTri = tri; break }
                 }
 
                 let u = Math.random()
                 let v = Math.random()
-                if (u + v > 1) {
-                    u = 1 - u
-                    v = 1 - v
-                }
+                if (u + v > 1) { u = 1 - u; v = 1 - v }
                 const w = 1 - u - v
 
                 positions.push({
@@ -460,13 +479,17 @@ export default class PatioScene {
             }
         }
 
-        console.log(`🌿 Total grass positions: ${positions.length}`)
+        console.log(`🌿 Total grass positions: ${positions.length} (density: ${(positions.length / grandTotalArea).toFixed(1)} blades/m²)`)
         return positions
     }
 
     update() {
         if (this.uTime) {
             this.uTime.value = this.time.elapsed * 0.001
+        }
+        if (this.waterUniforms?.uCamXZ) {
+            const cam = this.experience.camera.instance.position
+            this.waterUniforms.uCamXZ.value.set(cam.x, cam.z)
         }
     }
 
@@ -506,18 +529,38 @@ export default class PatioScene {
         waterFolder.close()
 
         const wu = this.waterUniforms
-        waterFolder.add(wu.uVoronoiScale, 'value', 1.0, 30.0, 0.5).name('Voronoi Scale')
-        waterFolder.add(wu.uMappingScaleY, 'value', 0.5, 10.0, 0.1).name('Flow Stretch (Y)')
-        waterFolder.add(wu.uMappingOffsetY, 'value', -1.0, 1.0, 0.01).name('Mapping Offset Y')
-        waterFolder.add(wu.uSmoothness, 'value', 0.01, 2.0, 0.01).name('Cell Smoothness')
-        waterFolder.add(wu.uEmissionStrength, 'value', 0.1, 5.0, 0.1).name('Caustics Emission')
-        waterFolder.add(wu.uCausticsThresholdLow, 'value', 0.001, 0.2, 0.001).name('Caustics Threshold Low')
-        waterFolder.add(wu.uCausticsThresholdHigh, 'value', 0.01, 0.5, 0.01).name('Caustics Threshold High')
-        waterFolder.add(wu.uDistortionStrength, 'value', 0.0, 3.0, 0.1).name('Noise Distortion')
-        waterFolder.add(wu.uIntersectionWidth, 'value', 0.0, 2.0, 0.1).name('Shore Contour Width')
-        waterFolder.add(wu.uIntersectionStrength, 'value', 0.0, 3.0, 0.1).name('Shore Contour Strength')
-        waterFolder.addColor({ value: wu.uWaterColor.value }, 'value').name('Water Color')
-            .onChange(v => wu.uWaterColor.value.copy(v))
+        waterFolder.add(wu.uScale, 'value', 0.01, 3.0, 0.01).name('Scale')
+        waterFolder.add(wu.uSmoothness, 'value', 0.0, 2.0, 0.01).name('Cell Smoothness')
+        waterFolder.add(wu.uEdgeThreshold, 'value', 0.0, 0.3, 0.005).name('Edge Threshold')
+        waterFolder.add(wu.uEdgeSoftness, 'value', 0.0, 0.1, 0.005).name('Edge Softness')
+        waterFolder.add(wu.uFlowX, 'value', -0.5, 0.5, 0.01).name('Flow X')
+        waterFolder.add(wu.uFlowZ, 'value', -0.5, 0.5, 0.01).name('Flow Z')
+        waterFolder.add(wu.uCellSpeed, 'value', 0.0, 3.0, 0.05).name('Cell Anim Speed')
+        waterFolder.add(wu.uNoiseScale, 'value', 0.1, 10.0, 0.01).name('Noise Scale')
+        waterFolder.add(wu.uNoiseFlowSpeed, 'value', 0.0, 2.0, 0.01).name('Noise Flow Speed')
+        waterFolder.add(wu.uDistortAmount, 'value', 0.0, 3.0, 0.01).name('Distort Amount')
+        waterFolder.add(wu.uMidPos, 'value', 0.001, 0.999, 0.001).name('Mid Color Position')
+        waterFolder.add(wu.uOpacity, 'value', 0.0, 1.0, 0.01).name('Opacity')
+        waterFolder.add(wu.uDeepOpacity, 'value', 0.0, 1.0, 0.01).name('Deep Opacity')
+        waterFolder.add(wu.uFadeDistance, 'value', 10, 300, 5).name('Fade Distance')
+        waterFolder.add(wu.uFadeStrength, 'value', 0.1, 5.0, 0.1).name('Fade Strength')
+        waterFolder.addColor({ value: wu.uDeepColor.value }, 'value').name('Deep Color')
+            .onChange(v => wu.uDeepColor.value.copy(v))
+        waterFolder.addColor({ value: wu.uMidColor.value }, 'value').name('Mid Color')
+            .onChange(v => wu.uMidColor.value.copy(v))
+        waterFolder.addColor({ value: wu.uHighlight.value }, 'value').name('Highlight Color')
+            .onChange(v => wu.uHighlight.value.copy(v))
+
+        const intersectionFolder = this.debug.ui.addFolder('Water Intersection')
+        intersectionFolder.close()
+        intersectionFolder.add(wu.uLineWidth, 'value', 0.0, 2.0, 0.01).name('Line Width')
+        intersectionFolder.add(wu.uGlowWidth, 'value', 0.0, 5.0, 0.1).name('Glow Width')
+        intersectionFolder.add(wu.uLineOpacity, 'value', 0.0, 1.0, 0.01).name('Line Opacity')
+        intersectionFolder.add(wu.uGlowOpacity, 'value', 0.0, 1.0, 0.01).name('Glow Opacity')
+        intersectionFolder.addColor({ value: wu.uLineColor.value }, 'value').name('Line Color')
+            .onChange(v => wu.uLineColor.value.copy(v))
+        intersectionFolder.addColor({ value: wu.uGlowColor.value }, 'value').name('Glow Color')
+            .onChange(v => wu.uGlowColor.value.copy(v))
 
         if (this.cloudUniforms && this.cloudMeshes.length > 0) {
             const cloudFolder = this.debug.ui.addFolder('Clouds')
