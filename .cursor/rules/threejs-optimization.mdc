@@ -1,0 +1,95 @@
+---
+description: Three.js documentation reference and best practices for WebGPU/TSL optimization
+alwaysApply: true
+---
+
+# Three.js Documentation & Optimization Guide
+
+When working with Three.js in this project, always reference the comprehensive documentation in `@my-portfolio/llms-full.txt`. This file contains critical guidelines for:
+
+## Import Maps & Setup
+
+Always use modern import maps pattern, NOT outdated CDN patterns:
+
+```javascript
+// ✅ CORRECT - Modern import map
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ❌ WRONG - Outdated
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+```
+
+## Renderer Selection
+
+- **WebGLRenderer**: Maximum compatibility (default, mature backend)
+- **WebGPURenderer**: Use for custom shaders, TSL, compute shaders, advanced materials
+
+This project uses **WebGPURenderer** for advanced shading capabilities.
+
+## TSL (Three.js Shading Language)
+
+When using WebGPURenderer, use TSL instead of raw GLSL:
+
+```javascript
+// ✅ Use TSL nodes
+import { texture, uv, color, time } from 'three/tsl';
+const material = new THREE.MeshStandardNodeMaterial();
+material.colorNode = texture(myTexture).mul(color(0xff0000));
+
+// ❌ Don't use raw GLSL strings
+material.onBeforeCompile = (shader) => { /* string manipulation */ }
+```
+
+**TSL benefits**:
+- Works with both WebGL and WebGPU backends
+- No string manipulation or performance hacks
+- Type-safe, composable shader nodes
+- Automatic optimization
+
+## Node Material Classes (for WebGPU/TSL)
+
+Use node-based materials when using TSL:
+- `MeshBasicNodeMaterial`
+- `MeshStandardNodeMaterial`
+- `MeshPhysicalNodeMaterial`
+- `LineBasicNodeMaterial`
+- `SpriteNodeMaterial`
+
+## Performance Optimization
+
+### Key Techniques
+1. **Instancing**: Render many identical objects efficiently
+2. **LOD (Level of Detail)**: Reduce poly count with distance
+3. **Texture Atlasing**: Combine textures to reduce draw calls
+4. **Shader Compilation**: Pre-compile during warm-up phase
+5. **Frustum Culling**: Remove out-of-view objects
+6. **Resource Pooling**: Reuse geometries and materials
+
+### Rapier3D Integration
+
+When combining with Rapier physics:
+- Keep rigid body shapes simple (box, sphere, capsule)
+- Use simplified collision geometry separate from visual mesh
+- Update Three.js position/rotation from Rapier world state
+- Use sleeping for static/inactive bodies
+
+## Project-Specific Patterns
+
+This project uses:
+- **WebGPU backend** with TSL shaders for water, ground, clouds
+- **WebGPURenderer** with iris transition effect
+- **Instanced rendering** for grass, trees, foliage
+- **LOD system** for performance scaling
+- **Event emitter pattern** for component communication
+- **Singleton pattern** for Experience class
+
+## Files Reference
+
+When working with Three.js shaders:
+- Water shader: `src/Experience/World/TSL/WaterShader.js`
+- Ground shader: `src/Experience/World/TSL/GroundShader.js`
+- Cloud shader: `src/Experience/World/TSL/CloudShader.js`
+- Noise utilities: `src/Experience/World/TSL/NoiseNodes.js`
+
+Always check `llms-full.txt` for complete examples and detailed API documentation.

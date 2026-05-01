@@ -1,0 +1,252 @@
+---
+description: Performance optimization checklist and profiling guidelines for 3D rendering
+alwaysApply: true
+---
+
+# Performance Optimization Guide
+
+## Quick Performance Checklist
+
+When adding new features or modifying existing code, verify:
+
+### Rendering
+- [ ] Using instancing for repeated objects (not individual meshes)
+- [ ] LOD system enabled for complex geometry
+- [ ] Shaders compiled to TSL, not raw GLSL
+- [ ] Unnecessary draw calls eliminated (batch when possible)
+- [ ] Textures atlased or compressed with Draco
+- [ ] Fog/bloom effects limited to visible area
+
+### Physics
+- [ ] Collision shapes simplified (box/sphere, not mesh)
+- [ ] Sleeping bodies properly configured
+- [ ] Raycast queries cached/throttled
+- [ ] Physics update rate synchronized with render
+
+### Memory
+- [ ] Disposed geometries/materials on cleanup
+- [ ] No memory leaks from event listeners
+- [ ] Texture atlasing to reduce VRAM usage
+- [ ] Resource pooling for frequently created objects
+
+### Mobile Specific
+- [ ] Quality settings adapted for low-end devices
+- [ ] Touch events debounced/throttled
+- [ ] Canvas resolution adaptive
+- [ ] No memory spike from resource loading
+
+## Profiling Tools
+
+### Browser DevTools
+```
+F12 → Performance tab
+1. Record for 5-10 seconds
+2. Zoom on the timeline
+3. Look for:
+   - Long frames (>16ms for 60 FPS)
+   - GPU stalls
+   - GC pauses
+```
+
+### Three.js Stats
+```javascript
+// In Experience.js or Debug.js
+import Stats from 'three/examples/jsm/libs/stats.min.js';
+const stats = new Stats();
+document.body.appendChild(stats.dom);
+
+// In animation loop
+stats.update();
+```
+
+### WebGPU Specific
+```javascript
+// Check shader compilation time
+const adapter = await navigator.gpu?.requestAdapter();
+const device = await adapter?.requestDevice();
+console.time('shader-compile');
+// ... create material ...
+console.timeEnd('shader-compile');
+```
+
+## Common Bottlenecks & Solutions
+
+### High CPU Usage
+
+**Symptom**: 60 FPS but CPU throttled
+
+| Issue | Solution |
+|-------|----------|
+| Too many draw calls | Use instancing, batch, combine meshes |
+| Physics queries | Cache raycasts, throttle checks |
+| Animation loops | Move to GPU, use GPU instancing |
+| Large geometries | Implement LOD, culling |
+
+### High GPU Usage
+
+**Symptom**: GPU at 100%, performance drops in complex areas
+
+| Issue | Solution |
+|-------|----------|
+| Overdraw | Reduce particle count, optimize shaders |
+| Fill rate | Lower resolution, reduce effects |
+| Texture bandwidth | Compress, use atlasing, mipmap |
+| Large buffers | Stream data, use dynamic buffers |
+
+### Memory Spikes
+
+**Symptom**: Sudden FPS drop, GC pause
+
+| Issue | Solution |
+|-------|----------|
+| Loading resources | Lazy load, stream, preload in background |
+| Allocating arrays | Use typed arrays, object pooling |
+| String concatenation | Pre-allocate strings, use template literals |
+| Event listeners | Always clean up, remove on destroy |
+
+## Optimization Strategies by System
+
+### Grass Rendering (Millions of Blades)
+
+```javascript
+// ✅ CORRECT - Instanced
+const geometry = new THREE.PlaneGeometry(width, height);
+const material = new THREE.MeshStandardMaterial();
+const instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+
+// ❌ WRONG - Individual meshes
+for (let i = 0; i < count; i++) {
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+}
+```
+
+### Terrain LOD
+
+```javascript
+// Use distance-based LOD
+const distance = camera.position.distanceTo(terrainPosition);
+if (distance < 50) {
+  terrain.setDetail('high');     // Full resolution
+} else if (distance < 200) {
+  terrain.setDetail('medium');   // 50% vertices
+} else {
+  terrain.setDetail('low');      // 10% vertices
+}
+```
+
+### Shader Optimization
+
+```javascript
+// ✅ EFFICIENT - Minimal operations
+const colorNode = texture(baseMap).mul(color(diffuse));
+
+// ❌ INEFFICIENT - Multiple samples
+const c1 = texture(map1);
+const c2 = texture(map2);
+const c3 = texture(map3);
+const final = c1.mul(c2).add(c3);
+```
+
+### Physics Optimization
+
+```javascript
+// ✅ CORRECT - Sleeping, simple shapes
+const body = world.createRigidBody(RigidBodyDesc.fixed());
+const shape = ColliderDesc.box(1, 1, 1);
+body.sleep();  // Put to sleep if inactive
+
+// ❌ WRONG - Complex mesh collider, always active
+const collider = ColliderDesc.trimesh(vertices, indices);
+body.wakeUp();
+```
+
+## Adaptive Quality System
+
+The project uses `Quality.js` to automatically scale:
+
+```javascript
+// Based on FPS monitoring
+if (avgFps < 30) {
+  quality.decrease();  // Lower resolution, disable effects
+} else if (avgFps > 50) {
+  quality.increase();  // Higher resolution, more effects
+}
+```
+
+Settings adjusted:
+1. **Shadow Resolution**: 512px → 256px
+2. **Particle Count**: 100% → 50% → 25%
+3. **LOD Distances**: Increased (objects disappear sooner)
+4. **Bloom**: Off → Quarter resolution → Full
+5. **Canvas Resolution**: Full → 3/4 → 1/2
+
+## Network & Asset Optimization
+
+### Model Loading
+```javascript
+// ✅ Use Draco compression
+const loader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+loader.setDRACOLoader(dracoLoader);
+
+// ❌ Avoid uncompressed large files
+```
+
+### Texture Optimization
+```javascript
+// ✅ Compress and optimize
+// Use PNG for non-transparent, WebP if supported
+// Add mipmaps for all textures
+texture.generateMipmaps = true;
+texture.magFilter = THREE.LinearFilter;
+texture.minFilter = THREE.LinearMipmapLinearFilter;
+```
+
+## Mobile-Specific Optimizations
+
+### Orientation Handling
+```javascript
+window.addEventListener('orientationchange', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+```
+
+### Touch Event Throttling
+```javascript
+let lastTouchTime = 0;
+canvas.addEventListener('touchmove', (e) => {
+  const now = Date.now();
+  if (now - lastTouchTime < 16) return;  // 60 FPS cap
+  lastTouchTime = now;
+  // ... handle touch ...
+});
+```
+
+### Battery & CPU Optimization
+```javascript
+// Reduce updates when not focused
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    renderer.setAnimationLoop(null);  // Stop rendering
+  } else {
+    renderer.setAnimationLoop(animate);
+  }
+});
+```
+
+## Benchmarking
+
+Target FPS by device:
+- **High-end Desktop** (RTX 3080): 144 FPS target
+- **Mid-range Desktop** (RTX 2070): 60 FPS target
+- **Low-end Laptop** (Intel UHD): 30 FPS target
+- **Tablet** (iPad Pro): 60 FPS target
+- **Mobile** (iPhone 15): 30 FPS target
+- **Old Mobile** (iPhone 12): 20 FPS target
+
+---
+
+**See Also**: `threejs-optimization.mdc` for Three.js specific patterns.

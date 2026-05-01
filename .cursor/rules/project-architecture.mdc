@@ -1,0 +1,221 @@
+---
+description: Project architecture, optimization patterns, and Animal Crossing aesthetic standards
+alwaysApply: true
+---
+
+# Portfolio 3D Animal Crossing - Arquitectura & Estándares
+
+## Descripción del Proyecto
+
+Portfolio 3D interactivo con **Three.js** + **Rapier3D**, inspirado en **Animal Crossing**. El objetivo es crear una experiencia lo más óptima posible en rendimiento, calidad visual y experiencia de usuario.
+
+## Arquitectura Core
+
+### Experience Singleton Pattern
+```javascript
+// src/Experience/Experience.js
+class Experience {
+  constructor(canvas) {
+    if (instance) return instance;
+    instance = this;
+    // Orchestrates: Debug, Quality, Sizes, Time, Scene, Resources, Camera, Renderer, World
+  }
+}
+```
+
+El `Experience` es el singleton central que orquesta todos los componentes. Todos los sub-sistemas se comunican a través de él.
+
+### Componentes Base
+
+1. **Time (src/Experience/Utils/Time.js)**
+   - Global ticker usando `requestAnimationFrame`
+   - Emite eventos 'tick' a ~60 FPS
+   - Sincroniza física, animaciones y render
+
+2. **Sizes (src/Experience/Utils/Sizes.js)**
+   - Maneja redimensionamiento responsivo
+   - Recalcula aspect ratio de cámara
+   - Emite 'resize' para reescalado de canvas
+
+3. **Quality (src/Experience/Utils/Quality.js)**
+   - Ajusta dinámicamente LOD, resolución, efectos
+   - Adapta rendimiento según FPS
+   - Aplica settings por dispositivo
+
+4. **Resources (src/Experience/Utils/Resources.js)**
+   - Carga asíncrona de modelos glTF (.glb, .gltf)
+   - Compresión Draco
+   - Tracking de progreso para loading bar
+
+5. **Renderer (src/Experience/Renderer.js)**
+   - WebGPURenderer con fallback a WebGLRenderer
+   - Iris transition effect (Animal Crossing style)
+   - Post-processing hooks
+
+6. **Camera (src/Experience/Camera.js)**
+   - PerspectiveCamera con controles
+   - Sigue el personaje del jugador
+   - Frustum culling automático
+
+## Optimización para Rendimiento
+
+### Rendering Pipeline
+
+```
+Frame:
+  1. Update Time
+  2. Update Sizes
+  3. Update Camera (follow player)
+  4. Update World (physics, animations, LOD)
+  5. Update Renderer (render + post-processing)
+```
+
+### Técnicas de Optimización Aplicadas
+
+1. **Instancing**
+   - Grass: Millones de instancias renderizadas en 1 draw call
+   - Trees, Bushes: Instanced meshes con matriz de transformaciones
+
+2. **LOD (Level of Detail)**
+   - Árboles: High-poly cerca, low-poly lejos
+   - Terreno: Resolución adaptativa
+   - Objetos dinámicos: Deshabilitados fuera de vista
+
+3. **Shader Optimization**
+   - Shaders compilados a TSL (Three.js Shading Language)
+   - Compiled to native WebGPU kernels
+   - Sin branching innecesario
+   - Precisión: Usar `mediump` en móviles si es posible
+
+4. **Culling Strategies**
+   - **Frustum Culling**: THREE.Frustum
+   - **Occlusion Culling**: Marcar objetos "occluded" como invisible
+   - **Distance Culling**: Desactivar objetos lejanos
+
+5. **Memory Management**
+   - Dispose de geometrías/materiales no usados
+   - Resource pooling: Reutilizar meshes
+   - Lazy loading de texturas
+
+### Physics Optimization (Rapier3D)
+
+- Bodies inactivos en "sleep" state
+- Simplified collision shapes (box, sphere, capsule)
+- Broadphase: AABB tree optimization
+- Narrow phase: SAT algorithm
+
+## Estética Animal Crossing
+
+### Paleta de Colores
+- Tonos pastel: Verdes suave (0x8BC34A), Azules cielo (0x87CEEB)
+- Sin colores saturados
+- Iluminación suave sin sombras duras
+
+### Geometría
+- Formas redondeadas (chamfered edges)
+- Low-poly estilizado
+- Proporciones cartoonish (cabeza grande, cuerpo compacto)
+
+### Movimiento
+- Animaciones fluidas y suaves
+- Bounce físico realista
+- Transiciones sin cutouts abruptos
+- Delay en key poses (anticipation, recovery)
+
+### UI
+- Menús con estilo documento/carta
+- Tonos acordes a la paleta
+- Iconografía simple y clara
+
+## Comunicación Entre Componentes
+
+### Event Emitter Pattern
+```javascript
+// Base class con emit/on/off
+class EventEmitter {
+  on(event, callback) { /* ... */ }
+  off(event, callback) { /* ... */ }
+  emit(event, ...args) { /* ... */ }
+}
+
+// Uso
+this.time.on('tick', () => this.update());
+this.sizes.on('resize', () => this.resize());
+```
+
+### Direct Reference Pattern
+```javascript
+// A través de singleton Experience
+const experience = window.experience;
+experience.scene.add(mesh);
+experience.renderer.setIrisTransitionSize(0.5);
+```
+
+## Estructura de Carpetas
+
+```
+src/
+├── script.js                    # Entry point
+├── Experience/
+│   ├── Experience.js            # Singleton orchestrator
+│   ├── Camera.js
+│   ├── Renderer.js
+│   ├── Utils/                   # Core utilities
+│   │   ├── Debug.js
+│   │   ├── Time.js
+│   │   ├── Sizes.js
+│   │   ├── Quality.js
+│   │   ├── Resources.js
+│   │   ├── EventEmitter.js
+│   │   └── MobileControls.js
+│   └── World/                   # Game world systems
+│       ├── World.js             # World orchestrator
+│       ├── Ground.js
+│       ├── Grass.js
+│       ├── Trees.js
+│       ├── Environment.js
+│       ├── Character.js
+│       ├── Physics.js
+│       ├── TSL/                 # Shaders WebGPU
+│       │   ├── WaterShader.js
+│       │   ├── GroundShader.js
+│       │   └── NoiseNodes.js
+│       └── Minigames/
+│           ├── FrisbeeMinigame.js
+│           └── ...
+```
+
+## Performance Targets
+
+- **Desktop**: 60 FPS, 1080p
+- **Tablet**: 30+ FPS, 720p
+- **Mobile**: 30 FPS, 360p adaptive
+- **Bundle**: < 1.5 MB gzipped
+- **Initial Load**: < 2 seconds
+
+## Debugging
+
+Abre **lil-gui panel** en esquina superior derecha:
+- Toggle Quality levels
+- Adjust LOD distances
+- Monitor FPS/memory
+- Control physics parameters
+- Adjust weather/lighting
+
+```javascript
+// Acceso desde consola
+window.experience.debug.ui.open();
+```
+
+## Próximos Pasos - Futuro
+
+1. **Audio System**: Ambient + interactive sounds
+2. **NPC AI**: Pathfinding + behavior trees
+3. **Persistence**: LocalStorage de jugador
+4. **Multiplayer**: WebSocket real-time
+5. **Mobile VR**: WebXR support
+6. **Asset Store**: In-game customization
+
+---
+
+**Ver también**: `AGENTS.md` para descripción completa del proyecto.
