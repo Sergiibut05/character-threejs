@@ -96,8 +96,15 @@ export default class Quality extends EventEmitter {
     get shadowMapSize()    { return 1024 }
     /** PCF kernel half-size: 1 low (sharp, cheap) / 3 high (soft, expensive). */
     get shadowRadius()     { return this.isLow ? 1 : 3 }
-    /** Orthographic shadow camera frustum half-size. */
-    get shadowCameraSize() { return this.isLow ? 18 : 22 }
+    /**
+     * Half-extent of the directional shadow ortho frustum (±size on left/right/top/bottom).
+     * Too small → a hard “straight line” on the ground where shadow coverage ends (patio + bridge
+     * extend past the old ~36–44 unit box). Larger spreads the same 1024² map over more world units
+     * (softer / coarser texels — fine for this art style).
+     */
+    get shadowCameraSize() { return this.isLow ? 40 : 50 }
+    /** Depth span of the shadow camera along the light axis (avoid far clipping on big scenes). */
+    get shadowCameraFar()  { return this.isLow ? 90 : 120 }
 
     /** Grass blade count (per spawn cluster). */
     get grassCount()      { return this.isLow ? 6000 : 10000 }

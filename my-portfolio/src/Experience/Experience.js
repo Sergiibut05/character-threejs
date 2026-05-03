@@ -8,6 +8,7 @@ import Renderer from './Renderer.js'
 import Resources from './Utils/Resources.js'
 import World from './World/World.js'
 import MobileControls from './Utils/MobileControls.js'
+import QualitySettingsUI from './Utils/QualitySettingsUI.js'
 import sources from './sources.js'
 
 let instance = null
@@ -31,10 +32,16 @@ export default class Experience {
         this.time = new Time()
         this.scene = new THREE.Scene()
         this.resources = new Resources(sources)
+
+        // Physics shares this Rapier load; must exist before World constructs Physics.
+        // Rapier 0.19 ships WASM bound at import time (see rapier_wasm3d.js) — there is no init().
+        this._rapierPromise = import('@dimforge/rapier3d').then((mod) => mod.default ?? mod)
+
         this.camera = new Camera()
         this.renderer = new Renderer()
         this.world = new World()
         this.mobileControls = new MobileControls()
+        this.qualitySettingsUi = new QualitySettingsUI(this)
 
         // Cloud transition elements
         this.cloudTransition = document.getElementById('cloud-transition')

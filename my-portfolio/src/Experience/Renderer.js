@@ -30,16 +30,18 @@ export default class Renderer {
         this.instance.outputColorSpace = THREE.SRGBColorSpace
         this.instance.toneMapping = THREE.ACESFilmicToneMapping
         this.instance.toneMappingExposure = 1.1
-        
-        // WebGPURenderer uses shadow system automatically when lights cast shadows.
-        // mapSize and type are set on the light/shadow objects themselves.
-        
+
         this.instance.setSize(this.sizes.width, this.sizes.height)
         this.instance.setPixelRatio(this.quality.pixelRatio)
     }
 
     async init() {
         await this.instance.init()
+        // Three r183+ unified Renderer: shadow maps default to OFF (`shadowMap.enabled === false`).
+        // Only flipping `directional.castShadow` is insufficient — the LightsNode cache key skips
+        // shadow passes until this is true (see three/src/renderers/common/nodes/NodeManager.js).
+        this.instance.shadowMap.enabled = true
+        this.instance.shadowMap.type = THREE.PCFShadowMap
         this.setPostProcessing()
     }
 

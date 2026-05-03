@@ -34,6 +34,7 @@
  * (typically wired to a debug GUI).
  */
 import * as THREE from 'three'
+import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 
 const _q = new THREE.Quaternion()
 const _euler = new THREE.Euler()
@@ -115,9 +116,8 @@ export function blenderTransformToMatrix(position, eulerXYZ, scale, target = new
 }
 
 /**
- * Replace the material of every mesh inside a scene/group with a
- * MeshLambertMaterial that reuses the provided map. Convenient for atlas-based
- * decorative pieces where lighting comes from ambient + directional only.
+ * Replace the material of every mesh inside a scene/group with a shared
+ * MeshLambertNodeMaterial (core shadow + shadow map) that reuses the provided map.
  */
 export function applyAtlasMaterial(root, map, options = {}) {
     const {
@@ -126,7 +126,7 @@ export function applyAtlasMaterial(root, map, options = {}) {
         receiveShadow = true
     } = options
 
-    const material = new THREE.MeshLambertMaterial({
+    const material = createStylizedPropNodeMaterial({
         map: map || null,
         color: 0xffffff,
         flatShading

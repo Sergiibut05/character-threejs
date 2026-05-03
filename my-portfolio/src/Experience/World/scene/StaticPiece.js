@@ -1,6 +1,6 @@
 /**
  * StaticPiece — drops a glTF scene into the world and re-binds its meshes to a
- * MeshLambertMaterial that uses the provided atlas/colour map.
+ * stylized MeshLambertNodeMaterial (core shadow + shadow map; see StylizedPropMaterial).
  *
  * Used by bridge, walls, InfoBoard, social-area, social-entrance and any other
  * decorative piece that shares a single colour atlas.
@@ -8,6 +8,7 @@
 import * as THREE from 'three'
 import Experience from '../../Experience.js'
 import { applyAtlasMaterial } from './SceneUtils.js'
+import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 
 export default class StaticPiece {
     constructor(name, gltf, options = {}) {
@@ -51,7 +52,7 @@ export default class StaticPiece {
 
         // Mixed mode: shared atlas where possible, but keep per-mesh maps when
         // the original GLB shipped a unique baseColor texture (e.g. signboards).
-        const sharedAtlas = map ? new THREE.MeshLambertMaterial({
+        const sharedAtlas = map ? createStylizedPropNodeMaterial({
             map, color: 0xffffff, flatShading
         }) : null
         if (sharedAtlas) this.material = sharedAtlas
@@ -64,7 +65,7 @@ export default class StaticPiece {
             if (sharedAtlas && (!preserveOwnMaps || !ownMap)) {
                 child.material = sharedAtlas
             } else {
-                child.material = new THREE.MeshLambertMaterial({
+                child.material = createStylizedPropNodeMaterial({
                     map: ownMap || null,
                     color: color !== null ? color : (old?.color || 0xffffff),
                     flatShading

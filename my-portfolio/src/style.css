@@ -720,3 +720,242 @@ body
     color: rgba(20, 50, 35, 0.8);
     font-weight: 600;
 }
+
+/* ═══════════════════════════════════
+   Quality FAB + modal (minimal)
+   ═══════════════════════════════════ */
+
+body.quality-modal-open
+{
+    overflow: hidden;
+}
+
+.quality-fab
+{
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 2100;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    appearance: none;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    margin: 0;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    color: rgba(50, 50, 52, 0.78);
+    cursor: pointer;
+    transition: opacity 0.28s ease, transform 0.22s ease, background 0.15s ease;
+}
+
+body:has(#cloud-transition.visible) .quality-fab,
+body:has(.cloud-transition.visible) .quality-fab
+{
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.92);
+}
+
+.quality-fab:hover
+{
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.quality-fab:active
+{
+    transform: scale(0.94);
+}
+
+.quality-fab:focus,
+.quality-fab:focus-visible
+{
+    outline: none;
+}
+
+.quality-fab-icon
+{
+    display: block;
+}
+
+.quality-modal-overlay
+{
+    position: fixed;
+    inset: 0;
+    z-index: 2600;
+    display: grid;
+    place-items: safe center;
+    padding: max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+    /* Veil pastel + cristal esmerilado (como antes) */
+    background: rgba(245, 250, 255, 0.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.26s ease,
+        visibility 0.26s;
+}
+
+.quality-modal-overlay.is-open
+{
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.quality-modal-overlay.is-open .quality-modal
+{
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.quality-modal
+{
+    width: min(276px, 90vw);
+    position: relative;
+    border-radius: 18px;
+    padding: 38px 20px 20px;
+    /* Papel de cuaderno: líneas sutiles + base crema pastel */
+    background:
+        repeating-linear-gradient(
+            -3deg,
+            transparent,
+            transparent 11px,
+            rgba(155, 195, 170, 0.085) 11px,
+            rgba(155, 195, 170, 0.085) 13px
+        ),
+        linear-gradient(160deg, #fffffd 0%, #f8fbfa 52%, #f2f9f7 100%);
+    border: 1.5px solid rgba(105, 160, 130, 0.26);
+    box-shadow:
+        0 2px 0 rgba(255, 255, 255, 0.92) inset,
+        0 20px 48px rgba(39, 90, 70, 0.17),
+        0 10px 22px rgba(60, 100, 80, 0.08);
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+        transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        opacity 0.24s ease;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Perforaciones tipo anilla de cuaderno */
+.quality-modal-paper-top
+{
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: -6px 0 12px;
+}
+
+.quality-modal-paper-top::before,
+.quality-modal-paper-top::after
+{
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff 0%, #e8f0ec 55%, #c5d8ce 100%);
+    box-shadow:
+        0 1px 2px rgba(40, 90, 70, 0.15) inset,
+        0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.quality-modal-close
+{
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: rgba(42, 75, 58, 0.38);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.quality-modal-close:hover
+{
+    color: rgba(42, 75, 58, 0.78);
+}
+
+.quality-modal-close:focus,
+.quality-modal-close:focus-visible
+{
+    outline: none;
+}
+
+.quality-modal-title
+{
+    font-family: 'Fredoka', 'Inter', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(36, 75, 58, 0.92);
+    margin: 0 32px 12px 0;
+    padding: 0 0 8px;
+    border: none;
+    border-bottom: 2px dashed rgba(120, 170, 140, 0.42);
+}
+
+.quality-cards
+{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.quality-card
+{
+    appearance: none;
+    border-radius: 8px;
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(32, 70, 55, 0.85);
+    border: 1px solid rgba(118, 170, 140, 0.32);
+    background: rgba(255, 255, 253, 0.55);
+}
+
+.quality-card:hover
+{
+    background: rgba(255, 255, 253, 0.88);
+    border-color: rgba(90, 150, 115, 0.4);
+}
+
+.quality-card:focus,
+.quality-card:active,
+.quality-card:focus-visible
+{
+    outline: none;
+}
+
+/* Activo discreto — sin halo ni segundo borde al soltar clic */
+.quality-card-selected
+{
+    background: rgba(215, 242, 228, 0.45);
+    border-color: rgba(90, 150, 115, 0.38);
+}
+
+@media (max-width: 320px)
+{
+    .quality-cards
+    {
+        grid-template-columns: 1fr;
+    }
+}

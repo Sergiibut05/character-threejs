@@ -9,6 +9,7 @@
 import * as THREE from 'three'
 import Experience from '../../Experience.js'
 import { blenderTransformToMatrix, findMesh } from './SceneUtils.js'
+import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 
 const _matrix = new THREE.Matrix4()
 
@@ -39,7 +40,7 @@ export default class Fence {
         }
 
         sourceMesh.material?.dispose?.()
-        this.material = new THREE.MeshLambertMaterial({
+        this.material = createStylizedPropNodeMaterial({
             map: atlasMap || null,
             color: 0xffffff
         })

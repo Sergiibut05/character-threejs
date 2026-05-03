@@ -1,6 +1,13 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 import { uniform, mix, positionWorld, cameraPosition, smoothstep, vec3 } from 'three/tsl'
+import {
+    syncPropStylizedSunDirection,
+    propLitTint,
+    propShadowTint,
+    propCoreLit0,
+    propCoreLit1
+} from './scene/StylizedPropMaterial.js'
 
 export default class Environment {
     constructor() {
@@ -52,7 +59,7 @@ export default class Environment {
         const sc = quality.shadowCameraSize
         const cam = this.sunLight.shadow.camera
         cam.left = -sc; cam.right = sc; cam.top = sc; cam.bottom = -sc
-        cam.far = quality.isLow ? 40 : 60
+        cam.far = quality.shadowCameraFar
         cam.updateProjectionMatrix()
 
         // Shadow map size is locked to 1024x1024 to avoid reallocation crashes
@@ -97,6 +104,7 @@ export default class Environment {
             this.sky.position.copy(camera.position)
             this.skySunDirection.value.copy(this.sunLight.position).normalize()
         }
+        syncPropStylizedSunDirection(this.sunLight)
     }
 
     setDebug() {
@@ -106,5 +114,29 @@ export default class Environment {
         f.add(this.sunLight.position, 'x', -10, 10, 0.01).name('Sun X')
         f.add(this.sunLight.position, 'y', -10, 10, 0.01).name('Sun Y')
         f.add(this.sunLight.position, 'z', -10, 10, 0.01).name('Sun Z')
+
+        const sp = this.debug.ui.addFolder('Stylized props (TSL)')
+        sp.close()
+        const spCtrls = []
+        spCtrls.push(sp.add(propCoreLit0, 'value', -1, 1, 0.01).name('Core shadow · edge 0 (N·L)'))
+        spCtrls.push(sp.add(propCoreLit1, 'value', -1, 1, 0.01).name('Core shadow · edge 1 (N·L)'))
+        const lit = propLitTint.value
+        spCtrls.push(sp.add(lit, 'x', 0.5, 2.5, 0.01).name('Lit tint · X'))
+        spCtrls.push(sp.add(lit, 'y', 0.5, 2.5, 0.01).name('Lit tint · Y'))
+        spCtrls.push(sp.add(lit, 'z', 0.5, 2.5, 0.01).name('Lit tint · Z'))
+        const sh = propShadowTint.value
+        spCtrls.push(sp.add(sh, 'x', 0.2, 1.2, 0.01).name('Shadow tint · X'))
+        spCtrls.push(sp.add(sh, 'y', 0.2, 1.2, 0.01).name('Shadow tint · Y'))
+        spCtrls.push(sp.add(sh, 'z', 0.2, 1.2, 0.01).name('Shadow tint · Z'))
+        const resetStylized = {
+            reset() {
+                propCoreLit0.value = -0.22
+                propCoreLit1.value = 0.52
+                lit.set(1.04, 1.01, 0.96)
+                sh.set(0.58, 0.56, 0.68)
+                for (const c of spCtrls) c.updateDisplay()
+            }
+        }
+        sp.add(resetStylized, 'reset').name('Reset stylized props')
     }
 }

@@ -8,6 +8,7 @@ import {
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { propSunDirection } from './scene/StylizedPropMaterial.js'
 
 function createRng(seed) {
     let s = seed | 0
@@ -110,8 +111,8 @@ export default class Foliage {
 
         const foliageTexture = this.resources.items.foliageTexture
 
-        // Normalized sun direction (matches Environment.js)
-        const lightDir = uniform(new THREE.Vector3(4, 5, -3).normalize())
+        // Same world-space sun vector as stylized props (updated in Environment.update)
+        const lightDir = propSunDirection
 
         // Wind: time-based UV rotation
         const windOffset = Fn(() => {

@@ -1,12 +1,13 @@
 /**
  * Coblestone — single-mesh InstancedMesh placed via `coblestone_instances.json`.
  *
- * No physics, no shadows, no lighting overhead beyond Lambert. The JSON file
+ * No physics; stylized Standard material for soft highlights. The JSON file
  * stores raw Blender Z-up matrices so we convert each transform on the fly.
  */
 import * as THREE from 'three'
 import Experience from '../../Experience.js'
 import { blenderTransformToMatrix, findMesh } from './SceneUtils.js'
+import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 
 const _matrix = new THREE.Matrix4()
 
@@ -38,7 +39,7 @@ export default class Coblestone {
         const baseColor = oldMat?.color?.clone?.() || new THREE.Color(0xab8268)
         oldMat?.dispose?.()
 
-        this.material = new THREE.MeshLambertMaterial({
+        this.material = createStylizedPropNodeMaterial({
             color: baseColor,
             map: oldMat?.map || null
         })

@@ -292,6 +292,7 @@ export default class PatioScene {
         const collidersGltf = r.collidersModel
         if (!collidersGltf?.scene) {
             console.warn('PatioScene: collidersModel missing — no colliders generated')
+            this._emitCollidersSkipped()
             return
         }
 
@@ -321,8 +322,14 @@ export default class PatioScene {
         chunkedInBackground(meshes, 4, (mesh) => this._createConvexCollider(mesh))
             .then(() => {
                 console.timeEnd('PatioScene · colliders')
-                console.log(`✅ PatioScene: ${this.colliderBodies.length} static convexHull colliders`)
+                console.log(`✅ PatioScene: ${this.colliderBodies.length} static colliders`)
+                this.resources.trigger('patioCollidersReady', [])
             })
+    }
+
+    /** Emits patioCollidersReady so Character waits for usable ground collisions. */
+    _emitCollidersSkipped() {
+        this.resources.trigger('patioCollidersReady', [])
     }
 
     /**

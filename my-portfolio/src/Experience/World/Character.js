@@ -14,7 +14,8 @@ export default class Character {
         this.capsuleHalfHeight = 0.5
         this.capsuleRadius = 0.32
         this.capsuleCenterY = this.capsuleHalfHeight + this.capsuleRadius
-        this.spawnOffsetY = 0.15
+        // Small lift above the capsule bottom so feet aren’t clipped by the terrain shader.
+        this.spawnOffsetY = 0.32
 
         // Position & velocity
         this.position = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
@@ -57,7 +58,7 @@ export default class Character {
         this.setAnimation()
         this.setInput()
 
-        setTimeout(() => this.setPhysics(), 200)
+        this._schedulePhysicsInit()
 
         if (this.debug.active) this.setDebug()
     }
@@ -80,7 +81,8 @@ export default class Character {
         this.model.scale.set(1, 1, 1)
 
         const box = new THREE.Box3().setFromObject(this.model)
-        const modelOffsetY = -this.capsuleCenterY - box.min.y - 0.01
+        // Extra +0.07 vs old offset: aligns mesh feet slightly higher (were sinking visually).
+        const modelOffsetY = -this.capsuleCenterY - box.min.y + 0.07
         this.model.position.set(0, modelOffsetY, 0)
 
         this._applyAtlas()
@@ -190,6 +192,30 @@ export default class Character {
 
     // ─── Physics ────────────────────────────────────────────────────────
 
+    /**
+     * Character controller must not start until patio static colliders exist;
+     * otherwise the capsule spawns into partial geometry, sinks, and horizontal
+     * slide hits as zero (appears “stuck”).
+     */
+    _schedulePhysicsInit() {
+        const world = this.experience.world
+        if (world?.patioScene) {
+            const start = () => {
+                if (this.rigidBody) return
+                this.setPhysics()
+            }
+            this.resources.on('patioCollidersReady', start)
+            setTimeout(() => {
+                if (!this.rigidBody) {
+                    console.warn('Character: patioCollidersReady timeout — starting physics anyway')
+                    start()
+                }
+            }, 15000)
+        } else {
+            setTimeout(() => this.setPhysics(), 200)
+        }
+    }
+
     setPhysics() {
         if (!this.physics.world) return
         const RAPIER = this.physics.RAPIER
@@ -207,7 +233,7 @@ export default class Character {
             )
         this.collider = this.physics.world.createCollider(colDesc, this.rigidBody)
 
-        this.characterController = this.physics.world.createCharacterController(0.01)
+        this.characterController = this.physics.world.createCharacterController(0.02)
         this.characterController.setApplyImpulsesToDynamicBodies(true)
         this.characterController.setMaxSlopeClimbAngle(Math.PI * 0.25)
         this.characterController.setMinSlopeSlideAngle(Math.PI * 0.3)

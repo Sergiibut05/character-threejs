@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css">
 
-    <link rel="preload" href="/models/Patio/patio-draco.glb" as="fetch" crossorigin>
     <link rel="preload" href="/models/human/human-walk-draco.glb" as="fetch" crossorigin>
     <link rel="preload" href="/basis/basis_transcoder.wasm" as="fetch" crossorigin>
 </head>
@@ -31,6 +30,32 @@
                     <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
             </button>
+        </div>
+    </div>
+
+    <button type="button" class="quality-fab" id="quality-fab-btn"
+        aria-label="Calidad"
+        aria-haspopup="dialog" aria-expanded="false" aria-controls="quality-modal">
+        <svg class="quality-fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"
+            xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.76 1.1 1.36 1.36h.09a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+
+    <div class="quality-modal-overlay" id="quality-modal-overlay" aria-hidden="true">
+        <div class="quality-modal" id="quality-modal" role="dialog" aria-modal="true"
+            aria-labelledby="quality-modal-title">
+            <button type="button" class="quality-modal-close" aria-label="Cerrar">&times;</button>
+            <div class="quality-modal-paper-top" aria-hidden="true"></div>
+            <h2 class="quality-modal-title" id="quality-modal-title">Calidad</h2>
+            <div class="quality-cards" role="group" aria-label="Presets">
+                <button type="button" class="quality-card" id="quality-card-high" data-quality-level="0"
+                    aria-pressed="false">Alta</button>
+                <button type="button" class="quality-card" id="quality-card-low" data-quality-level="1"
+                    aria-pressed="false">Ligera</button>
+            </div>
         </div>
     </div>
 

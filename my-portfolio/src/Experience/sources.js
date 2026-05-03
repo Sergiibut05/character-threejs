@@ -288,42 +288,37 @@ const allSources = [
         }
     },
 
-    // ─── Trees (visuals + Blender reference matrices) ────────────── decorative
+    // ─── Trees (visuals + Blender reference matrices) ────────────── critical
+    // Loaded with the critical batch so World.setupTrees() has items when 'ready' fires.
     {
         name: 'abedulTreeVisual',
         type: 'gltfModel',
-        path: '/models/trees/Abedul-tree/Abedul-tree-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Abedul-tree/Abedul-tree-compressed.glb'
     },
     {
         name: 'normalTreeVisual',
         type: 'gltfModel',
-        path: '/models/trees/Normal-tree/Normal-tree-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Normal-tree/Normal-tree-compressed.glb'
     },
     {
         name: 'oldTreeVisual',
         type: 'gltfModel',
-        path: '/models/trees/Old-tree/Old-tree-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Old-tree/Old-tree-compressed.glb'
     },
     {
         name: 'abedulTreeReferences',
         type: 'gltfModel',
-        path: '/models/trees/Abedul-tree/Abedul-tree-references-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Abedul-tree/Abedul-tree-references-compressed.glb'
     },
     {
         name: 'normalTreeReferences',
         type: 'gltfModel',
-        path: '/models/trees/Normal-tree/Normal-tree-references-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Normal-tree/Normal-tree-references-compressed.glb'
     },
     {
         name: 'oldTreeReferences',
         type: 'gltfModel',
-        path: '/models/trees/Old-tree/Old-tree-references-compressed.glb',
-        priority: 'decorative'
+        path: '/models/trees/Old-tree/Old-tree-references-compressed.glb'
     }
 ]
 
