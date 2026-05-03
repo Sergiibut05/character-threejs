@@ -193,7 +193,7 @@ export default class Grass {
             const alpha = smoothstep(this.uAlphaCutoff, this.uAlphaCutoff.add(this.uAlphaSoftness), rawAlpha)
 
             // ── 1. World-space patch color (large color blotches from fBM noise) ──
-            const noiseVal = fbm(worldPos.mul(this.uNoiseScale))
+            const noiseVal = fbm(worldPos.mul(this.uNoiseScale).xz)
             const patchColor = colorRamp(
                 noiseVal,
                 this.uColor0, this.uColor1, this.uColor2, this.uColor3,

@@ -1,18 +1,38 @@
 /**
- * PatioScene
- * Loads patio-draco.glb, sets up:
- *   - Grupo_Colliders → invisible + Rapier trimesh colliders
- *   - suelo1, suelo2 → custom ground shader (grass/dirt via vertex colors)
- *   - agua → water caustics shader
- *   - agua.001 → water shadow shader
- *   - All other meshes → MeshLambertMaterial for Mali GPU compat
+ * PatioScene — main scene orchestrator.
+ *
+ * The old monolithic `Patio.glb` has been split into many small GLB files,
+ * each loaded individually and wired up by a dedicated component class:
+ *
+ *   - Floor          (floor.glb)            grass + dirt + slabs
+ *   - GrassBorders   (grass-borders.glb)    matches floor's grass palette
+ *   - River          (river.glb)            cel-shaded water shader
+ *   - Coblestone     (coblestone.glb + json) instanced cobblestones
+ *   - Fence          (fence.glb + json)     instanced fences (Sushi atlas)
+ *   - StaticPiece    (bridge / walls / InfoBoard / social-area / social-entrance / house)
+ *   - BaseballPitch  (baseball-pitch.glb)   embedded baked field texture
+ *   - BlackCave      (black-cave.glb)       pure-black planes, no lighting
+ *   - Clouds         (still in environment) — kept here as a separate group of meshes
+ *
+ * This class only stitches things together and exposes:
+ *   - getGrassSpawnPositions() for the Grass system
+ *   - update() for animated shaders
  */
 import * as THREE from 'three'
-import { uniform } from 'three/tsl'
 import Experience from '../Experience.js'
-import { createGroundColorNode } from './TSL/GroundShader.js'
-import { createWaterColorNode, createWaterShadowColorNode } from './TSL/WaterShader.js'
-import { createCloudShaderNodes } from './TSL/CloudShader.js'
+import Floor, { createDefaultFloorUniforms } from './scene/Floor.js'
+import GrassBorders from './scene/GrassBorders.js'
+import River from './scene/River.js'
+import StaticPiece from './scene/StaticPiece.js'
+import {
+    setBlenderRotationMode,
+    getBlenderRotationMode,
+    getBlenderRotationModes
+} from './scene/SceneUtils.js'
+import { chunkedInBackground } from '../Utils/Scheduler.js'
+
+// Lazy-imported (decorative-only): Coblestone, Fence, BaseballPitch, BlackCave.
+// Pulled out of the main bundle to drop a few KB of parse cost on first visit.
 
 export default class PatioScene {
     constructor() {
@@ -24,75 +44,294 @@ export default class PatioScene {
         this.debug = this.experience.debug
         this.isLow = this.experience.quality.isLow
 
+        this.pieces = {}
         this.colliderBodies = []
-        this.groundMeshes = []
-        this.waterMesh = null
-        this.waterShadowMesh = null
-        this.cloudMeshes = []
+        this.floorUniforms = createDefaultFloorUniforms()
 
-        this.uTime = uniform(0)
+        this._setupAtlasTextureFlags()
+        console.time('PatioScene · critical pieces')
+        this._buildCriticalPieces()
+        console.timeEnd('PatioScene · critical pieces')
 
-        this.loadModel()
-    }
+        // River, house, bridge, infoBoard are now decorative-priority assets.
+        // Hook sourceLoaded so each piece pops in as soon as its file arrives.
+        this._setupProgressiveLoading()
 
-    loadModel() {
-        const gltf = this.resources.items.patioModel
-        if (!gltf) {
-            console.error('PatioScene: patioModel not found in resources')
-            return
+        // Heavy work (colliders) is scheduled across animation frames so the
+        // main thread keeps yielding to the browser. We use convexHull instead
+        // of trimesh — same result for convex meshes but ~5-10x faster to build.
+        this._buildCollidersAsync()
+
+        // Decorative pieces (trees, fences, parkthings, baseball, blackcave,
+        // social-area / social-entrance, coblestones) are streamed in *after*
+        // the user already entered the patio. They pop in over the first few
+        // seconds while the player roams.
+        if (!this.resources.allDone) {
+            this.resources.on('allReady', () => this._buildDecorativePieces())
+        } else {
+            this._buildDecorativePieces()
         }
 
-        this.model = gltf.scene
+        if (this.debug?.active) this._setupGUI()
 
-        // Convert ALL default GLTF meshes to Lambert for Mali compatibility
-        this.model.traverse((child) => {
-            if (child.isMesh) {
-                const oldMat = child.material
-                child.material = new THREE.MeshLambertMaterial({
-                    map: oldMat?.map || null,
-                    color: oldMat?.color || 0xffffff
+        console.log('✅ PatioScene critical pieces loaded')
+    }
+
+    _setupGUI() {
+        const folder = this.debug.ui.addFolder('PatioScene · Instances')
+        folder.close()
+
+        const state = { rotationMode: getBlenderRotationMode() }
+        folder
+            .add(state, 'rotationMode', getBlenderRotationModes())
+            .name('Rotation mode (Blender→Three)')
+            .onChange((mode) => {
+                setBlenderRotationMode(mode)
+                this.pieces.coblestone?.rebuildMatrices?.(mode)
+                this.pieces.fence?.rebuildMatrices?.(mode)
+                console.log(`🔄 Instance rotation mode → ${mode}`)
+            })
+    }
+
+    _setupAtlasTextureFlags() {
+        const r = this.resources.items
+        // Atlas textures need RGB clamping + linear filter for atlas sampling
+        for (const tex of [r.forestAtlas, r.sushiAtlas]) {
+            if (!tex) continue
+            tex.minFilter = THREE.LinearFilter
+            tex.magFilter = THREE.LinearFilter
+            tex.generateMipmaps = false
+            tex.flipY = false
+        }
+        if (r.slabsTexture) r.slabsTexture.flipY = false
+    }
+
+    _buildCriticalPieces() {
+        const r = this.resources.items
+
+        // ── Floor (grass-floor-1, grass-floor-2, ground-floor-1, ground-floor-2)
+        if (r.floorModel) {
+            this.pieces.floor = new Floor(r.floorModel, {
+                grassFloorMasks: {
+                    'grass-floor-1': r.grassFloor1Mask || null,
+                    'grass-floor-2': r.grassFloor2Mask || null
+                },
+                maskCpuImages: {
+                    'grass-floor-1': r.grassFloor1MaskCpu || null,
+                    'grass-floor-2': r.grassFloor2MaskCpu || null
+                },
+                slabsTexture: r.slabsTexture || null,
+                sharedUniforms: this.floorUniforms
+            })
+        }
+
+        // ── Grass borders (perimeter cliffs) — must blend with floor on day 1.
+        if (r.grassBordersModel) {
+            this.pieces.grassBorders = new GrassBorders(r.grassBordersModel, this.floorUniforms)
+        }
+
+        // ── Walls (Forest atlas) — patio boundaries, first thing the user sees.
+        if (r.wallsModel) {
+            this.pieces.walls = new StaticPiece('walls', r.wallsModel, {
+                map: r.forestAtlas || null
+            })
+        }
+        // River, house, bridge, infoBoard → decorative (see _setupProgressiveLoading)
+    }
+
+    /**
+     * Hooks into `sourceLoaded` so decorative pieces pop in the instant
+     * their GLB arrives — no need to wait for `allReady`.
+     */
+    _setupProgressiveLoading() {
+        const r = this.resources.items
+
+        const tryBuild = (name) => {
+            // River (water shader)
+            if (name === 'riverModel' && !this.pieces.river && r.riverModel) {
+                this.pieces.river = new River(r.riverModel)
+            }
+            // House (needs both model + texture — build as soon as model arrives)
+            if ((name === 'houseModel' || name === 'houseTexture') &&
+                !this.pieces.house && r.houseModel) {
+                this.pieces.house = new StaticPiece('house', r.houseModel, {
+                    map: r.houseTexture || null
                 })
-                child.castShadow = !this.isLow
-                child.receiveShadow = !this.isLow
             }
-        })
+            // Bridge
+            if (name === 'bridgeModel' && !this.pieces.bridge && r.bridgeModel) {
+                this.pieces.bridge = new StaticPiece('bridge', r.bridgeModel, {
+                    map: r.forestAtlas || null
+                })
+            }
+            // InfoBoard
+            if (name === 'infoBoardModel' && !this.pieces.infoBoard && r.infoBoardModel) {
+                this.pieces.infoBoard = new StaticPiece('infoBoard', r.infoBoardModel, {
+                    map: r.forestAtlas || null
+                })
+            }
+        }
 
-        this.processColliders()
-        this.processGround()
-        this.processWater()
-        this.processClouds()
-        this.processHouse()
-        this.processRocks()
+        this.resources.on('sourceLoaded', tryBuild)
 
-        this.scene.add(this.model)
-
-        this.setupGUI()
-
-        console.log('✅ PatioScene loaded')
+        // Also check immediately in case assets loaded from cache already
+        for (const name of ['riverModel', 'houseModel', 'bridgeModel', 'infoBoardModel']) {
+            tryBuild(name)
+        }
     }
 
-    // ─── COLLIDERS ───────────────────────────────────────────────
-    processColliders() {
-        const collidersGroup = this.model.getObjectByName('Grupo_Colliders')
-        if (!collidersGroup) {
-            console.warn('PatioScene: Grupo_Colliders not found')
+    /**
+     * Adds decorative pieces once their assets are loaded. Called when the
+     * `allReady` event fires from Resources (i.e. after the player has
+     * already started exploring). Pieces pop in smoothly over the next
+     * frames. The wrapper classes are dynamic-imported so they're not in
+     * the initial bundle.
+     */
+    async _buildDecorativePieces() {
+        const r = this.resources.items
+
+        console.time('PatioScene · decorative imports')
+        const [
+            { default: Coblestone },
+            { default: Fence },
+            { default: BaseballPitch },
+            { default: BlackCave }
+        ] = await Promise.all([
+            import('./scene/Coblestone.js'),
+            import('./scene/Fence.js'),
+            import('./scene/BaseballPitch.js'),
+            import('./scene/BlackCave.js')
+        ])
+        console.timeEnd('PatioScene · decorative imports')
+
+        if (!this.pieces.coblestone && r.coblestoneModel && r.coblestoneInstances) {
+            this.pieces.coblestone = new Coblestone(r.coblestoneModel, r.coblestoneInstances)
+        }
+
+        if (!this.pieces.fence && r.fenceModel && r.fenceInstances) {
+            this.pieces.fence = new Fence(r.fenceModel, r.fenceInstances, r.sushiAtlas)
+        }
+
+        if (!this.pieces.parkThings && r.parkThingsModel) {
+            this.pieces.parkThings = new StaticPiece('parkThings', r.parkThingsModel, {})
+        }
+
+        if (!this.pieces.socialArea && r.socialAreaModel) {
+            this.pieces.socialArea = new StaticPiece('socialArea', r.socialAreaModel, {
+                map: r.sushiAtlas || null
+            })
+        }
+
+        if (!this.pieces.socialEntrance && r.socialEntranceModel) {
+            this.pieces.socialEntrance = new StaticPiece('socialEntrance', r.socialEntranceModel, {
+                map: r.sushiAtlas || null,
+                preserveOwnMaps: true
+            })
+        }
+
+        // Fallback: build these if they weren't caught by sourceLoaded yet
+        if (!this.pieces.house && r.houseModel) {
+            this.pieces.house = new StaticPiece('house', r.houseModel, { map: r.houseTexture || null })
+        }
+        if (!this.pieces.river && r.riverModel) {
+            this.pieces.river = new River(r.riverModel)
+        }
+        if (!this.pieces.bridge && r.bridgeModel) {
+            this.pieces.bridge = new StaticPiece('bridge', r.bridgeModel, { map: r.forestAtlas || null })
+        }
+        if (!this.pieces.infoBoard && r.infoBoardModel) {
+            this.pieces.infoBoard = new StaticPiece('infoBoard', r.infoBoardModel, { map: r.forestAtlas || null })
+        }
+
+        if (!this.pieces.baseballPitch && r.baseballPitchModel) {
+            this.pieces.baseballPitch = new BaseballPitch(r.baseballPitchModel)
+        }
+
+        if (!this.pieces.blackCave && r.blackCaveModel) {
+            this.pieces.blackCave = new BlackCave(r.blackCaveModel)
+        }
+
+        console.log('✅ PatioScene decorative pieces loaded')
+    }
+
+    /**
+     * Build colliders from the dedicated `Collaiders.glb`.
+     *
+     * Causa #3 fix — uses convexHull instead of trimesh:
+     *   - trimesh  = O(n) vertex walk + O(m) triangle BVH → 5–20 ms per mesh
+     *   - convexHull = O(n log n) quickhull on vertex cloud → <1 ms per mesh
+     *
+     * For architectural pieces (walls, house, bridge) this is fine because
+     * they are convex. Falls back to a bounding-box cuboid for degenerate hulls.
+     *
+     * Still scheduled across frames (via chunkedInBackground) so the browser
+     * stays responsive during startup.
+     */
+    async _buildCollidersAsync() {
+        if (this.physics?.world && this.physics?.RAPIER) {
+            this._scheduleCollidersBuild()
+            return
+        }
+        // Physics is async; wait until it's up before we even try.
+        await this._waitForPhysics()
+        this._scheduleCollidersBuild()
+    }
+
+    _waitForPhysics() {
+        return new Promise((resolve) => {
+            const tick = () => {
+                if (this.physics?.world && this.physics?.RAPIER) resolve()
+                else setTimeout(tick, 30)
+            }
+            tick()
+        })
+    }
+
+    _scheduleCollidersBuild() {
+        const r = this.resources.items
+        const collidersGltf = r.collidersModel
+        if (!collidersGltf?.scene) {
+            console.warn('PatioScene: collidersModel missing — no colliders generated')
             return
         }
 
-        collidersGroup.visible = false
+        console.time('PatioScene · colliders')
 
-        collidersGroup.traverse((child) => {
-            if (child.isMesh && child.geometry) {
-                this.createTrimeshCollider(child)
+        const root = collidersGltf.scene
+        root.name = 'Colliders'
+        root.visible = false
+        root.traverse((child) => {
+            if (child.isMesh) {
+                child.visible = false
+                child.castShadow = false
+                child.receiveShadow = false
             }
         })
+        this.scene.add(root)
+        root.updateMatrixWorld(true)
 
-        console.log(`✅ Created ${this.colliderBodies.length} colliders from Grupo_Colliders`)
+        const meshes = []
+        root.traverse((child) => {
+            if (child.isMesh && child.geometry) meshes.push(child)
+        })
+
+        // Time-budgeted background scheduler (4 ms per setTimeout tick).
+        // Unlike rAF-based chunking, this does NOT compete with the render
+        // loop for the browser's single animation frame slot.
+        chunkedInBackground(meshes, 4, (mesh) => this._createConvexCollider(mesh))
+            .then(() => {
+                console.timeEnd('PatioScene · colliders')
+                console.log(`✅ PatioScene: ${this.colliderBodies.length} static convexHull colliders`)
+            })
     }
 
-    createTrimeshCollider(mesh) {
-        if (!this.physics.world) return
-
+    /**
+     * Builds a trimesh collider.
+     * Trimesh is extremely fast to build for fixed colliders because Rapier just
+     * computes a BVH tree over the raw arrays (O(N) vs QuickHull's O(N log N) with
+     * huge constant factors). It also preserves concave shapes (like valleys/rivers).
+     */
+    _createConvexCollider(mesh) {
         const RAPIER = this.physics.RAPIER
 
         mesh.updateWorldMatrix(true, false)
@@ -103,483 +342,69 @@ export default class PatioScene {
 
         const geometry = mesh.geometry
         const posAttr = geometry.attributes.position
-        const vertices = new Float32Array(posAttr.count * 3)
+        if (!posAttr) return
 
+        // Scale vertices into world space
+        const vertices = new Float32Array(posAttr.count * 3)
         for (let i = 0; i < posAttr.count; i++) {
-            vertices[i * 3] = posAttr.getX(i) * worldScale.x
+            vertices[i * 3]     = posAttr.getX(i) * worldScale.x
             vertices[i * 3 + 1] = posAttr.getY(i) * worldScale.y
             vertices[i * 3 + 2] = posAttr.getZ(i) * worldScale.z
         }
 
         let indices
         if (geometry.index) {
-            indices = new Uint32Array(geometry.index.array)
+            indices = new Uint32Array(geometry.index.count)
+            for (let i = 0; i < geometry.index.count; i++) {
+                indices[i] = geometry.index.getX(i)
+            }
         } else {
+            // If no index, generate unindexed triangles
             indices = new Uint32Array(posAttr.count)
             for (let i = 0; i < posAttr.count; i++) indices[i] = i
         }
 
-        const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
-            .setTranslation(worldPos.x, worldPos.y, worldPos.z)
-            .setRotation({
-                x: worldQuat.x,
-                y: worldQuat.y,
-                z: worldQuat.z,
-                w: worldQuat.w
-            })
-        const rigidBody = this.physics.world.createRigidBody(rigidBodyDesc)
-
         try {
-            const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices)
+            const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
+                .setTranslation(worldPos.x, worldPos.y, worldPos.z)
+                .setRotation({
+                    x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w
+                })
+            const rigidBody = this.physics.world.createRigidBody(rigidBodyDesc)
+
+            // Fast BVH construction without blocking the main thread
+            let colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices)
+
+            colliderDesc
                 .setFriction(0.8)
                 .setRestitution(0.0)
                 .setActiveCollisionTypes(
                     RAPIER.ActiveCollisionTypes.DEFAULT |
                     RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED
                 )
+
             const collider = this.physics.world.createCollider(colliderDesc, rigidBody)
-            this.colliderBodies.push({ rigidBody, collider })
+            this.colliderBodies.push({ rigidBody, collider, mesh })
         } catch (e) {
-            console.warn('PatioScene: Failed to create trimesh collider for', mesh.name, e)
+            console.warn('PatioScene: failed to create convex collider for', mesh.name, e.message)
         }
-    }
-
-    // ─── GROUND (suelo1, suelo2) ─────────────────────────────────
-    processGround() {
-        const groundNames = ['suelo1', 'suelo2']
-
-        this.groundUniforms = {
-            uScale: uniform(0.2),
-            uEmissionStrength: uniform(0.75),
-            uGrassColor0: uniform(new THREE.Color(0x3E7E32)),
-            uGrassColor1: uniform(new THREE.Color(0x5FB538)),
-            uGrassColor2: uniform(new THREE.Color(0x8FCC3A)),
-            uGrassColor3: uniform(new THREE.Color(0xBDE868)),
-            uGrassRampStop1: uniform(0.18),
-            uGrassRampStop2: uniform(0.68),
-            uGrassMicroScale: uniform(1.4),
-            uGrassAOStrength: uniform(0),
-            uGrassSunStrength: uniform(0.28),
-            uGrassSoilColor: uniform(new THREE.Color(0x2C4A1A)),
-            uSandColor1: uniform(new THREE.Color(0.791, 0.352, 0.122)),
-            uSandColor2: uniform(new THREE.Color(0.597, 0.266, 0.093)),
-            uSandVoronoiScale: uniform(6.3),
-            uSandNoiseScale: uniform(0.8),
-            uSandDistortion: uniform(0.136)
-        }
-
-        const groundColorNode = createGroundColorNode(this.groundUniforms)
-
-        for (const name of groundNames) {
-            const mesh = this.model.getObjectByName(name)
-            if (!mesh) {
-                console.warn(`PatioScene: ${name} not found`)
-                continue
-            }
-
-            if (!mesh.geometry.attributes.color_1) {
-                console.warn(`PatioScene: ${name} has no 'color_1' (Mask) attribute`)
-            }
-
-            const groundMaterial = new THREE.MeshLambertNodeMaterial({
-                side: THREE.DoubleSide,
-                depthWrite: true
-            })
-            groundMaterial.colorNode = groundColorNode
-
-            mesh.material = groundMaterial
-            mesh.receiveShadow = !this.isLow
-            mesh.castShadow = false
-
-            this.groundMeshes.push(mesh)
-        }
-
-        console.log(`✅ Applied ground shader to ${this.groundMeshes.length} meshes`)
-    }
-
-    // ─── WATER (agua, agua001, agua002) ───────────────────────────
-    processWater() {
-        this.waterUniforms = {
-            uTime: this.uTime,
-            uScale: uniform(1.17),
-            uSmoothness: uniform(0.53),
-            uEdgeThreshold: uniform(0.09),
-            uEdgeSoftness: uniform(0.10),
-            uFlowX: uniform(0.07),
-            uFlowZ: uniform(-0.23),
-            uCellSpeed: uniform(0.55),
-            uNoiseScale: uniform(2.58),
-            uNoiseFlowSpeed: uniform(0.11),
-            uDistortAmount: uniform(0.26),
-            uDeepColor: uniform(new THREE.Color('#27a3d8')),
-            uMidColor: uniform(new THREE.Color('#59c0e8')),
-            uMidPos: uniform(0.31),
-            uHighlight: uniform(new THREE.Color('#ffffff')),
-            uOpacity: uniform(1.0),
-            uDeepOpacity: uniform(0.78),
-            uFadeDistance: uniform(275),
-            uFadeStrength: uniform(1.3),
-            uCamXZ: uniform(new THREE.Vector2(0, 0)),
-            // Depth intersection
-            uLineWidth: uniform(0.25),
-            uGlowWidth: uniform(1.2),
-            uLineColor: uniform(new THREE.Color('#ffffff')),
-            uLineOpacity: uniform(1.0),
-            uGlowColor: uniform(new THREE.Color('#88ccff')),
-            uGlowOpacity: uniform(0.25)
-        }
-
-        const shadowUniforms = {
-            uTime: this.uTime,
-            uScale: this.waterUniforms.uScale,
-            uSmoothness: this.waterUniforms.uSmoothness,
-            uCellSpeed: this.waterUniforms.uCellSpeed,
-            uFlowX: this.waterUniforms.uFlowX,
-            uFlowZ: this.waterUniforms.uFlowZ,
-            uNoiseScale: this.waterUniforms.uNoiseScale,
-            uNoiseFlowSpeed: this.waterUniforms.uNoiseFlowSpeed,
-            uDistortAmount: this.waterUniforms.uDistortAmount
-        }
-
-        const waterColorNode = createWaterColorNode(this.waterUniforms)
-        const aguaMesh = this.model.getObjectByName('agua')
-        if (aguaMesh) {
-            const waterMaterial = new THREE.MeshBasicNodeMaterial({
-                side: THREE.DoubleSide,
-                transparent: true,
-                depthWrite: false
-            })
-            waterMaterial.fragmentNode = waterColorNode
-            waterMaterial.blending = THREE.CustomBlending
-            waterMaterial.blendSrc = THREE.SrcAlphaFactor
-            waterMaterial.blendDst = THREE.OneMinusSrcAlphaFactor
-
-            aguaMesh.material = waterMaterial
-            aguaMesh.castShadow = false
-            aguaMesh.receiveShadow = false
-            aguaMesh.renderOrder = 1
-            this.waterMesh = aguaMesh
-            console.log('✅ Applied water caustics shader to agua')
-        } else {
-            console.warn('PatioScene: agua mesh not found')
-        }
-
-        const shadowNames = ['agua001', 'agua.001', 'agua002', 'agua.002']
-        const processed = new Set()
-
-        for (const name of shadowNames) {
-            const mesh = this.model.getObjectByName(name)
-            if (!mesh || processed.has(mesh.uuid)) continue
-            processed.add(mesh.uuid)
-
-            const shadowMaterial = new THREE.MeshBasicNodeMaterial({
-                side: THREE.DoubleSide,
-                transparent: true,
-                depthWrite: false
-            })
-            shadowMaterial.fragmentNode = createWaterShadowColorNode(shadowUniforms)
-            shadowMaterial.blending = THREE.CustomBlending
-            shadowMaterial.blendSrc = THREE.SrcAlphaFactor
-            shadowMaterial.blendDst = THREE.OneMinusSrcAlphaFactor
-
-            mesh.material = shadowMaterial
-            mesh.castShadow = false
-            mesh.receiveShadow = false
-            mesh.renderOrder = 0
-            console.log('✅ Applied water shadow shader to', mesh.name)
-        }
-    }
-
-    // ─── CLOUDS (Clouds plane from patio GLB) ────────────────────
-    processClouds() {
-        this.cloudUniforms = {
-            uNoiseScale1: uniform(1.2),
-            uNoiseScale2: uniform(1.8),
-            uNoiseScale3: uniform(3.0),
-            uScrollSpeed1: uniform(0.15),
-            uScrollSpeed2: uniform(0.25),
-            uDisplacement: uniform(0.35),
-            uBaseColor: uniform(new THREE.Color('#4a6fa5')),
-            uCloudColor: uniform(new THREE.Color('#e8eef8')),
-            uHighlight: uniform(new THREE.Color('#fff8ee')),
-            uOpacity: uniform(0.82)
-        }
-
-        const cloudNodes = createCloudShaderNodes(this.cloudUniforms)
-        const processed = new Set()
-        const cloudCandidates = ['Clouds', 'Clouds.001']
-
-        const applyCloudMaterial = (mesh) => {
-            if (!mesh || processed.has(mesh.uuid)) return
-            processed.add(mesh.uuid)
-
-            const cloudMaterial = new THREE.MeshLambertNodeMaterial({
-                side: THREE.DoubleSide,
-                transparent: true,
-                depthWrite: false
-            })
-            cloudMaterial.positionNode = cloudNodes.positionNode
-            cloudMaterial.colorNode = cloudNodes.colorNode
-            cloudMaterial.opacityNode = cloudNodes.opacityNode
-
-            mesh.material = cloudMaterial
-            mesh.castShadow = false
-            mesh.receiveShadow = false
-            mesh.renderOrder = 2
-            this.cloudMeshes.push(mesh)
-            console.log('✅ Applied fluffy cloud shader to', mesh.name)
-        }
-
-        for (const name of cloudCandidates) {
-            const mesh = this.model.getObjectByName(name)
-            if (mesh?.isMesh) applyCloudMaterial(mesh)
-        }
-
-        if (this.cloudMeshes.length === 0) {
-            this.model.traverse((child) => {
-                if (child.isMesh && child.name.toLowerCase().includes('cloud')) {
-                    applyCloudMaterial(child)
-                }
-            })
-        }
-
-        if (this.cloudMeshes.length === 0) {
-            console.warn('PatioScene: Clouds mesh not found')
-        }
-    }
-
-    getGroundMeshes() {
-        return this.groundMeshes
-    }
-
-    // ─── HOUSE TEXTURE ────────────────────────────────────────────
-    processHouse() {
-        const tex = this.resources.items.houseTexture
-
-        this.model.traverse((child) => {
-            if (!child.isMesh) return
-            if (child.name !== 'material') return
-
-            child.material = new THREE.MeshLambertMaterial({
-                map: tex || null,
-                color: tex ? 0xffffff : 0xc8b89a
-            })
-            child.castShadow = !this.isLow
-            child.receiveShadow = !this.isLow
-        })
-    }
-
-    // ─── ROCKS ────────────────────────────────────────────────────
-    processRocks() {
-        const rockMat = new THREE.MeshLambertMaterial({
-            color: 0x8a8a8a,
-            flatShading: true
-        })
-
-        this.model.traverse((child) => {
-            if (!child.isMesh) return
-            if (!child.name.toLowerCase().includes('rock')) return
-
-            child.material = rockMat
-            child.castShadow = !this.isLow
-            child.receiveShadow = !this.isLow
-        })
     }
 
     getGrassSpawnPositions(count = 3000) {
-        const positions = []
-        if (this.groundMeshes.length === 0) return positions
+        return this.pieces.floor?.getGrassSpawnPositions?.(count) || []
+    }
 
-        const meshData = []
-        let grandTotalArea = 0
-
-        const vA = new THREE.Vector3()
-        const vB = new THREE.Vector3()
-        const vC = new THREE.Vector3()
-
-        for (const mesh of this.groundMeshes) {
-            const geometry = mesh.geometry
-            const posAttr = geometry.attributes.position
-            const colorAttr = geometry.attributes.color_1 || geometry.attributes.color
-
-            if (!posAttr || !colorAttr) continue
-
-            mesh.updateWorldMatrix(true, false)
-            const worldMatrix = mesh.matrixWorld
-
-            const indexArray = geometry.index ? geometry.index.array : null
-            const faceCount = indexArray ? indexArray.length / 3 : posAttr.count / 3
-
-            const grassTriangles = []
-            let totalArea = 0
-
-            for (let f = 0; f < faceCount; f++) {
-                let iA, iB, iC
-                if (indexArray) {
-                    iA = indexArray[f * 3]
-                    iB = indexArray[f * 3 + 1]
-                    iC = indexArray[f * 3 + 2]
-                } else {
-                    iA = f * 3
-                    iB = f * 3 + 1
-                    iC = f * 3 + 2
-                }
-
-                const rA = colorAttr.getX(iA)
-                const rB = colorAttr.getX(iB)
-                const rC = colorAttr.getX(iC)
-
-                if (rA > 0.4 || rB > 0.4 || rC > 0.4) continue
-
-                vA.set(posAttr.getX(iA), posAttr.getY(iA), posAttr.getZ(iA)).applyMatrix4(worldMatrix)
-                vB.set(posAttr.getX(iB), posAttr.getY(iB), posAttr.getZ(iB)).applyMatrix4(worldMatrix)
-                vC.set(posAttr.getX(iC), posAttr.getY(iC), posAttr.getZ(iC)).applyMatrix4(worldMatrix)
-
-                const ab = new THREE.Vector3().subVectors(vB, vA)
-                const ac = new THREE.Vector3().subVectors(vC, vA)
-                const area = ab.cross(ac).length() * 0.5
-
-                if (area > 0.0001) {
-                    grassTriangles.push({ a: vA.clone(), b: vB.clone(), c: vC.clone(), area })
-                    totalArea += area
-                }
-            }
-
-            if (grassTriangles.length > 0 && totalArea > 0) {
-                meshData.push({ mesh, grassTriangles, totalArea })
-                grandTotalArea += totalArea
-            }
-        }
-
-        if (grandTotalArea === 0) return positions
-
-        for (const { mesh, grassTriangles, totalArea } of meshData) {
-            const meshCount = Math.round(count * (totalArea / grandTotalArea))
-
-            console.log(`🌿 ${mesh.name}: ${grassTriangles.length} tris, area ${totalArea.toFixed(2)} m², ${meshCount} blades`)
-
-            for (let i = 0; i < meshCount; i++) {
-                let r = Math.random() * totalArea
-                let chosenTri = grassTriangles[0]
-                for (const tri of grassTriangles) {
-                    r -= tri.area
-                    if (r <= 0) { chosenTri = tri; break }
-                }
-
-                let u = Math.random()
-                let v = Math.random()
-                if (u + v > 1) { u = 1 - u; v = 1 - v }
-                const w = 1 - u - v
-
-                positions.push({
-                    x: chosenTri.a.x * u + chosenTri.b.x * v + chosenTri.c.x * w,
-                    y: chosenTri.a.y * u + chosenTri.b.y * v + chosenTri.c.y * w,
-                    z: chosenTri.a.z * u + chosenTri.b.z * v + chosenTri.c.z * w
-                })
-            }
-        }
-
-        console.log(`🌿 Total grass positions: ${positions.length} (density: ${(positions.length / grandTotalArea).toFixed(1)} blades/m²)`)
-        return positions
+    /**
+     * Convenience getter so legacy World code can keep referring to
+     * `patioScene.groundMeshes` for shadow casters / ray-casts.
+     */
+    get groundMeshes() {
+        const out = []
+        if (this.pieces.floor) out.push(...this.pieces.floor.grassMeshes, ...this.pieces.floor.dirtMeshes)
+        return out
     }
 
     update() {
-        if (this.uTime) {
-            this.uTime.value = this.time.elapsed * 0.001
-        }
-        if (this.waterUniforms?.uCamXZ) {
-            const cam = this.experience.camera.instance.position
-            this.waterUniforms.uCamXZ.value.set(cam.x, cam.z)
-        }
-    }
-
-    // ─── GUI CONTROLS ────────────────────────────────────────────
-    setupGUI() {
-        if (!this.debug.active) return
-        if (!this.groundUniforms) return
-
-        const groundFolder = this.debug.ui.addFolder('Ground')
-        groundFolder.close()
-
-        const gu = this.groundUniforms
-        groundFolder.add(gu.uScale, 'value', 0.01, 2.0, 0.01).name('Grass Patch Scale')
-        groundFolder.add(gu.uEmissionStrength, 'value', 0.1, 2.0, 0.01).name('Emission Strength')
-        groundFolder.add(gu.uGrassMicroScale, 'value', 0.2, 5.0, 0.1).name('Grass Micro Scale')
-        groundFolder.add(gu.uGrassAOStrength, 'value', 0.0, 1.5, 0.01).name('Grass AO Strength')
-        groundFolder.add(gu.uGrassSunStrength, 'value', 0.0, 1.0, 0.01).name('Grass Sun Highlights')
-        groundFolder.addColor({ value: gu.uGrassSoilColor.value }, 'value').name('Grass Soil Color')
-            .onChange(v => gu.uGrassSoilColor.value.copy(v))
-        groundFolder.addColor({ value: gu.uGrassColor0.value }, 'value').name('Grass Color 0')
-            .onChange(v => gu.uGrassColor0.value.copy(v))
-        groundFolder.addColor({ value: gu.uGrassColor1.value }, 'value').name('Grass Color 1')
-            .onChange(v => gu.uGrassColor1.value.copy(v))
-        groundFolder.addColor({ value: gu.uGrassColor2.value }, 'value').name('Grass Color 2')
-            .onChange(v => gu.uGrassColor2.value.copy(v))
-        groundFolder.addColor({ value: gu.uGrassColor3.value }, 'value').name('Grass Color 3')
-            .onChange(v => gu.uGrassColor3.value.copy(v))
-        groundFolder.add(gu.uSandVoronoiScale, 'value', 0.5, 20.0, 0.1).name('Sand Voronoi Scale')
-        groundFolder.add(gu.uSandNoiseScale, 'value', 0.1, 3.0, 0.05).name('Sand UV Scale')
-        groundFolder.add(gu.uSandDistortion, 'value', 0.0, 1.0, 0.01).name('Sand Distortion')
-        groundFolder.addColor({ value: gu.uSandColor1.value }, 'value').name('Sand Color 1')
-            .onChange(v => gu.uSandColor1.value.copy(v))
-        groundFolder.addColor({ value: gu.uSandColor2.value }, 'value').name('Sand Color 2')
-            .onChange(v => gu.uSandColor2.value.copy(v))
-
-        const waterFolder = this.debug.ui.addFolder('Water')
-        waterFolder.close()
-
-        const wu = this.waterUniforms
-        waterFolder.add(wu.uScale, 'value', 0.01, 3.0, 0.01).name('Scale')
-        waterFolder.add(wu.uSmoothness, 'value', 0.0, 2.0, 0.01).name('Cell Smoothness')
-        waterFolder.add(wu.uEdgeThreshold, 'value', 0.0, 0.3, 0.005).name('Edge Threshold')
-        waterFolder.add(wu.uEdgeSoftness, 'value', 0.0, 0.1, 0.005).name('Edge Softness')
-        waterFolder.add(wu.uFlowX, 'value', -0.5, 0.5, 0.01).name('Flow X')
-        waterFolder.add(wu.uFlowZ, 'value', -0.5, 0.5, 0.01).name('Flow Z')
-        waterFolder.add(wu.uCellSpeed, 'value', 0.0, 3.0, 0.05).name('Cell Anim Speed')
-        waterFolder.add(wu.uNoiseScale, 'value', 0.1, 10.0, 0.01).name('Noise Scale')
-        waterFolder.add(wu.uNoiseFlowSpeed, 'value', 0.0, 2.0, 0.01).name('Noise Flow Speed')
-        waterFolder.add(wu.uDistortAmount, 'value', 0.0, 3.0, 0.01).name('Distort Amount')
-        waterFolder.add(wu.uMidPos, 'value', 0.001, 0.999, 0.001).name('Mid Color Position')
-        waterFolder.add(wu.uOpacity, 'value', 0.0, 1.0, 0.01).name('Opacity')
-        waterFolder.add(wu.uDeepOpacity, 'value', 0.0, 1.0, 0.01).name('Deep Opacity')
-        waterFolder.add(wu.uFadeDistance, 'value', 10, 300, 5).name('Fade Distance')
-        waterFolder.add(wu.uFadeStrength, 'value', 0.1, 5.0, 0.1).name('Fade Strength')
-        waterFolder.addColor({ value: wu.uDeepColor.value }, 'value').name('Deep Color')
-            .onChange(v => wu.uDeepColor.value.copy(v))
-        waterFolder.addColor({ value: wu.uMidColor.value }, 'value').name('Mid Color')
-            .onChange(v => wu.uMidColor.value.copy(v))
-        waterFolder.addColor({ value: wu.uHighlight.value }, 'value').name('Highlight Color')
-            .onChange(v => wu.uHighlight.value.copy(v))
-
-        const intersectionFolder = this.debug.ui.addFolder('Water Intersection')
-        intersectionFolder.close()
-        intersectionFolder.add(wu.uLineWidth, 'value', 0.0, 2.0, 0.01).name('Line Width')
-        intersectionFolder.add(wu.uGlowWidth, 'value', 0.0, 5.0, 0.1).name('Glow Width')
-        intersectionFolder.add(wu.uLineOpacity, 'value', 0.0, 1.0, 0.01).name('Line Opacity')
-        intersectionFolder.add(wu.uGlowOpacity, 'value', 0.0, 1.0, 0.01).name('Glow Opacity')
-        intersectionFolder.addColor({ value: wu.uLineColor.value }, 'value').name('Line Color')
-            .onChange(v => wu.uLineColor.value.copy(v))
-        intersectionFolder.addColor({ value: wu.uGlowColor.value }, 'value').name('Glow Color')
-            .onChange(v => wu.uGlowColor.value.copy(v))
-
-        if (this.cloudUniforms && this.cloudMeshes.length > 0) {
-            const cloudFolder = this.debug.ui.addFolder('Clouds')
-            cloudFolder.close()
-
-            const cu = this.cloudUniforms
-            cloudFolder.add(cu.uNoiseScale1, 'value', 0.2, 4.0, 0.01).name('Noise Scale 1')
-            cloudFolder.add(cu.uNoiseScale2, 'value', 0.2, 5.0, 0.01).name('Noise Scale 2')
-            cloudFolder.add(cu.uNoiseScale3, 'value', 0.2, 8.0, 0.01).name('Noise Scale 3')
-            cloudFolder.add(cu.uScrollSpeed1, 'value', -1.0, 1.0, 0.01).name('Scroll Speed 1')
-            cloudFolder.add(cu.uScrollSpeed2, 'value', -1.0, 1.0, 0.01).name('Scroll Speed 2')
-            cloudFolder.add(cu.uDisplacement, 'value', 0.0, 3.0, 0.01).name('Displacement')
-            cloudFolder.add(cu.uOpacity, 'value', 0.0, 1.0, 0.01).name('Opacity')
-            cloudFolder.addColor({ value: cu.uBaseColor.value }, 'value').name('Base Color')
-                .onChange(v => cu.uBaseColor.value.copy(v))
-            cloudFolder.addColor({ value: cu.uCloudColor.value }, 'value').name('Cloud Color')
-                .onChange(v => cu.uCloudColor.value.copy(v))
-            cloudFolder.addColor({ value: cu.uHighlight.value }, 'value').name('Highlight Color')
-                .onChange(v => cu.uHighlight.value.copy(v))
-        }
+        this.pieces.river?.update?.()
     }
 }

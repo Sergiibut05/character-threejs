@@ -143,7 +143,7 @@ export function createGroundColorNode(uniforms) {
 
         // Layer 1: Large colour patches (Ghibli "painted" feel)
         // Uses the same scale as before, controls big colour blotches
-        const grassP = wp.mul(uScale)
+        const grassP = wp.mul(uScale).xz
         const largeFBM = fbm(grassP)
 
         // Map FBM [-1..1] → [0..1] normalised for the color ramp
@@ -155,7 +155,7 @@ export function createGroundColorNode(uniforms) {
 
         // Layer 2: Micro-detail noise — tiny brightness variation replicating
         // individual grass blade clusters / uneven ground surface
-        const microP = wp.mul(uGrassMicroScale)
+        const microP = wp.mul(uGrassMicroScale).xz
         const microFBM = fbm(microP) // -1..1
 
         // Normalise micro noise to 0..1

@@ -43,7 +43,7 @@ export default class GroundPerlin {
 
         // Build the color node using shared TSL noise functions
         const colorNode = Fn(() => {
-            const p = worldPos.mul(this.uScale)
+            const p = worldPos.mul(this.uScale).xz
             const raw = fbm(p)
 
             // ColorRamp with 4 colors (same as Blender node setup)

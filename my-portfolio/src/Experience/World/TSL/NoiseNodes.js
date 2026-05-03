@@ -1,151 +1,101 @@
-/**
- * Shared TSL Noise Nodes
- * Replaces the duplicated GLSL simplex noise + fBM + ColorRamp code
- * that was in both GroundPerlin.js and Grass.js
- */
+import * as THREE from 'three'
 import {
-    Fn, float, vec2, vec3, vec4,
-    floor, fract, dot, step, min, max, abs,
-    smoothstep, mix, clamp,
-    Loop, int
+    Fn, float, vec2, vec3,
+    floor, fract,
+    mix, smoothstep,
+    Loop, int, texture
 } from 'three/tsl'
 
-// --- Helper functions for simplex noise ---
+// --- High-Performance Texture Noise ---
+// Generate a 256x256 random noise texture ONCE on the CPU (0ms cost).
+// This replaces the extremely heavy 3D procedural math that was crashing
+// the WebGPU compiler and causing 26-60 second freezes.
+const NOISE_SIZE = 256
+const noiseData = new Uint8Array(NOISE_SIZE * NOISE_SIZE * 4)
+for (let i = 0; i < noiseData.length; i++) {
+    noiseData[i] = Math.floor(Math.random() * 255)
+}
 
-const mod289_vec3 = Fn(([x]) => {
-    return x.sub(floor(x.mul(1.0 / 289.0)).mul(289.0))
-})
+export const hashTexture = new THREE.DataTexture(noiseData, NOISE_SIZE, NOISE_SIZE, THREE.RGBAFormat)
+hashTexture.minFilter = THREE.NearestFilter
+hashTexture.magFilter = THREE.NearestFilter
+hashTexture.wrapS = THREE.RepeatWrapping
+hashTexture.wrapT = THREE.RepeatWrapping
+hashTexture.generateMipmaps = false
+hashTexture.needsUpdate = true
 
-const mod289_vec4 = Fn(([x]) => {
-    return x.sub(floor(x.mul(1.0 / 289.0)).mul(289.0))
-})
-
-const permute = Fn(([x]) => {
-    return mod289_vec4(x.mul(34.0).add(1.0).mul(x))
-})
-
-const taylorInvSqrt = Fn(([r]) => {
-    return float(1.79284291400159).sub(float(0.85373472095314).mul(r))
-})
-
-// --- Simplex Noise 3D ---
+// --- 2D Value Noise ---
+// O(1) texture lookup instead of O(N) mathematical trigonometry
 export const snoise = Fn(([v]) => {
+    // Value noise expects a vec2. If a vec3 is passed (like world position), 
+    // we just use the XZ plane.
+    const p = vec2(v.x, v.y)
+    
+    const i = floor(p)
+    const f = fract(p)
 
-    const C = vec2(1.0 / 6.0, 1.0 / 3.0)
-    const D = vec4(0.0, 0.5, 1.0, 2.0)
+    // Smoothstep interpolation (Hermite curve)
+    const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0))).toVar()
 
-    // First corner
-    const i = floor(v.add(dot(v, C.yyy))).toVar()
-    const x0 = v.sub(i).add(dot(i, C.xxx)).toVar()
+    // Map pixel coordinates to UVs with half-pixel offset 
+    // to fix precision glitches on older Android devices.
+    const res = float(NOISE_SIZE)
+    const halfPixel = float(0.5).div(res)
+    
+    const uv00 = i.div(res).add(halfPixel)
+    const uv10 = i.add(vec2(1.0, 0.0)).div(res).add(halfPixel)
+    const uv01 = i.add(vec2(0.0, 1.0)).div(res).add(halfPixel)
+    const uv11 = i.add(vec2(1.0, 1.0)).div(res).add(halfPixel)
 
-    // Other corners
-    const g = step(x0.yzx, x0.xyz).toVar()
-    const l = float(1.0).sub(g).toVar()
-    const i1 = min(g.xyz, l.zxy).toVar()
-    const i2 = max(g.xyz, l.zxy).toVar()
+    const a = texture(hashTexture, uv00).r
+    const b = texture(hashTexture, uv10).r
+    const c = texture(hashTexture, uv01).r
+    const d = texture(hashTexture, uv11).r
 
-    const x1 = x0.sub(i1).add(C.xxx).toVar()
-    const x2 = x0.sub(i2).add(C.yyy).toVar()
-    const x3 = x0.sub(D.yyy).toVar()
+    // Interpolate along x, then y
+    const mixAB = mix(a, b, u.x)
+    const mixCD = mix(c, d, u.x)
+    const finalVal = mix(mixAB, mixCD, u.y)
 
-    // Permutations
-    i.assign(mod289_vec3(i))
-    const p = permute(
-        permute(
-            permute(
-                i.z.add(vec4(0.0, i1.z, i2.z, 1.0))
-            ).add(i.y).add(vec4(0.0, i1.y, i2.y, 1.0))
-        ).add(i.x).add(vec4(0.0, i1.x, i2.x, 1.0))
-    ).toVar()
-
-    // Gradients
-    const n_ = float(0.142857142857)
-    const ns = n_.mul(D.wyz).sub(D.xzx).toVar()
-
-    const j = p.sub(floor(p.mul(ns.z).mul(ns.z)).mul(49.0)).toVar()
-
-    const x_ = floor(j.mul(ns.z)).toVar()
-    const y_ = floor(j.sub(x_.mul(7.0))).toVar()
-
-    const x = x_.mul(ns.x).add(ns.yyyy).toVar()
-    const y = y_.mul(ns.x).add(ns.yyyy).toVar()
-    const h = float(1.0).sub(abs(x)).sub(abs(y)).toVar()
-
-    const b0 = vec4(x.xy, y.xy).toVar()
-    const b1 = vec4(x.zw, y.zw).toVar()
-
-    const s0 = floor(b0).mul(2.0).add(1.0).toVar()
-    const s1 = floor(b1).mul(2.0).add(1.0).toVar()
-    const sh = step(h, vec4(0.0)).negate().toVar()
-
-    const a0 = b0.xzyw.add(s0.xzyw.mul(sh.xxyy)).toVar()
-    const a1 = b1.xzyw.add(s1.xzyw.mul(sh.zzww)).toVar()
-
-    const p0 = vec3(a0.xy, h.x).toVar()
-    const p1 = vec3(a0.zw, h.y).toVar()
-    const p2 = vec3(a1.xy, h.z).toVar()
-    const p3 = vec3(a1.zw, h.w).toVar()
-
-    // Normalise gradients
-    const norm = taylorInvSqrt(vec4(
-        dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)
-    )).toVar()
-    p0.mulAssign(norm.x)
-    p1.mulAssign(norm.y)
-    p2.mulAssign(norm.z)
-    p3.mulAssign(norm.w)
-
-    // Mix contributions
-    const m = max(
-        float(0.6).sub(vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3))),
-        0.0
-    ).toVar()
-    m.assign(m.mul(m))
-
-    return float(42.0).mul(
-        dot(m.mul(m), vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)))
-    )
-
+    // Return mapped to [-1, 1] range to simulate simplex output
+    return finalVal.mul(2.0).sub(1.0)
 })
 
 // --- Fractal Brownian Motion (fBM) ---
-// 4 octaves, lacunarity 2.0, persistence 0.5 (Blender-style)
-export const fbm = Fn(([p]) => {
-
+export const fbm = Fn(([v]) => {
     const value = float(0.0).toVar()
-    const amplitude = float(1.0).toVar()
-    const frequency = float(1.0).toVar()
-    const lacunarity = float(2.0)
-    const persistence = float(0.5)
+    const amplitude = float(0.5).toVar()
+    
+    // We only need the XZ coordinates for the 2D noise texture
+    const p = vec2(v.x, v.y).toVar()
 
-    Loop(4, () => {
-        value.addAssign(amplitude.mul(snoise(p.mul(frequency))))
-        frequency.mulAssign(lacunarity)
-        amplitude.mulAssign(persistence)
+    Loop({ start: int(0), end: int(4), type: 'int', condition: '<' }, () => {
+        value.addAssign(amplitude.mul(snoise(p)))
+        p.mulAssign(2.0)
+        amplitude.mulAssign(0.5)
     })
 
     return value
-
 })
 
-// --- ColorRamp (Blender-style with 4 colors and 2 stops) ---
-export const colorRamp = Fn(([noiseValue, color0, color1, color2, color3, rampStop1, rampStop2]) => {
+// --- Color Ramp ---
+export const colorRamp = Fn(([t, c0, c1, c2, c3, stop1, stop2]) => {
+    // Map noise [-1, 1] to [0, 1]
+    const t01 = t.mul(0.5).add(0.5).toVar()
 
-    // Normalize to [0,1] with soft remap
-    const n = clamp(noiseValue.div(1.875).mul(0.5).add(0.5), 0.0, 1.0).toVar()
-    n.assign(smoothstep(0.0, 1.0, n))
+    const color = vec3(0.0).toVar()
 
-    // ColorRamp Blender-style: 3 transitions
-    const s1 = min(rampStop1, rampStop2)
-    const s2 = max(rampStop1, rampStop2)
-    const t1 = smoothstep(0.0, s1, n)
-    const t2 = smoothstep(s1, s2, n)
-    const t3 = smoothstep(s2, 1.0, n)
+    const w0 = float(1.0).sub(smoothstep(0.0, stop1, t01))
+    color.addAssign(vec3(c0).mul(w0))
 
-    const result = mix(color0, color1, t1).toVar()
-    result.assign(mix(result, color2, t2))
-    result.assign(mix(result, color3, t3))
+    const w1 = smoothstep(0.0, stop1, t01).mul(float(1.0).sub(smoothstep(stop1, stop2, t01)))
+    color.addAssign(vec3(c1).mul(w1))
 
-    return result
+    const w2 = smoothstep(stop1, stop2, t01).mul(float(1.0).sub(smoothstep(stop2, 1.0, t01)))
+    color.addAssign(vec3(c2).mul(w2))
 
+    const w3 = smoothstep(stop2, 1.0, t01)
+    color.addAssign(vec3(c3).mul(w3))
+
+    return color
 })

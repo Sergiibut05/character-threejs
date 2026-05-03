@@ -182,12 +182,18 @@ export default class Experience {
         this.cloudTransition?.remove()
         this.cloudTransition = null
 
-        // Iris transition:
-        // 1) reveal to a small hole, 2) hold, 3) tiny anticipation in, 4) open fully.
-        await this.animateValue(0.0, 0.075, 420, (v) => this.renderer.setIrisTransitionSize(v))
+        // Iris transition: open to a small hole, hold, anticipation in, open fully.
+        // Total ~3.2 s — shaders compile naturally in the render loop during this time.
+        // On mobile, we make the hole significantly bigger because 0.075 is microscopic 
+        // on a phone screen, which makes it look like a "black screen bug" to the user.
+        const isMobile = this.quality.isLow
+        const holeSize = isMobile ? 0.25 : 0.075
+        const shrinkSize = isMobile ? 0.18 : 0.058
+
+        await this.animateValue(0.0, holeSize, 420, (v) => this.renderer.setIrisTransitionSize(v))
         await this.waitMs(1000)
-        await this.animateValue(0.075, 0.058, 150, (v) => this.renderer.setIrisTransitionSize(v))
-        await this.animateValue(0.058, 1.35, 1650, (v) => this.renderer.setIrisTransitionSize(v))
+        await this.animateValue(holeSize, shrinkSize, 150, (v) => this.renderer.setIrisTransitionSize(v))
+        await this.animateValue(shrinkSize, 1.35, 1650, (v) => this.renderer.setIrisTransitionSize(v))
         this.renderer.setIrisTransitionEnabled(false)
     }
 

@@ -549,3 +549,174 @@ body
     font-weight: 600;
     text-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
 }
+
+/* ═══════════════════════════════════
+   Settings — top-right gear button + popover
+   Discreet floating control. Hidden until the
+   experience is ready (no modal interrupt).
+   ═══════════════════════════════════ */
+
+.settings-host
+{
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 1500;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.settings-host[hidden]
+{
+    display: none;
+}
+
+.settings-host.is-visible
+{
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.settings-gear
+{
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1.5px solid rgba(50, 130, 95, 0.18);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: rgba(25, 60, 45, 0.75);
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(20, 50, 35, 0.15);
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.settings-gear:hover
+{
+    background: rgba(255, 255, 255, 0.78);
+    color: rgba(25, 60, 45, 0.95);
+    transform: translateY(-1px);
+}
+
+.settings-gear:active
+{
+    transform: translateY(1px);
+}
+
+.settings-gear svg
+{
+    width: 20px;
+    height: 20px;
+}
+
+.settings-host.is-open .settings-gear
+{
+    background: rgba(255, 255, 255, 0.92);
+    color: #2c5e3d;
+}
+
+.settings-panel
+{
+    position: absolute;
+    top: 54px;
+    right: 0;
+    min-width: 220px;
+    padding: 14px 14px 12px;
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1.5px solid rgba(50, 130, 95, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 12px 28px rgba(20, 50, 35, 0.2);
+    font-family: 'Fredoka', 'Nunito', sans-serif;
+    color: rgba(20, 50, 35, 0.85);
+    transform: translateY(-4px) scale(0.98);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.settings-panel[hidden]
+{
+    display: none;
+}
+
+.settings-host.is-open .settings-panel
+{
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-row
+{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.settings-row-label
+{
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(20, 50, 35, 0.55);
+}
+
+.settings-toggle
+{
+    display: inline-flex;
+    background: rgba(20, 50, 35, 0.06);
+    border-radius: 999px;
+    padding: 3px;
+}
+
+.settings-toggle-btn
+{
+    appearance: none;
+    border: 0;
+    padding: 6px 14px;
+    background: transparent;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(20, 50, 35, 0.55);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-toggle-btn:hover
+{
+    color: rgba(20, 50, 35, 0.85);
+}
+
+.settings-toggle-btn[aria-checked="true"]
+{
+    background: #ffffff;
+    color: #2c5e3d;
+    box-shadow: 0 2px 6px rgba(20, 50, 35, 0.18);
+}
+
+.settings-hint
+{
+    margin: 10px 0 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: rgba(20, 50, 35, 0.55);
+}
+
+.settings-hint strong
+{
+    color: rgba(20, 50, 35, 0.8);
+    font-weight: 600;
+}

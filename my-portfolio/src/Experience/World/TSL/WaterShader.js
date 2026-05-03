@@ -88,30 +88,14 @@ const voronoiSF1 = Fn(([p, time, cellSpeed, smoothness]) => {
     return res
 })
 
-// ── Scalar hash for value noise ─────────────────────────────────────────────
-const nHash = Fn(([p_in]) => {
-    const p = fract(p_in.mul(vec2(127.1, 311.7)))
-    const pp = p.add(dot(p, p.add(45.32)))
-    return fract(pp.x.mul(pp.y))
-})
-
-// ── Value noise (smoothstep interpolated) ───────────────────────────────────
-const vnoise = Fn(([p]) => {
-    const i = floor(p)
-    const f = fract(p)
-    const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0)))
-
-    const a = nHash(i)
-    const b = nHash(i.add(vec2(1.0, 0.0)))
-    const c = nHash(i.add(vec2(0.0, 1.0)))
-    const d = nHash(i.add(vec2(1.0, 1.0)))
-
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y)
-})
+import { snoise } from './NoiseNodes.js'
 
 // ── 2-octave fBm ───────────────────────────────────────────────────────────
 const fbm = Fn(([p]) => {
-    return float(0.5).mul(vnoise(p)).add(float(0.25).mul(vnoise(p.mul(2.0))))
+    // Map snoise [-1..1] to [0..1] to match the old vnoise range
+    const noise1 = snoise(p).mul(0.5).add(0.5)
+    const noise2 = snoise(p.mul(2.0)).mul(0.5).add(0.5)
+    return float(0.5).mul(noise1).add(float(0.25).mul(noise2))
 })
 
 // ── Core: noise distortion + Voronoi F1−SF1 edge detection ─────────────────

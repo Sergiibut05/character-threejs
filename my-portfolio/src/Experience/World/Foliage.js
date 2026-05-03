@@ -36,6 +36,9 @@ export default class Foliage {
         this.seeThroughCenterOffsetY = -0.04
         this.rng = createRng(42)
 
+        // Pre-allocated temp vector to avoid GC pressure in update() (60fps × clone = heap churn)
+        this._tmpVec3 = new THREE.Vector3()
+
         this.setGeometry()
         this.setMaterial()
         this.setFromReferences()
@@ -242,10 +245,11 @@ export default class Foliage {
             if (this.lockSeeThroughToScreenCenter || !character) {
                 this.material.seeThroughPosition.value.set(0.5, 0.5 + this.seeThroughCenterOffsetY)
             } else {
-                const projected = character.position.clone().project(camera)
+                // Reuse pre-allocated vector — avoids new THREE.Vector3() every frame
+                this._tmpVec3.copy(character.position).project(camera)
                 this.material.seeThroughPosition.value.set(
-                    THREE.MathUtils.clamp((projected.x + 1) * 0.5, 0, 1),
-                    THREE.MathUtils.clamp((1 - projected.y) * 0.5 + this.seeThroughCenterOffsetY, 0, 1)
+                    THREE.MathUtils.clamp((this._tmpVec3.x + 1) * 0.5, 0, 1),
+                    THREE.MathUtils.clamp((1 - this._tmpVec3.y) * 0.5 + this.seeThroughCenterOffsetY, 0, 1)
                 )
             }
 

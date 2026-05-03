@@ -41,7 +41,25 @@ export default {
         outDir: '../dist', // Output in the dist/ folder
         emptyOutDir: true, // Empty the folder first
         sourcemap: false,
-        target: 'esnext'
+        target: 'esnext',
+        // Split three.js into its own chunk so the browser caches it across
+        // visits. Subsequent loads only re-download the (small) app code.
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    // Loaders and TSL effects come from three/examples/jsm/* and
+                    // import nothing else outside three — safe to split.
+                    if (id.includes('node_modules/three/examples/jsm/loaders')) return 'three-loaders'
+                    if (id.includes('node_modules/three/examples/jsm/tsl')) return 'three-tsl-fx'
+                    // Bundle the core library (three.webgpu + three.tsl + everything
+                    // it transitively imports from three/) into ONE chunk to avoid
+                    // the circular-chunk warning. ~600 kB (170 kB gzip), cacheable.
+                    if (id.includes('node_modules/three/')) return 'three'
+                    if (id.includes('@dimforge/rapier3d')) return 'rapier'
+                }
+            }
+        },
+        chunkSizeWarningLimit: 800
     },
     plugins:
         [

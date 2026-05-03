@@ -18,7 +18,12 @@ export default class Physics
     async init()
     {
         try {
-            const RAPIER = await import('@dimforge/rapier3d')
+            // ── Causa #2 fix ────────────────────────────────────────────────
+            // Re-use the in-flight Rapier promise that Experience started at
+            // app boot (experience._rapierPromise). This means Rapier's WASM
+            // download overlaps with all the asset downloads instead of
+            // waiting for them to finish first.
+            const RAPIER = await this.experience._rapierPromise
             this.RAPIER = RAPIER
 
             const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0)
