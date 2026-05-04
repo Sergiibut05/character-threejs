@@ -42,19 +42,23 @@ export function syncPropStylizedSunDirection(sunLight) {
  * @param {THREE.Texture|null} [options.map]
  * @param {number|THREE.Color} [options.color]
  * @param {boolean} [options.flatShading]
+ * @param {boolean} [options.mapAlpha] Use texture alpha in output (transparent cutout / billboard)
  */
 export function createStylizedPropNodeMaterial(options = {}) {
     const {
         map = null,
         color = 0xffffff,
-        flatShading = false
+        flatShading = false,
+        mapAlpha = false
     } = options
 
     const tc = toThreeColor(color)
     const tintRgb = uniform(new THREE.Vector3(tc.r, tc.g, tc.b))
 
     const material = new THREE.MeshLambertNodeMaterial({
-        flatShading
+        flatShading,
+        transparent: mapAlpha && !!map,
+        depthWrite: !(mapAlpha && !!map)
     })
     if (map) material.map = map
 
@@ -66,9 +70,8 @@ export function createStylizedPropNodeMaterial(options = {}) {
     })
 
     material.outputNode = Fn(() => {
-        const base = map
-            ? texture(map, uv()).rgb.mul(tintRgb)
-            : tintRgb
+        const texel = map ? texture(map, uv()) : null
+        const base = map ? texel.rgb.mul(tintRgb) : tintRgb
 
         const N = normalWorld.normalize()
         const ndl = N.dot(propSunDirection.normalize())
@@ -79,7 +82,8 @@ export function createStylizedPropNodeMaterial(options = {}) {
         const lit = base.mul(propLitTint)
         const shaded = base.mul(propShadowTint)
         const rgb = mix(lit, shaded, combined)
-        return vec4(rgb, float(1))
+        const outA = mapAlpha && map ? texel.a : float(1)
+        return vec4(rgb, outA)
     })()
 
     return material

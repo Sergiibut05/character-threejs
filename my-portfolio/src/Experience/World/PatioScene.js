@@ -151,11 +151,11 @@ export default class PatioScene {
             if (name === 'riverModel' && !this.pieces.river && r.riverModel) {
                 this.pieces.river = new River(r.riverModel)
             }
-            // House (needs both model + texture — build as soon as model arrives)
+            // House: wait for BOTH glb + ktx2 — if glb loads first, map was null and texture never applied.
             if ((name === 'houseModel' || name === 'houseTexture') &&
-                !this.pieces.house && r.houseModel) {
+                !this.pieces.house && r.houseModel && r.houseTexture) {
                 this.pieces.house = new StaticPiece('house', r.houseModel, {
-                    map: r.houseTexture || null
+                    map: r.houseTexture
                 })
             }
             // Bridge
@@ -175,7 +175,7 @@ export default class PatioScene {
         this.resources.on('sourceLoaded', tryBuild)
 
         // Also check immediately in case assets loaded from cache already
-        for (const name of ['riverModel', 'houseModel', 'bridgeModel', 'infoBoardModel']) {
+        for (const name of ['riverModel', 'houseModel', 'houseTexture', 'bridgeModel', 'infoBoardModel']) {
             tryBuild(name)
         }
     }
@@ -223,15 +223,21 @@ export default class PatioScene {
         }
 
         if (!this.pieces.socialEntrance && r.socialEntranceModel) {
+            const titleTex = r.socialTittleTexture || null
             this.pieces.socialEntrance = new StaticPiece('socialEntrance', r.socialEntranceModel, {
                 map: r.sushiAtlas || null,
-                preserveOwnMaps: true
+                preserveOwnMaps: true,
+                meshMaps: titleTex
+                    ? {
+                        'social-tittle': { map: titleTex, mapAlpha: true, castShadow: false }
+                    }
+                    : {}
             })
         }
 
         // Fallback: build these if they weren't caught by sourceLoaded yet
-        if (!this.pieces.house && r.houseModel) {
-            this.pieces.house = new StaticPiece('house', r.houseModel, { map: r.houseTexture || null })
+        if (!this.pieces.house && r.houseModel && r.houseTexture) {
+            this.pieces.house = new StaticPiece('house', r.houseModel, { map: r.houseTexture })
         }
         if (!this.pieces.river && r.riverModel) {
             this.pieces.river = new River(r.riverModel)

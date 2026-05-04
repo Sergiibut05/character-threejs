@@ -27,6 +27,13 @@ const GRASS_MESH_NAMES = ['grass-floor-1', 'grass-floor-2']
 const DIRT_MESH_NAMES = ['ground-floor-1', 'ground-floor-2']
 const SLABS_CHANNELS = ['lum', 'r', 'g', 'b', 'a']
 
+/** Same response as shader `smoothstep(uGrassMaskLow, uGrassMaskHigh, lum)` — CPU-side. */
+function grassMaskBlendCpu(lum, low, high) {
+    const denom = Math.max(1e-6, high - low)
+    const t = THREE.MathUtils.clamp((lum - low) / denom, 0, 1)
+    return t * t * (3 - 2 * t)
+}
+
 export default class Floor {
     constructor(gltf, options = {}) {
         this.experience = new Experience()
@@ -163,13 +170,51 @@ export default class Floor {
     }
 
     /**
+     * Re-run CPU grass placement (uses current mask + spawn uniforms).
+     * Only when debug World already created `grass` with `spawnFunction`.
+     */
+    _rebuildGrassInstances() {
+        const world = this.experience.world
+        const grass = world?.grass
+        if (!grass?.spawnFunction) return
+
+        const target = this.experience.quality.grassCount
+        const positions = this.getGrassSpawnPositions(target)
+        if (positions.length === 0) {
+            console.warn(
+                '[Floor] Re-bake: 0 grass positions — baja «Min blade grass» o «Triangle peak scale», o revisa mascaras CPU (*.png)'
+            )
+            return
+        }
+
+        grass.spawnPositions = positions
+        grass.count = positions.length
+        grass.setMesh()
+    }
+
+    _refreshGrassMaskShaderAndSpawn() {
+        this._rebuildGrassMaterials()
+        this._rebuildGrassInstances()
+    }
+
+    /**
      * Sample triangles of grass meshes by UV against the baked grass mask
      * (PNG, CPU-readable) and return random spawn positions for the Grass
      * system. If no mask image is available, returns ALL triangles as grass.
+     *
+     * When masks exist: (1) drop triangles wholly on dirt vs shared floor uniforms;
+     * (2) rejection sample each blade — only place where mask blend matches shader.
      */
     getGrassSpawnPositions(count = 3000) {
         const positions = []
         if (this.grassMeshes.length === 0) return positions
+
+        const grassLow = this.uniforms.uGrassMaskLow?.value ?? 0.45
+        const grassHigh = this.uniforms.uGrassMaskHigh?.value ?? 0.62
+        const minBladeGrass = this.uniforms.uGrassSpawnMinBlade?.value ?? 0.16
+        const triPeakScale = this.uniforms.uGrassSpawnTriPeakScale?.value ?? 0.88
+        const attemptsMult = this.uniforms.uGrassSpawnAttemptsMult?.value ?? 56
+        const triMinPeak = grassLow * triPeakScale
 
         const meshData = []
         let grandTotalArea = 0
@@ -181,7 +226,8 @@ export default class Floor {
             if (!posAttr || !uvAttr) continue
 
             const cpuImage = this.maskCpuImages[mesh.name] || null
-            const sampleMask = cpuImage ? this._buildMaskSampler(cpuImage) : null
+            const flipCpuV = (this.uniforms.uGrassSpawnFlipMaskV?.value ?? 0) > 0.5
+            const sampleMask = cpuImage ? this._buildMaskSampler(cpuImage, flipCpuV) : null
 
             mesh.updateWorldMatrix(true, false)
             const worldMatrix = mesh.matrixWorld
@@ -196,11 +242,19 @@ export default class Floor {
                 const iB = indexArray ? indexArray[f * 3 + 1] : f * 3 + 1
                 const iC = indexArray ? indexArray[f * 3 + 2] : f * 3 + 2
 
+                const ua = uvAttr.getX(iA)
+                const va = uvAttr.getY(iA)
+                const ub = uvAttr.getX(iB)
+                const vb = uvAttr.getY(iB)
+                const uc = uvAttr.getX(iC)
+                const vc = uvAttr.getY(iC)
+
                 if (sampleMask) {
-                    const lA = sampleMask(uvAttr.getX(iA), uvAttr.getY(iA))
-                    const lB = sampleMask(uvAttr.getX(iB), uvAttr.getY(iB))
-                    const lC = sampleMask(uvAttr.getX(iC), uvAttr.getY(iC))
-                    if (lA < 0.4 && lB < 0.4 && lC < 0.4) continue
+                    const lA = sampleMask(ua, va)
+                    const lB = sampleMask(ub, vb)
+                    const lC = sampleMask(uc, vc)
+                    const peak = Math.max(lA, lB, lC)
+                    if (peak < triMinPeak) continue
                 }
 
                 _vA.set(posAttr.getX(iA), posAttr.getY(iA), posAttr.getZ(iA)).applyMatrix4(worldMatrix)
@@ -211,7 +265,13 @@ export default class Floor {
                 const ac = new THREE.Vector3().subVectors(_vC, _vA)
                 const area = ab.cross(ac).length() * 0.5
                 if (area > 0.0001) {
-                    grassTriangles.push({ a: _vA.clone(), b: _vB.clone(), c: _vC.clone(), area })
+                    grassTriangles.push({
+                        a: _vA.clone(),
+                        b: _vB.clone(),
+                        c: _vC.clone(),
+                        ua, va, ub, vb, uc, vc,
+                        area
+                    })
                     totalArea += area
                 }
             }
@@ -224,39 +284,70 @@ export default class Floor {
                     runningArea += grassTriangles[i].area
                     cumulativeAreas[i] = runningArea
                 }
-                meshData.push({ mesh, grassTriangles, cumulativeAreas, totalArea })
+                meshData.push({
+                    mesh,
+                    grassTriangles,
+                    cumulativeAreas,
+                    totalArea,
+                    sampleMask
+                })
                 grandTotalArea += totalArea
             }
         }
 
         if (grandTotalArea === 0) return positions
 
-        for (const { mesh, grassTriangles, cumulativeAreas, totalArea } of meshData) {
+        const pickTriangle = (grassTriangles, cumulativeAreas, totalArea) => {
+            const r = Math.random() * totalArea
+            let lo = 0
+            let hi = cumulativeAreas.length - 1
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1
+                if (r <= cumulativeAreas[mid]) hi = mid
+                else lo = mid + 1
+            }
+            return grassTriangles[lo]
+        }
+
+        for (const { mesh, grassTriangles, cumulativeAreas, totalArea, sampleMask } of meshData) {
             const meshCount = Math.round(count * (totalArea / grandTotalArea))
             console.log(`🌿 ${mesh.name}: ${grassTriangles.length} tris, area ${totalArea.toFixed(2)} m², ${meshCount} blades`)
 
-            for (let i = 0; i < meshCount; i++) {
-                const r = Math.random() * totalArea
-                
-                // Binary Search (O(log M) instead of O(M))
-                let low = 0
-                let high = cumulativeAreas.length - 1
-                while (low < high) {
-                    const mid = (low + high) >> 1
-                    if (r <= cumulativeAreas[mid]) high = mid
-                    else low = mid + 1
-                }
-                const chosenTri = grassTriangles[low]
+            const attemptsCap = Math.max(meshCount * attemptsMult, meshCount + attemptsMult)
 
-                let u = Math.random()
-                let v = Math.random()
-                if (u + v > 1) { u = 1 - u; v = 1 - v }
-                const w = 1 - u - v
-                positions.push({
-                    x: chosenTri.a.x * u + chosenTri.b.x * v + chosenTri.c.x * w,
-                    y: chosenTri.a.y * u + chosenTri.b.y * v + chosenTri.c.y * w,
-                    z: chosenTri.a.z * u + chosenTri.b.z * v + chosenTri.c.z * w
-                })
+            for (let i = 0; i < meshCount; i++) {
+                let placed = false
+                let tries = 0
+
+                while (!placed && tries < attemptsCap) {
+                    tries++
+                    const tri = pickTriangle(grassTriangles, cumulativeAreas, totalArea)
+                    let u = Math.random()
+                    let vv = Math.random()
+                    if (u + vv > 1) { u = 1 - u; vv = 1 - vv }
+                    const ww = 1 - u - vv
+
+                    const x = tri.a.x * u + tri.b.x * vv + tri.c.x * ww
+                    const y = tri.a.y * u + tri.b.y * vv + tri.c.y * ww
+                    const z = tri.a.z * u + tri.b.z * vv + tri.c.z * ww
+
+                    if (!sampleMask) {
+                        positions.push({ x, y, z })
+                        placed = true
+                        break
+                    }
+
+                    // Same barycentric weights as position: u·A + vv·B + ww·C
+                    const sampU = tri.ua * u + tri.ub * vv + tri.uc * ww
+                    const sampV = tri.va * u + tri.vb * vv + tri.vc * ww
+                    const lum = sampleMask(sampU, sampV)
+                    const g = grassMaskBlendCpu(lum, grassLow, grassHigh)
+
+                    if (g >= minBladeGrass) {
+                        positions.push({ x, y, z })
+                        placed = true
+                    }
+                }
             }
         }
 
@@ -264,7 +355,10 @@ export default class Floor {
         return positions
     }
 
-    _buildMaskSampler(imageOrTexture) {
+    /**
+     * @param {boolean} flipV Use `v` instead of `(1-v)` for row index if PNG differs from GPU UV.
+     */
+    _buildMaskSampler(imageOrTexture, flipV = false) {
         try {
             const image = imageOrTexture?.image || imageOrTexture
             if (!image || (!image.width && !image.naturalWidth)) return null
@@ -285,7 +379,8 @@ export default class Floor {
 
             return (u, v) => {
                 const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(u * canvas.width)))
-                const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((1 - v) * canvas.height)))
+                const yNorm = flipV ? v : (1 - v)
+                const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(yNorm * canvas.height)))
                 const i = (y * canvas.width + x) * 4
                 return (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255
             }
@@ -301,9 +396,33 @@ export default class Floor {
 
         const u = this.uniforms
 
-        const grassFolder = folder.addFolder('Grass mask (UV-baked)')
-        grassFolder.add(u.uGrassMaskLow, 'value', 0, 1, 0.01).name('Mask Low')
-        grassFolder.add(u.uGrassMaskHigh, 'value', 0, 1, 0.01).name('Mask High')
+        const grassFolder = folder.addFolder('Grass mask (GPU / floor shader)')
+        grassFolder
+            .add(u.uGrassMaskLow, 'value', 0, 1, 0.01)
+            .name('Mask Low')
+            .onFinishChange(() => this._refreshGrassMaskShaderAndSpawn())
+        grassFolder
+            .add(u.uGrassMaskHigh, 'value', 0, 1, 0.01)
+            .name('Mask High')
+            .onFinishChange(() => this._refreshGrassMaskShaderAndSpawn())
+
+        const spawnCpu = folder.addFolder('Grass spawn (CPU · anti-dirt)')
+        spawnCpu.close()
+        spawnCpu.add(u.uGrassSpawnMinBlade, 'value', 0.02, 0.55, 0.01).name('Min blade grass blend')
+            .onFinishChange(() => this._rebuildGrassInstances())
+        spawnCpu.add(u.uGrassSpawnTriPeakScale, 'value', 0.5, 1.02, 0.01).name('Triangle peak × maskLow')
+            .onFinishChange(() => this._rebuildGrassInstances())
+        spawnCpu.add(u.uGrassSpawnAttemptsMult, 'value', 12, 160, 1).name('Reject tries multiplier')
+            .onFinishChange(() => this._rebuildGrassInstances())
+        spawnCpu.add(u.uGrassSpawnFlipMaskV, 'value', 0, 1, 1).name('Flip CPU mask V (0=no, 1=sí)')
+            .onFinishChange(() => this._rebuildGrassInstances())
+
+        spawnCpu.add(
+            {
+                rebakeGrass: () => this._rebuildGrassInstances()
+            },
+            'rebakeGrass'
+        ).name('Re-bake grass positions NOW')
 
         const slabsFolder = folder.addFolder('Slabs overlay')
         slabsFolder
@@ -350,6 +469,13 @@ export function createDefaultFloorUniforms() {
         // Grass mask (UV-baked) — values tuned in the live GUI.
         uGrassMaskLow: uniform(0.45),
         uGrassMaskHigh: uniform(0.62),
+
+        // CPU grass spawn (PNG masks vs shader) — see Floor → lil-gui «Grass spawn»
+        uGrassSpawnMinBlade: uniform(0.16),
+        uGrassSpawnTriPeakScale: uniform(0.88),
+        uGrassSpawnAttemptsMult: uniform(56),
+        /** Toggle if grass lines up on GPU but spawn still hits dirt (PNG V vs glTF UV). */
+        uGrassSpawnFlipMaskV: uniform(1),
 
         // Slabs overlay — values tuned in the live GUI.
         uSlabsMaskLow: uniform(0.0),

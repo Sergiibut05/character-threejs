@@ -38,7 +38,8 @@ export default class StaticPiece {
             flatShading = false,
             preserveOwnMaps = false,
             castShadow = !this.isLow,
-            receiveShadow = !this.isLow
+            receiveShadow = !this.isLow,
+            meshMaps = {}
         } = this.options
 
         if (map && !preserveOwnMaps) {
@@ -59,6 +60,26 @@ export default class StaticPiece {
 
         this.root.traverse((child) => {
             if (!child.isMesh) return
+            const meshSpec = meshMaps[child.name]
+            if (meshSpec) {
+                const spec = meshSpec instanceof THREE.Texture ? { map: meshSpec } : meshSpec
+                if (!spec.map) {
+                    console.warn(`StaticPiece:${this.name} meshMaps["${child.name}"] missing .map`)
+                    return
+                }
+                const old = child.material
+                if (Array.isArray(old)) old.forEach((m) => m?.dispose?.())
+                else old?.dispose?.()
+                child.material = createStylizedPropNodeMaterial({
+                    map: spec.map,
+                    flatShading,
+                    mapAlpha: spec.mapAlpha === true
+                })
+                child.castShadow = spec.castShadow !== undefined ? spec.castShadow : false
+                child.receiveShadow = receiveShadow
+                return
+            }
+
             const old = child.material
             const ownMap = old?.map
 

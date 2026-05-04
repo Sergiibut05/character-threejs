@@ -190,6 +190,20 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        name: 'socialTittleTexture',
+        type: 'textureKtx',
+        path: '/models/social-entrance/social-tittle-image.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+            texture.minFilter = THREE.LinearMipMapLinearFilter
+            texture.magFilter = THREE.LinearFilter
+            texture.flipY = false
+        },
+        priority: 'decorative'
+    },
+    {
         name: 'baseballPitchModel',
         type: 'gltfModel',
         path: '/models/baseball-pitch/baseball-pitch-compressed.glb',
