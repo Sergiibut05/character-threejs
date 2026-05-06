@@ -26,8 +26,8 @@ export default class FrisbeeFlightController {
         this._flightBaseQuat = new THREE.Quaternion()
 
         // Tuning
-        this.gravity = 1.5
-        this.airDrag = 0.65
+        this.gravity = 1.1
+        this.airDrag = 0.55
         this.spinSpeed = 14
         this.groundY = 0.08
         this.curveStrength = 6.0
@@ -49,8 +49,10 @@ export default class FrisbeeFlightController {
     setupMesh() {
         const gltf = this.resources.items.frisbeeModel
         if (!gltf) return
+        if (this.mesh) return
 
         this.mesh = gltf.scene.clone()
+        this.mesh.scale.set(0.78, 0.78, 0.78)
 
         const tex = this.resources.items.frisbeeTexture
         this.mesh.traverse((child) => {

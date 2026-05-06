@@ -165,7 +165,7 @@ export default class ActivityPrompt {
         this.updateOpenState()
 
         this.screenPosition.copy(this.anchorPosition)
-        this.screenPosition.y += 1.5
+        this.screenPosition.y += 1.8
         this.screenPosition.project(this.camera.instance)
 
         const isBehind = this.screenPosition.z > 1

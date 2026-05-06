@@ -249,7 +249,7 @@ const allSources = [
     {
         name: 'activitiesPointsModel',
         type: 'gltfModel',
-        path: '/models/activities/activities-points-compressed.glb'
+        path: '/models/activities/activities-points.glb'
     },
     {
         name: 'frisbeeModel',

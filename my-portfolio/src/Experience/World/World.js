@@ -36,6 +36,24 @@ export default class World {
                 this.activityPrompt = new ActivityPrompt()
                 this.frisbeeMinigame = new FrisbeeMinigame()
                 this.raycaster = new Raycaster()
+                this._showDogAtAnchor()
+
+                this.resources.on('sourceLoaded', (name) => {
+                    if (name === 'dogModel') {
+                        this.frisbeeMinigame?.dog?.setupModel()
+                        this._showDogAtAnchor()
+                    }
+                    if (name === 'frisbeeModel' || name === 'frisbeeTexture') {
+                        this.frisbeeMinigame?.flightController?.setupMesh()
+                    }
+                    if (name === 'objectiveArrowTexture') {
+                        this.frisbeeMinigame?.objectiveMarker?.setupArrow()
+                    }
+                    if (name === 'checkTexture') {
+                        this.frisbeeMinigame?.objectiveMarker?.setupCheck()
+                    }
+                })
+
                 this.setupModal()
                 console.info('World: VITE_DEV_LIGHT_MODE enabled (minimal world)')
                 return
@@ -65,6 +83,25 @@ export default class World {
             this.raycaster = new Raycaster()
             this.activityPrompt = new ActivityPrompt()
             this.frisbeeMinigame = new FrisbeeMinigame()
+
+            this._showDogAtAnchor()
+
+            // When decorative assets finish, retry minigame component setup
+            this.resources.on('sourceLoaded', (name) => {
+                if (name === 'dogModel') {
+                    this.frisbeeMinigame?.dog?.setupModel()
+                    this._showDogAtAnchor()
+                }
+                if (name === 'frisbeeModel' || name === 'frisbeeTexture') {
+                    this.frisbeeMinigame?.flightController?.setupMesh()
+                }
+                if (name === 'objectiveArrowTexture') {
+                    this.frisbeeMinigame?.objectiveMarker?.setupArrow()
+                }
+                if (name === 'checkTexture') {
+                    this.frisbeeMinigame?.objectiveMarker?.setupCheck()
+                }
+            })
 
             // Setup modal close functionality
             this.setupModal()
@@ -167,6 +204,31 @@ export default class World {
                 this.fakeShadow.createTreeShadows(tree.references, 1.0)
             }
         }
+    }
+
+    getPitchBBox() {
+        return this.patioScene?.pieces?.baseballPitch?.getBoundingBox?.() ?? null
+    }
+
+    _showDogAtAnchor() {
+        const prompt = this.activityPrompt
+        const minigame = this.frisbeeMinigame
+        if (!prompt?.hasAnchor || !minigame?.dog) return
+
+        const anchorPos = prompt.anchorPosition.clone()
+        const bbox = this.getPitchBBox()
+        let yaw = 0
+        if (bbox) {
+            const center = new THREE.Vector3()
+            bbox.getCenter(center)
+            const dx = center.x - anchorPos.x
+            const dz = center.z - anchorPos.z
+            yaw = Math.atan2(dx, dz)
+            // Use the pitch surface Y (bbox center on a flat field ≈ surface height)
+            // instead of the GLB empty-point Y, which doesn't match the visual ground.
+            anchorPos.y = (bbox.min.y + bbox.max.y) * 0.5
+        }
+        minigame.dog.showAtAnchor(anchorPos, yaw)
     }
 
     setupModal() {

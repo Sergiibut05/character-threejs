@@ -23,6 +23,7 @@ export default class DogCompanion {
         this._headBone = null
 
         this.position = new THREE.Vector3()
+        this._groundY = 0  // world-space Y of the ground; set in showAtAnchor / show
 
         // ─── Chase tuning ─────────────────────────────────────
         this.maxRunSpeed = 8
@@ -61,13 +62,17 @@ export default class DogCompanion {
     setupModel() {
         const gltf = this.resources.items.dogModel
         if (!gltf) return
+        if (this.container) return // already initialised
 
         this.container = new THREE.Group()
         this.container.name = 'DogCompanion'
         this.container.visible = false
 
         this.model = gltf.scene
-        this.model.scale.set(0.01, 0.01, 0.01)
+        // Clear any baked root transforms from the GLB so the Box3 only sees geometry
+        this.model.position.set(0, 0, 0)
+        this.model.rotation.set(0, 0, 0)
+        this.model.scale.set(0.0075, 0.0075, 0.0075)
 
         this.model.traverse((child) => {
             if (child.isMesh) {
@@ -82,6 +87,12 @@ export default class DogCompanion {
                 }
             }
         })
+
+        // Flush world matrices so Box3 reads the scaled geometry correctly
+        this.model.updateMatrixWorld(true)
+        const _box = new THREE.Box3().setFromObject(this.model)
+        // Lift the model inside the container so its feet land exactly at Y=0
+        this.model.position.y = -_box.min.y
 
         this.container.add(this.model)
         this.scene.add(this.container)
@@ -119,8 +130,24 @@ export default class DogCompanion {
 
     // ─── Lifecycle ──────────────────────────────────────────────────────
 
-    show(playerPosition, playerYaw) {
+    showAtAnchor(pos, yaw) {
         if (!this.container) return
+        this._anchorPos = pos.clone()
+        this._anchorYaw = yaw
+        this._groundY = pos.y
+
+        this.position.copy(pos)
+        this.position.y = this._groundY
+        this.container.position.copy(this.position)
+        this.container.rotation.y = yaw
+        this.container.visible = true
+        this.state = 'idleAnchor'
+        this._playAction('idle')
+    }
+
+    show(playerPosition, playerYaw, groundY = 0) {
+        if (!this.container) return
+        this._groundY = groundY
 
         const offset = new THREE.Vector3(
             Math.sin(playerYaw + Math.PI * 0.5) * 1.5,
@@ -128,7 +155,7 @@ export default class DogCompanion {
             Math.cos(playerYaw + Math.PI * 0.5) * 1.5
         )
         this.position.copy(playerPosition).add(offset)
-        this.position.y = 0
+        this.position.y = this._groundY
 
         this.container.position.copy(this.position)
         this.container.rotation.y = playerYaw
@@ -138,8 +165,19 @@ export default class DogCompanion {
         this._playAction('idle')
     }
 
-    startChase(landingPoint, flightDuration) {
-        this.landingPoint.copy(landingPoint)
+    startChase(landingPoint, flightDuration, opts) {
+        this._badThrow = opts?.badThrow ?? false
+        this._giveUpDist = 0
+
+        if (this._badThrow) {
+            // Stop at ~50% of the distance
+            const halfway = this.position.clone().lerp(landingPoint, 0.5)
+            this.landingPoint.copy(halfway)
+            this._giveUpDist = this.position.distanceTo(this.landingPoint)
+        } else {
+            this.landingPoint.copy(landingPoint)
+        }
+
         this.flightDuration = flightDuration
         this.chaseElapsed = 0
 
@@ -208,6 +246,7 @@ export default class DogCompanion {
     update(dt) {
         if (this.state === 'hidden' || !this.container) return
         if (this.mixer) this.mixer.update(dt)
+        if (this.state === 'idleAnchor' || this.state === 'gaveUp') return
 
         switch (this.state) {
             case 'chasing': this._updateChasing(dt); break
@@ -227,6 +266,12 @@ export default class DogCompanion {
         if (dist < 0.5) {
             this.position.x = this.landingPoint.x
             this.position.z = this.landingPoint.z
+            if (this._badThrow) {
+                this.state = 'gaveUp'
+                this._playAction('idle')
+                this.container.position.copy(this.position)
+                return
+            }
             this.state = 'arriving'
             this._playAction('idle')
             this.container.position.copy(this.position)
@@ -241,7 +286,7 @@ export default class DogCompanion {
         const yaw = this.container.rotation.y
         _v3b.set(Math.sin(yaw), 0, Math.cos(yaw))
         this.position.addScaledVector(_v3b, this.chaseSpeed * dt)
-        this.position.y = 0
+        this.position.y = this._groundY
 
         this.container.position.copy(this.position)
     }
@@ -261,16 +306,16 @@ export default class DogCompanion {
 
         if (this._catchTimer <= ascentEnd) {
             const t = this._catchTimer / ascentEnd
-            this.position.y = Math.sin(t * Math.PI * 0.5) * this._jumpHeight
+            this.position.y = this._groundY + Math.sin(t * Math.PI * 0.5) * this._jumpHeight
         } else if (this._catchTimer <= jumpEnd) {
             if (!this._jumpEndPlayed) {
                 this._jumpEndPlayed = true
                 this._playAction('jumpEnd')
             }
             const t = (this._catchTimer - ascentEnd) / this._jumpDescentDur
-            this.position.y = Math.cos(t * Math.PI * 0.5) * this._jumpHeight
+            this.position.y = this._groundY + Math.cos(t * Math.PI * 0.5) * this._jumpHeight
         } else {
-            this.position.y = 0
+            this.position.y = this._groundY
         }
 
         // Smooth frisbee movement: lerp from frozen air position toward the head
@@ -307,7 +352,7 @@ export default class DogCompanion {
 
         toTarget.normalize()
         this.position.addScaledVector(toTarget, this.walkSpeed * dt)
-        this.position.y = 0
+        this.position.y = this._groundY
 
         this._rotateToward(toTarget, dt)
         this.container.position.copy(this.position)
@@ -326,7 +371,7 @@ export default class DogCompanion {
 
         toTarget.normalize()
         this.position.addScaledVector(toTarget, this.walkSpeed * dt)
-        this.position.y = 0
+        this.position.y = this._groundY
         this._rotateToward(toTarget, dt)
         this.container.position.copy(this.position)
     }
@@ -389,12 +434,20 @@ export default class DogCompanion {
 
     reset() {
         this.detachFrisbee()
-        this.state = 'hidden'
         this._catchTimer = 0
         this._jumpEndPlayed = false
         this._frisbeeAttached = false
-        if (this.container) {
-            this.container.visible = false
+        this._badThrow = false
+
+        if (this._anchorPos) {
+            // Reuse the physics-accurate groundY from the last activity rather than
+            // the anchor's GLB Y (which may not match the visual ground).
+            const anchorPos = this._anchorPos.clone()
+            anchorPos.y = this._groundY
+            this.showAtAnchor(anchorPos, this._anchorYaw)
+        } else {
+            this.state = 'hidden'
+            if (this.container) this.container.visible = false
         }
     }
 

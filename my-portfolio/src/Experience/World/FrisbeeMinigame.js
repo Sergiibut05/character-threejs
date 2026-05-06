@@ -22,14 +22,19 @@ export default class FrisbeeMinigame {
 
         // Tuning
         this.throwReleaseTime = 32 / 24
-        this.launchSpeedMin = 8
-        this.launchSpeedMax = 18
+        this.launchSpeedMin = 3.0
+        this.launchSpeedMax = 5.5
         this.aimSensitivity = 1.5
         this.tiltSensitivity = 2.5
-        this.launchUpAngle = 0.25
+        this.launchUpAngle = 0.38
         this.catchTriggerHeight = 1.8
         this.catchTriggerRadius = 2.5
         this.catchMinFlightTime = 1.5
+        this.aimYawCenter = 0
+        this.aimYawHalfRange = THREE.MathUtils.degToRad(70)
+        this.fieldMargin = 1.5
+        this.isBadThrow = false
+        this._pitchBBox = null
 
         // Power oscillator
         this._powerPhase = 0
@@ -48,6 +53,7 @@ export default class FrisbeeMinigame {
         // Scoring
         this.targetCenter = new THREE.Vector3()
         this.dogCatchPosition = new THREE.Vector3()
+        this._charGroundPos = new THREE.Vector3() // reusable — avoids alloc per frame
         this._catchSequenceTimer = -1
         this._bullseyeShown = false
         this._scoreShown = false
@@ -143,8 +149,25 @@ export default class FrisbeeMinigame {
 
         character.movementLocked = true
         this.state = 'intro'
+        this.isBadThrow = false
 
-        this.aimYaw = character.container.rotation.y
+        // Get pitch bbox for aim clamping & target placement
+        this._pitchBBox = this.experience.world.getPitchBBox?.() ?? null
+
+        // Compute aim center toward pitch
+        if (this._pitchBBox) {
+            const center = new THREE.Vector3()
+            this._pitchBBox.getCenter(center)
+            const dx = center.x - character.position.x
+            const dz = center.z - character.position.z
+            this.aimYawCenter = Math.atan2(dx, dz)
+            this.aimYaw = this.aimYawCenter
+            character.container.rotation.y = this.aimYaw
+        } else {
+            this.aimYaw = character.container.rotation.y
+            this.aimYawCenter = this.aimYaw
+        }
+
         this.tiltAngle = 0
         this.power = 0
         this._powerPhase = 0
@@ -163,7 +186,8 @@ export default class FrisbeeMinigame {
             this.flightController.attachToHand(handBone)
         }
 
-        this.dog.show(character.position, this.aimYaw)
+        this.dog.show(character.position, this.aimYaw, character.groundY)
+        this.flightController.groundY = character.groundY
 
         this.objectiveMarker.createAimLine()
 
@@ -186,7 +210,8 @@ export default class FrisbeeMinigame {
 
         this.objectiveMarker.showArrow(this.targetCenter)
         this.objectiveMarker.showAimLine()
-        this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
+        this._charGroundPos.set(character.container.position.x, character.groundY, character.container.position.z)
+        this.objectiveMarker.updateAimLine(0, 1, this._charGroundPos, this.aimYaw)
 
         this._placeBalloon(character)
 
@@ -195,21 +220,52 @@ export default class FrisbeeMinigame {
     }
 
     _placeBalloon(character) {
+        const groundY = character.groundY
+        if (this._pitchBBox) {
+            const m = this.fieldMargin + 1
+            const minX = this._pitchBBox.min.x + m
+            const maxX = this._pitchBBox.max.x - m
+            const minZ = this._pitchBBox.min.z + m
+            const maxZ = this._pitchBBox.max.z - m
+            const pos = new THREE.Vector3(
+                minX + Math.random() * (maxX - minX),
+                groundY + 2.2 + Math.random() * 1.0,
+                minZ + Math.random() * (maxZ - minZ)
+            )
+            this.balloon.show(pos)
+            return
+        }
+
+        // Fallback (dev light mode)
         const yaw = this.aimYaw
         const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
         const rt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
-
-        // Place balloon to one side so the player needs curve to reach it
         const side = Math.random() < 0.5 ? 1 : -1
         const pos = character.position.clone()
         pos.addScaledVector(fw, 11 + Math.random() * 4)
         pos.addScaledVector(rt, side * (5 + Math.random() * 2))
-        pos.y = 2.2 + Math.random() * 1.0
-
+        pos.y = groundY + 2.2 + Math.random() * 1.0
         this.balloon.show(pos)
     }
 
     _pickTarget(character) {
+        const groundY = character.groundY
+        if (this._pitchBBox) {
+            const m = this.fieldMargin
+            const minX = this._pitchBBox.min.x + m
+            const maxX = this._pitchBBox.max.x - m
+            const minZ = this._pitchBBox.min.z + m
+            const maxZ = this._pitchBBox.max.z - m
+
+            this.targetCenter.set(
+                minX + Math.random() * (maxX - minX),
+                groundY,
+                minZ + Math.random() * (maxZ - minZ)
+            )
+            return
+        }
+
+        // Fallback (dev light mode)
         const spot = TARGET_SPOTS[Math.floor(Math.random() * TARGET_SPOTS.length)]
         const yaw = this.aimYaw
         const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
@@ -218,7 +274,7 @@ export default class FrisbeeMinigame {
         this.targetCenter.copy(character.position)
         this.targetCenter.addScaledVector(fw, spot.forward)
         this.targetCenter.addScaledVector(rt, spot.lateral)
-        this.targetCenter.y = 0
+        this.targetCenter.y = groundY
     }
 
     _snapCameraBehindCharacter() {
@@ -263,7 +319,8 @@ export default class FrisbeeMinigame {
 
         if (this.state === 'windUp') {
             this.updateAim(dt, character)
-            this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
+            this._charGroundPos.set(character.container.position.x, character.groundY, character.container.position.z)
+            this.objectiveMarker.updateAimLine(0, 1, this._charGroundPos, this.aimYaw)
             if (character.throwPaused) {
                 this.state = 'charge'
                 this._powerPhase = 0
@@ -296,6 +353,11 @@ export default class FrisbeeMinigame {
 
         if (this.state === 'dogReturn') {
             this._updateDogReturn(dt)
+            return
+        }
+
+        if (this.state === 'badThrowEnding') {
+            this._updateBadThrowEnding(dt)
             return
         }
 
@@ -345,6 +407,10 @@ export default class FrisbeeMinigame {
 
         // Frisbee landed without dog catching in the air
         if (!this.flightController.active) {
+            if (this.isBadThrow) {
+                this._onBadThrowLanded()
+                return
+            }
             if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
                 this.dogCatchPosition.copy(this.dog.position)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
@@ -407,6 +473,28 @@ export default class FrisbeeMinigame {
         }
     }
 
+    _onBadThrowLanded() {
+        this.objectiveMarker.hideArrow()
+        this.state = 'badThrowEnding'
+        this.endTimer = 0
+        this._badThrowShown = false
+    }
+
+    _updateBadThrowEnding(dt) {
+        this.endTimer += dt
+        this.dog.update(dt)
+        this.experience.camera.frisbeeTarget = this.dog.position
+
+        if (!this._badThrowShown && this.endTimer >= 0.8) {
+            this._badThrowShown = true
+            this.scoreFeedback.showBadThrow()
+        }
+
+        if (this.endTimer > 3.5) {
+            this.exitMinigame()
+        }
+    }
+
     _updateDogCatch(dt) {
         this.dog.update(dt)
         this.experience.camera.frisbeeTarget = this.dog.position
@@ -445,6 +533,18 @@ export default class FrisbeeMinigame {
         }
 
         this.aimYaw += aimDelta
+
+        // Clamp within ±halfRange of center (pitch-aware)
+        if (this._pitchBBox) {
+            const half = this.aimYawHalfRange
+            const diff = Math.atan2(
+                Math.sin(this.aimYaw - this.aimYawCenter),
+                Math.cos(this.aimYaw - this.aimYawCenter)
+            )
+            const clamped = THREE.MathUtils.clamp(diff, -half, half)
+            this.aimYaw = this.aimYawCenter + clamped
+        }
+
         character.container.rotation.y = this.aimYaw
     }
 
@@ -471,11 +571,13 @@ export default class FrisbeeMinigame {
             this.tiltAngle = THREE.MathUtils.clamp(this.tiltAngle + tiltDelta, -1, 1)
             this.flightController.setTilt(this.tiltAngle)
             this._updateTiltUI()
-            this.objectiveMarker.updateAimLine(this.tiltAngle, 1, character.container.position, this.aimYaw)
+            this._charGroundPos.set(character.container.position.x, character.groundY, character.container.position.z)
+            this.objectiveMarker.updateAimLine(this.tiltAngle, 1, this._charGroundPos, this.aimYaw)
         } else {
             // Phase 1: aiming (A/D rotates character)
             this.updateAim(dt, character)
-            this.objectiveMarker.updateAimLine(0, 1, character.container.position, this.aimYaw)
+            this._charGroundPos.set(character.container.position.x, character.groundY, character.container.position.z)
+            this.objectiveMarker.updateAimLine(0, 1, this._charGroundPos, this.aimYaw)
         }
 
         // Mobile single-press detection (mirrors keyboard two-step)
@@ -518,6 +620,17 @@ export default class FrisbeeMinigame {
             launchPos, direction, speed, this.tiltAngle
         )
 
+        // Check if landing is outside the pitch
+        this.isBadThrow = false
+        if (this._pitchBBox) {
+            const lp = prediction.point
+            const m = this.fieldMargin
+            if (lp.x < this._pitchBBox.min.x - m || lp.x > this._pitchBBox.max.x + m ||
+                lp.z < this._pitchBBox.min.z - m || lp.z > this._pitchBBox.max.z + m) {
+                this.isBadThrow = true
+            }
+        }
+
         this.flightController.launch(launchPos, direction, speed, this.tiltAngle)
 
         this.powerBarContainer.style.display = 'none'
@@ -527,7 +640,7 @@ export default class FrisbeeMinigame {
         this.experience.camera.setMode('frisbeeFlight')
 
         // Dog starts chasing toward the predicted landing spot
-        this.dog.startChase(prediction.point, prediction.flightTime)
+        this.dog.startChase(prediction.point, prediction.flightTime, { badThrow: this.isBadThrow })
     }
 
     // ─── Exit ────────────────────────────────────────────────────────────
@@ -554,6 +667,7 @@ export default class FrisbeeMinigame {
         this.scoreFeedback.hide()
         this.balloon.hide()
         this._catchSequenceTimer = -1
+        this.isBadThrow = false
 
         this.experience.camera.setMode('follow')
         this.experience.camera.frisbeeTarget = null

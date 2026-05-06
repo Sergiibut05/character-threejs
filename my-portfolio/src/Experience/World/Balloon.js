@@ -27,7 +27,7 @@ export default class Balloon {
     }
 
     setupMesh() {
-        const geo = new THREE.SphereGeometry(0.8, 28, 18)
+        const geo = new THREE.SphereGeometry(0.65, 28, 18)
 
         const mat = new THREE.MeshBasicNodeMaterial({
             transparent: true,

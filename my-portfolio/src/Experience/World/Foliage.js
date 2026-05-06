@@ -37,8 +37,10 @@ export default class Foliage {
         this.seeThroughCenterOffsetY = -0.04
         this.rng = createRng(42)
 
-        // Pre-allocated temp vector to avoid GC pressure in update() (60fps × clone = heap churn)
+        // Pre-allocated helpers — avoid GC pressure in update()
         this._tmpVec3 = new THREE.Vector3()
+        this._billboardObj = new THREE.Object3D()
+        this._instances = [] // { position: Vector3, size: number }
 
         this.setGeometry()
         this.setMaterial()
@@ -191,23 +193,24 @@ export default class Foliage {
     }
 
     setFromReferences() {
+        this._instances = []
         this.transformMatrices = []
-        const towardCamera = this.experience.camera.instance.position.clone().normalize()
+        const camPos = this.experience.camera.instance.position
 
         for (const _child of this.references) {
             const size = _child.scale.x
+            const pos = _child.position.clone()
+            this._instances.push({ position: pos, size })
+
             const object = new THREE.Object3D()
-
-            // Match original: random up, then face default camera direction
-            const angle = Math.PI * 2 * this.rng()
-            object.up.set(Math.sin(angle), Math.cos(angle), 0)
-            object.lookAt(towardCamera)
-
-            object.position.copy(_child.position)
+            object.position.copy(pos)
             object.scale.setScalar(size)
+            // Initial billboard orientation toward camera
+            const dx = camPos.x - pos.x
+            const dz = camPos.z - pos.z
+            object.rotation.y = Math.atan2(dx, dz)
             object.updateMatrix()
-
-            this.transformMatrices.push(object.matrix)
+            this.transformMatrices.push(object.matrix.clone())
         }
     }
 
@@ -237,6 +240,23 @@ export default class Foliage {
     update() {
         // Wind time
         this.material.uTime.value = this.time.elapsed * 0.001
+
+        // Billboard: rotate each instance to face the camera around the Y axis
+        if (this.mesh && this._instances.length > 0) {
+            const camPos = this.experience.camera.instance.position
+            const obj = this._billboardObj
+            for (let i = 0; i < this._instances.length; i++) {
+                const inst = this._instances[i]
+                const dx = camPos.x - inst.position.x
+                const dz = camPos.z - inst.position.z
+                obj.position.copy(inst.position)
+                obj.scale.setScalar(inst.size)
+                obj.rotation.set(0, Math.atan2(dx, dz), 0)
+                obj.updateMatrix()
+                this.mesh.setMatrixAt(i, obj.matrix)
+            }
+            this.mesh.instanceMatrix.needsUpdate = true
+        }
 
         // See-through: use stable center to avoid projection jitter
         if (this.seeThrough) {

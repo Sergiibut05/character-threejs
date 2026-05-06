@@ -78,11 +78,11 @@ export default class Character {
 
         this.model = this.resource.scene
         this.model.name = 'CharacterModel'
-        this.model.scale.set(1, 1, 1)
+        this.model.scale.set(0.85, 0.85, 0.85)
 
         const box = new THREE.Box3().setFromObject(this.model)
-        // Extra +0.07 vs old offset: aligns mesh feet slightly higher (were sinking visually).
-        const modelOffsetY = -this.capsuleCenterY - box.min.y + 0.07
+        // Small lift to prevent feet sinking visually, scaled with model scale.
+        const modelOffsetY = -this.capsuleCenterY - box.min.y + 0.07 * this.model.scale.y
         this.model.position.set(0, modelOffsetY, 0)
 
         this._applyAtlas()
@@ -90,6 +90,9 @@ export default class Character {
         this.container.add(this.model)
         this.scene.add(this.container)
     }
+
+    /** World-space Y of the character's feet (ground level). */
+    get groundY() { return this.container.position.y - this.capsuleCenterY }
 
     getRightHandBone() {
         if (this._rightHandBone) return this._rightHandBone

@@ -27,6 +27,7 @@ export default class ObjectiveMarker {
     setupArrow() {
         const tex = this.resources.items.objectiveArrowTexture
         if (!tex) return
+        if (this.arrowSprite) return
 
         const mat = new THREE.SpriteMaterial({
             map: tex,
@@ -55,6 +56,7 @@ export default class ObjectiveMarker {
     setupCheck() {
         const tex = this.resources.items.checkTexture
         if (!tex) return
+        if (this.checkSprite) return
 
         const mat = new THREE.SpriteMaterial({
             map: tex,
@@ -80,7 +82,7 @@ export default class ObjectiveMarker {
     // ─── Bullseye Rings ─────────────────────────────────────────────────
 
     setupBullseye() {
-        const geo = new THREE.CircleGeometry(8, 64)
+        const geo = new THREE.CircleGeometry(2, 64)
         geo.rotateX(-Math.PI * 0.5)
 
         const mat = new THREE.MeshBasicNodeMaterial({
@@ -101,7 +103,7 @@ export default class ObjectiveMarker {
 
     showBullseye(targetCenter) {
         if (!this.bullseyeMesh) return
-        this.bullseyeMesh.position.set(targetCenter.x, 0.02, targetCenter.z)
+        this.bullseyeMesh.position.set(targetCenter.x, targetCenter.y + 0.02, targetCenter.z)
         this.bullseyeMesh.scale.set(0.01, 0.01, 0.01)
         this.bullseyeMesh.visible = true
         this._bullseyeTimer = 0
@@ -160,7 +162,7 @@ export default class ObjectiveMarker {
         if (!this.aimLineMesh || !this._aimLineGroup) return
 
         if (charPos) {
-            this._aimLineGroup.position.set(charPos.x, 0, charPos.z)
+            this._aimLineGroup.position.set(charPos.x, charPos.y, charPos.z)
 
             const target = charYaw ?? 0
             if (this._currentYaw === undefined) {
@@ -284,11 +286,12 @@ const _bullseyeColor = () => {
         const green = vec3(0.25, 0.78, 0.38)
         const blue = vec3(0.35, 0.55, 0.95)
 
-        const innerEdge = smoothstep(float(0.24), float(0.26), d)
-        const midEdge = smoothstep(float(0.615), float(0.635), d)
+        // Radius 2m: inner zone at 1m (d=0.50), outer ring at 1.7m (d=0.85)
+        const innerEdge = smoothstep(float(0.49), float(0.51), d)
+        const midEdge = smoothstep(float(0.84), float(0.86), d)
 
-        const border1 = smoothstep(float(0.005), float(0.0), abs(d.sub(0.25)))
-        const border2 = smoothstep(float(0.005), float(0.0), abs(d.sub(0.625)))
+        const border1 = smoothstep(float(0.005), float(0.0), abs(d.sub(0.50)))
+        const border2 = smoothstep(float(0.005), float(0.0), abs(d.sub(0.85)))
 
         let col = mix(gold, green, innerEdge)
         col = mix(col, blue, midEdge)
@@ -304,8 +307,9 @@ const _bullseyeOpacity = () => {
 
         const outerFade = smoothstep(float(1.0), float(0.95), d)
 
-        const innerEdge = smoothstep(float(0.24), float(0.26), d)
-        const midEdge = smoothstep(float(0.615), float(0.635), d)
+        // Radius 2m: inner zone at 1m (d=0.50), outer ring at 1.7m (d=0.85)
+        const innerEdge = smoothstep(float(0.49), float(0.51), d)
+        const midEdge = smoothstep(float(0.84), float(0.86), d)
 
         const op = mix(float(0.7), float(0.5), innerEdge)
         const finalOp = mix(op, float(0.35), midEdge)

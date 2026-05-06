@@ -33,5 +33,12 @@ export default class BaseballPitch {
         })
 
         this.scene.add(this.root)
+
+        this.root.updateMatrixWorld(true)
+        this.bbox = new THREE.Box3().setFromObject(this.root)
+    }
+
+    getBoundingBox() {
+        return this.bbox ?? null
     }
 }

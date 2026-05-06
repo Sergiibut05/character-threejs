@@ -66,7 +66,7 @@ export default class ScoreFeedback {
         }
 
         this.label.textContent = zone
-        this.points.textContent = `+${pts}`
+        this.points.textContent = pts != null ? `+${pts}` : ''
         this.label.style.color = color
         this.points.style.color = color
         this.overlay.classList.add('is-visible')
@@ -74,6 +74,10 @@ export default class ScoreFeedback {
         this._hideTimeout = setTimeout(() => {
             this.overlay.classList.remove('is-visible')
         }, 2200)
+    }
+
+    showBadThrow() {
+        this._show('BAD THROW!', null, '#ff4444')
     }
 
     hide() {
