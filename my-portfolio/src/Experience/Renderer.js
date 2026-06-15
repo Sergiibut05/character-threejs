@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs, vec2, vec4, max, length } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
+import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import Experience from './Experience.js'
 
 export default class Renderer {
@@ -80,7 +81,15 @@ export default class Renderer {
             .add(hiddenEdge.mul(hiddenEdgeColor))
             .mul(edgeStrength)
 
-        const composited = outlineColor.add(scenePass)
+        let composited = outlineColor.add(scenePass)
+
+        // 1b. Bloom (High quality only) — threshold 1.0 so ONLY HDR emissive
+        // surfaces glow (fire core/embers are boosted above 1.0), the rest of
+        // the pastel scene stays untouched.
+        if (!this.quality.isLow) {
+            const bloomPass = bloom(scenePass.getTextureNode(), 0.5, 0.4, 1.0)
+            composited = composited.add(bloomPass)
+        }
 
         // 2. Tilt-Shift Blur (Both Qualities)
         // Reduced intensity: radius 3 for High, 2 for Low to save GPU.

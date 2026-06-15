@@ -6,6 +6,9 @@ import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Ground from './Ground.js'
 import Grass from './Grass.js'
+import Flowers from './Flowers.js'
+import Fireflies from './Fireflies.js'
+import Fire from './Fire.js'
 import PatioScene from './PatioScene.js'
 import Trees from './Trees.js'
 import Bushes from './Bushes.js'
@@ -38,6 +41,10 @@ export default class World {
                 this.raycaster = new Raycaster()
                 this._showDogAtAnchor()
 
+                // Stylized TSL fire — test instance near world center
+                this.fire = new Fire()
+                this.fire.addFire(new THREE.Vector3(2, 0, 0), 1.0)
+
                 this.resources.on('sourceLoaded', (name) => {
                     if (name === 'dogModel') {
                         this.frisbeeMinigame?.dog?.setupModel()
@@ -67,6 +74,13 @@ export default class World {
 
             // Grass — placed on grass regions from the ground mesh vertex colors
             this.setupGrass()
+
+        // Flowers + fireflies — decorate the grass zones with vibes
+        this.setupMeadowDecor()
+
+            // Stylized TSL fire — test instance near world center
+            this.fire = new Fire()
+            this.fire.addFire(new THREE.Vector3(2, 0, 0), 1.0)
 
             // Trees — instanced per type from reference models
             this.setupTrees()
@@ -145,6 +159,34 @@ export default class World {
                 position: new THREE.Vector3(0, 0, 0)
             })
         }
+    }
+
+    setupMeadowDecor() {
+        const isLow = this.experience.quality.isLow
+
+        // Candidate ground positions on the grass regions (reuse the spawner)
+        const candidateCount = isLow ? 2500 : 4500
+        const candidates = this.patioScene?.getGrassSpawnPositions
+            ? this.patioScene.getGrassSpawnPositions(candidateCount)
+            : []
+
+        if (candidates.length === 0) return
+
+        // Flowers grouped in colourful patches
+        this.flowers = new Flowers({
+            candidates,
+            maxCount: isLow ? 360 : 700,
+            viewRadius: this.experience.quality.grassViewRadius,
+            viewFadeBand: 4.0
+        })
+
+        // Fireflies drift over ALL the grass (not just flower zones)
+        const avgY = candidates.reduce((s, p) => s + p.y, 0) / candidates.length
+        this.fireflies = new Fireflies({
+            grassPositions: candidates,
+            groundY: avgY,
+            count: isLow ? 80 : 200
+        })
     }
 
     setupTrees() {
@@ -300,6 +342,19 @@ export default class World {
         // Update grass
         if (this.grass) {
             this.grass.update()
+        }
+
+        // Update meadow decoration
+        if (this.flowers) {
+            this.flowers.update()
+        }
+
+        if (this.fireflies) {
+            this.fireflies.update()
+        }
+
+        if (this.fire) {
+            this.fire.update()
         }
 
         if (this.environment) {
