@@ -15,9 +15,10 @@
  * are configurable both via constructor options and the debug GUI.
  */
 import * as THREE from 'three'
-import { uniform } from 'three/tsl'
+import { uniform, vec4 } from 'three/tsl'
 import Experience from '../../Experience.js'
 import { createFloorColorNode } from '../TSL/FloorShader.js'
+import { dayNightLitTint } from '../DayNight.js'
 
 const _vA = new THREE.Vector3()
 const _vB = new THREE.Vector3()
@@ -139,7 +140,7 @@ export default class Floor {
             slabsAttribute: slabsAttribute || 'color',
             slabsChannel: this.slabsConfig.channel,
             debugSlabsMask: this.slabsConfig.debug
-        })
+        }).mul(vec4(dayNightLitTint, 1.0))
 
         mesh.material?.dispose?.()
         mesh.material = material
@@ -154,6 +155,7 @@ export default class Floor {
             depthWrite: true
         })
         material.colorNode = createFloorColorNode(this.uniforms, { mode: 'dirt' })
+            .mul(vec4(dayNightLitTint, 1.0))
 
         mesh.material?.dispose?.()
         mesh.material = material

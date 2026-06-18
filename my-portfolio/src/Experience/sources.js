@@ -64,6 +64,28 @@ const allSources = [
         }
     },
 
+    // ─── Flowers ──────────────────────────────────────────────────
+    {
+        name: 'flowerViolet',
+        type: 'texture',
+        path: '/texture/flowers/violet-flower.webp'
+    },
+    {
+        name: 'flowerWhite',
+        type: 'texture',
+        path: '/texture/flowers/white-flower.webp'
+    },
+    {
+        name: 'flowerYellow',
+        type: 'texture',
+        path: '/texture/flowers/yellow-flower.webp'
+    },
+    {
+        name: 'flowerBlue',
+        type: 'texture',
+        path: '/texture/flowers/blue-flower.webp'
+    },
+
     // ─── Atlas textures (shared by many props) ────────────────────
     {
         name: 'forestAtlas',

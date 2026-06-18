@@ -9,6 +9,7 @@ import {
 import Experience from '../Experience.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { propSunDirection } from './scene/StylizedPropMaterial.js'
+import { dayNightLitTint } from './DayNight.js'
 
 function createRng(seed) {
     let s = seed | 0
@@ -174,7 +175,7 @@ export default class Foliage {
             const mixStrength = normalWorld.dot(lightDir).smoothstep(0, 1)
             const bias = float(0.5).sub(this.material.colorAPresence)
             const shiftedMix = mixStrength.add(bias).clamp(0.0, 1.0)
-            return mix(this.colorANode, this.colorBNode, shiftedMix)
+            return mix(this.colorANode, this.colorBNode, shiftedMix).mul(dayNightLitTint)
         })()
 
         this.material.instance = new THREE.MeshLambertNodeMaterial({

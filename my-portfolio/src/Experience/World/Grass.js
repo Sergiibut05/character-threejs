@@ -8,6 +8,7 @@ import {
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { fbm, colorRamp } from './TSL/NoiseNodes.js'
+import { dayNightTint } from './DayNight.js'
 
 export default class Grass {
     constructor(options = {}) {
@@ -217,7 +218,7 @@ export default class Grass {
             const backlightAdd = this.uBacklightColor.mul(backlight).mul(0.15)
 
             // ── 5. Combine ──
-            const finalRGB = tipColor.add(backlightAdd).mul(this.uEmissionStrength)
+            const finalRGB = tipColor.add(backlightAdd).mul(this.uEmissionStrength).mul(dayNightTint)
 
             // ── 6. Base fade: smoothly fade out at the root so blades merge with ground ──
             const baseFade = smoothstep(0.0, 0.25, h)

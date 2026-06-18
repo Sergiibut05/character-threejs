@@ -198,22 +198,25 @@ export default class World {
                 name: 'Abedul',
                 visual: res.abedulTreeVisual?.scene,
                 references: res.abedulTreeReferences?.scene?.children,
-                colorA: '#ff4f2b',
-                colorB: '#ff903f'
+                colorA: '#663000',
+                colorB: '#ff5e00',
+                foliageOpts: { shadowOffset: 0.181, threshold: 0.3, seeThroughEdgeMin: 0.06973, seeThroughEdgeMax: 0.348654, colorAPresence: 0.09 }
             },
             {
                 name: 'Normal',
                 visual: res.normalTreeVisual?.scene,
                 references: res.normalTreeReferences?.scene?.children,
-                colorA: '#b4b536',
-                colorB: '#d8cf3b'
+                colorA: '#3b7500',
+                colorB: '#4e9301',
+                foliageOpts: { shadowOffset: 1.0, threshold: 0.3, seeThroughEdgeMin: 0.06973, seeThroughEdgeMax: 0.348654, colorAPresence: 0.5 }
             },
             {
                 name: 'Old',
                 visual: res.oldTreeVisual?.scene,
                 references: res.oldTreeReferences?.scene?.children,
-                colorA: '#ff6d6d',
-                colorB: '#ff9990'
+                colorA: '#d01616',
+                colorB: '#bf4745',
+                foliageOpts: { shadowOffset: 0.041, threshold: 0.3, seeThroughEdgeMin: 0.275, seeThroughEdgeMax: 0.707, colorAPresence: 0.835 }
             }
         ]
 
@@ -231,7 +234,7 @@ export default class World {
                 continue
             }
 
-            const tree = new Trees(cfg.name, cfg.visual, bodyRefs, cfg.colorA, cfg.colorB)
+            const tree = new Trees(cfg.name, cfg.visual, bodyRefs, cfg.colorA, cfg.colorB, cfg.foliageOpts || {})
             this.trees.push(tree)
         }
     }

@@ -1,8 +1,18 @@
 import * as THREE from 'three'
-import { color, uniform } from 'three/tsl'
+import { uniform } from 'three/tsl'
 import Foliage from './Foliage.js'
 import Experience from '../Experience.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
+
+/**
+ * Parse a hex color string as raw linear floats — bypasses sRGB→linear
+ * conversion so that the value stored in the uniform matches digit-for-digit
+ * what lil-gui shows (lil-gui reads .r/.g/.b directly as hex digits).
+ */
+function hexToColor(hex) {
+    const n = parseInt(hex.replace('#', ''), 16)
+    return new THREE.Color(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
+}
 
 const _pos = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
@@ -10,7 +20,7 @@ const _scale = new THREE.Vector3()
 const _identityScale = new THREE.Vector3(1, 1, 1)
 
 export default class Trees {
-    constructor(name, visual, references, colorA, colorB) {
+    constructor(name, visual, references, colorA, colorB, foliageOpts = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.debug = this.experience.debug
@@ -21,9 +31,10 @@ export default class Trees {
         this.references = references
         this.colorA = colorA
         this.colorB = colorB
+        this.foliageOpts = foliageOpts
 
-        this.leavesColorANode = uniform(color(this.colorA))
-        this.leavesColorBNode = uniform(color(this.colorB))
+        this.leavesColorANode = uniform(hexToColor(this.colorA))
+        this.leavesColorBNode = uniform(hexToColor(this.colorB))
 
         this.setModelParts()
         this.setBodies()
@@ -103,6 +114,13 @@ export default class Trees {
                 this.leavesColorBNode,
                 true
             )
+            const m = this.leaves.material
+            const o = this.foliageOpts
+            if (o.shadowOffset !== undefined) m.shadowOffset.value = o.shadowOffset
+            if (o.threshold !== undefined) m.threshold.value = o.threshold
+            if (o.seeThroughEdgeMin !== undefined) m.seeThroughEdgeMin.value = o.seeThroughEdgeMin
+            if (o.seeThroughEdgeMax !== undefined) m.seeThroughEdgeMax.value = o.seeThroughEdgeMax
+            if (o.colorAPresence !== undefined) m.colorAPresence.value = o.colorAPresence
         }
     }
 

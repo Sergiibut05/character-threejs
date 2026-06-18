@@ -10,6 +10,7 @@ import {
     normalWorld,
     mix, smoothstep, max
 } from 'three/tsl'
+import { dayNightTint } from '../DayNight.js'
 
 /** Unit vector toward the directional sun (same convention as Foliage.js). */
 export const propSunDirection = uniform(new THREE.Vector3(4, 5, -3).normalize())
@@ -81,7 +82,7 @@ export function createStylizedPropNodeMaterial(options = {}) {
 
         const lit = base.mul(propLitTint)
         const shaded = base.mul(propShadowTint)
-        const rgb = mix(lit, shaded, combined)
+        const rgb = mix(lit, shaded, combined).mul(dayNightTint)
         const outA = mapAlpha && map ? texel.a : float(1)
         return vec4(rgb, outA)
     })()

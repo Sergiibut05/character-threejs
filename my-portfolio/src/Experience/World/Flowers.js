@@ -1,27 +1,17 @@
 import * as THREE from 'three'
 import {
-    Fn, float, vec3, attribute, uniform,
-    positionLocal, sin, cos, length, smoothstep, clamp, mix, step
+    Fn, float, vec3, vec4, attribute, uniform, uv, texture,
+    positionLocal, sin, cos, length, smoothstep, clamp, mix, step,
+    If, Discard
 } from 'three/tsl'
 import Experience from '../Experience.js'
 
 /**
  * Flowers
  * -------
- * Stylized low-poly flowers scattered across the grass in single-colour ZONES.
- * Each flower is real (tiny) 3D geometry — a short green stem + a bloom made of
- * rounded petals arranged in a shallow cup, plus a domed yellow center. This
- * reads as an actual flower from the game's 3/4 camera (not a flat painted
- * sprite), while staying very cheap (~40 tris, one InstancedMesh draw call).
- *
- * References:
- *   - three.js official "instanced flower" pattern: split stem (uniform green)
- *     vs blossom (per-instance colour). Here both live in one mesh, separated
- *     by an `aPart` vertex attribute so we keep a single draw call.
- *
- * Colour ZONES: a low-frequency noise field picks ONE palette colour per region
- * so you get contiguous beds of a specific colour (red bed, blue bed, ...),
- * while a mid-frequency mask carves the actual flower beds out of the lawn.
+ * Billboard-style flowers scattered across the grass.
+ * Uses 3 textures (violet, white, yellow) with crossed quads for the flower heads,
+ * and crossed quads for the green stems.
  */
 export default class Flowers {
     constructor(options = {}) {
@@ -44,17 +34,10 @@ export default class Flowers {
         this.viewRadius = options.viewRadius ?? 24
         this.viewFadeBand = options.viewFadeBand ?? 5.0
 
-        this.palette = (options.palette || [
-            '#FF7AA2', // pink
-            '#FFFFFF', // white
-            '#FFD93D', // yellow
-            '#FF5C5C', // red
-            '#B57BEE', // purple
-            '#6FB7FF'  // sky blue
-        ]).map(c => new THREE.Color(c))
+        this.palette = [0, 1, 2, 3] // 0: violet, 1: white, 2: yellow, 3: blue
 
-        this._stemTop = 0.14
-        this._topY = 0.24
+        this._stemTop = 0.0 // Removed procedural stem
+        this._topY = 0.20 // Adjust top limit for wind
 
         this.setGeometry()
         this.buildPlacements()
@@ -70,94 +53,46 @@ export default class Flowers {
         if (this.geometry) this.geometry.dispose()
 
         const positions = []
-        const parts = []
+        const uvs = []
         const indices = []
 
-        const addVertex = (x, y, z, part) => {
+        const addVertex = (x, y, z, u, v) => {
             positions.push(x, y, z)
-            parts.push(part)
+            uvs.push(u, v)
             return positions.length / 3 - 1
         }
 
         const baseY = this._stemTop
 
-        // ── Petals: tessellated, width-profiled, gently curling up → smooth cup ──
-        const petals = 6
-        const N = 4               // segments along the petal length
-        const M = 3               // segments across the petal width
-        const baseTilt = (36 * Math.PI) / 180
-        const L = 0.11            // petal length
-        const rIn = 0.012         // where the petal attaches near the center
-        const maxW = 0.075        // max full width of a petal
-        const curl = 0.03         // upward curl at the tip
+        // ── Flower: segmented quad mapped with texture ──
+        // Subdivided into 3 vertical segments so the wind bends it smoothly (volumetric effect)
+        const hwTop = 0.10
+        const topH = 0.20
+        const segments = 3
+        const addTopQuad = () => {
+            for (let i = 0; i < segments; i++) {
+                const v1 = i / segments
+                const v2 = (i + 1) / segments
+                const y1 = baseY + topH * v1
+                const y2 = baseY + topH * v2
 
-        for (let p = 0; p < petals; p++) {
-            const az = (p * Math.PI * 2) / petals + (Math.random() - 0.5) * 0.05
-            const cosA = Math.cos(az), sinA = Math.sin(az)
-            const ct = Math.cos(baseTilt), st = Math.sin(baseTilt)
-
-            const grid = []
-            for (let i = 0; i <= N; i++) {
-                const u = i / N
-                // spine in the (radial, up) plane, with a slight upward curl at the tip
-                const rad = rIn + ct * L * u
-                const up = baseY + st * L * u + curl * (u * u)
-                // petal silhouette: pointed at base & tip, widest around the middle
-                const width = maxW * Math.pow(Math.sin(Math.PI * u), 0.6)
-                const row = []
-                for (let j = 0; j <= M; j++) {
-                    const v = j / M - 0.5
-                    const off = v * width
-                    const x = rad * cosA - sinA * off
-                    const z = rad * sinA + cosA * off
-                    row.push(addVertex(x, up, z, 0))
-                }
-                grid.push(row)
-            }
-            for (let i = 0; i < N; i++) {
-                for (let j = 0; j < M; j++) {
-                    const a = grid[i][j], b = grid[i + 1][j]
-                    const c = grid[i + 1][j + 1], d = grid[i][j + 1]
-                    indices.push(a, b, d, b, c, d)
-                }
+                const b0 = addVertex(-hwTop, y1, 0, 0, v1)
+                const b1 = addVertex(hwTop, y1, 0, 1, v1)
+                const t1 = addVertex(hwTop, y2, 0, 1, v2)
+                const t0 = addVertex(-hwTop, y2, 0, 0, v2)
+                
+                indices.push(b0, b1, t1, b0, t1, t0)
             }
         }
-
-        // ── Center: small domed disc (smooth fan) ──
-        const seg = 12
-        const rc = 0.03
-        const yRim = baseY + 0.012
-        const apex = addVertex(0, baseY + 0.034, 0, 1)
-        const rim = []
-        for (let s = 0; s < seg; s++) {
-            const a = (s * Math.PI * 2) / seg
-            rim.push(addVertex(Math.cos(a) * rc, yRim, Math.sin(a) * rc, 1))
-        }
-        for (let s = 0; s < seg; s++) {
-            indices.push(apex, rim[s], rim[(s + 1) % seg])
-        }
-
-        // ── Stem: two crossed quads ──
-        const hw = 0.011
-        const addStemQuad = (axis) => {
-            const b0 = axis === 0 ? addVertex(-hw, 0, 0, 2) : addVertex(0, 0, -hw, 2)
-            const b1 = axis === 0 ? addVertex(hw, 0, 0, 2) : addVertex(0, 0, hw, 2)
-            const t1 = axis === 0 ? addVertex(hw, baseY, 0, 2) : addVertex(0, baseY, hw, 2)
-            const t0 = axis === 0 ? addVertex(-hw, baseY, 0, 2) : addVertex(0, baseY, -hw, 2)
-            indices.push(b0, b1, t1, b0, t1, t0)
-        }
-        addStemQuad(0)
-        addStemQuad(1)
+        addTopQuad()
 
         this.geometry = new THREE.BufferGeometry()
         this.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
-        this.geometry.setAttribute('aPart', new THREE.BufferAttribute(new Float32Array(parts), 1))
+        this.geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
         this.geometry.setIndex(indices)
-        // Indexed → computeVertexNormals yields SMOOTH normals across each petal
         this.geometry.computeVertexNormals()
     }
 
-    // Mid-frequency mask → organic flower beds carved out of the lawn
     _bedMask(x, z) {
         const s = this.bedScale
         const n =
@@ -167,19 +102,27 @@ export default class Flowers {
         return THREE.MathUtils.clamp(n, 0, 1)
     }
 
-    // Low-frequency field → ONE palette colour per contiguous region
     _zoneColorIndex(x, z) {
-        const s = this.zoneScale
+        // Zonas de color más pequeñas
+        const s = this.zoneScale * 4.0
         let field =
             0.6 * Math.sin(x * s + 1.3) * Math.cos(z * s * 0.9 - 0.7) +
             0.4 * Math.sin((x + z) * s * 0.5 + 2.1)
         field = THREE.MathUtils.clamp(field * 0.5 + 0.5, 0, 0.9999)
-        return Math.floor(field * this.palette.length) % this.palette.length
+        
+        const zoneColor = Math.floor(field * this.palette.length) % this.palette.length
+        
+        // 25% de probabilidad de que sea un color aleatorio para dar variedad
+        if (Math.random() < 0.25) {
+            return Math.floor(Math.random() * this.palette.length)
+        }
+        
+        return zoneColor
     }
 
     buildPlacements() {
         this._positions = []
-        this._colors = []
+        this._types = []
         this._clusterPositions = []
 
         if (this.candidates.length === 0) return
@@ -192,10 +135,7 @@ export default class Flowers {
             this._positions.push(new THREE.Vector3(p.x, p.y, p.z))
 
             const idx = this._zoneColorIndex(p.x, p.z)
-            const base = this.palette[idx]
-            // keep the same hue across the zone; only a tiny brightness jitter
-            const c = base.clone().multiplyScalar(0.92 + Math.random() * 0.16)
-            this._colors.push(c)
+            this._types.push(idx)
 
             if (this._clusterPositions.length < 64 && Math.random() > 0.85) {
                 this._clusterPositions.push(this._positions[this._positions.length - 1].clone())
@@ -210,6 +150,17 @@ export default class Flowers {
         this.uCharacterPosition = uniform(new THREE.Vector3(0, 0, 0))
         this.uViewRadius = uniform(this.viewRadius)
         this.uViewFadeBand = uniform(this.viewFadeBand)
+
+        const texViolet = this.experience.resources.items.flowerViolet
+        const texWhite = this.experience.resources.items.flowerWhite
+        const texYellow = this.experience.resources.items.flowerYellow
+        const texBlue = this.experience.resources.items.flowerBlue
+
+        ;[texViolet, texWhite, texYellow, texBlue].forEach(tex => {
+            if (tex) {
+                tex.colorSpace = THREE.SRGBColorSpace
+            }
+        })
 
         const topY = this._topY
 
@@ -235,15 +186,28 @@ export default class Flowers {
             return pos
         })()
 
-        // part: 0 = petal (instance colour), 1 = center (yellow), 2 = stem (green)
         const colorNode = Fn(() => {
-            const aPart = attribute('aPart', 'float')
-            const aColor = attribute('aFlowerColor', 'vec3')
-            const isCenter = step(0.5, aPart).sub(step(1.5, aPart))
-            const isStem = step(1.5, aPart)
-            const col = mix(aColor, vec3(1.0, 0.84, 0.26), isCenter).toVar()
-            col.assign(mix(col, vec3(0.18, 0.45, 0.16), isStem))
-            return col
+            const aFlowerType = attribute('aFlowerType', 'float')
+            const uvCoord = uv()
+
+            const sampleViolet = texture(texViolet, uvCoord)
+            const sampleWhite = texture(texWhite, uvCoord)
+            const sampleYellow = texture(texYellow, uvCoord)
+            const sampleBlue = texture(texBlue, uvCoord)
+
+            const isType1 = step(0.5, aFlowerType).sub(step(1.5, aFlowerType))
+            const isType2 = step(1.5, aFlowerType).sub(step(2.5, aFlowerType))
+            const isType3 = step(2.5, aFlowerType)
+            
+            const texColor = mix(sampleViolet, sampleWhite, isType1).toVar()
+            texColor.assign(mix(texColor, sampleYellow, isType2))
+            texColor.assign(mix(texColor, sampleBlue, isType3))
+
+            const finalColor = texColor
+            
+            If(finalColor.a.lessThan(0.5), () => { Discard() })
+            
+            return finalColor
         })()
 
         this.material = new THREE.MeshLambertNodeMaterial({
@@ -269,30 +233,36 @@ export default class Flowers {
 
         const dummy = new THREE.Object3D()
         const seeds = new Float32Array(count)
-        const colors = new Float32Array(count * 3)
+        const types = new Float32Array(count)
         const worldPos = new Float32Array(count * 3)
 
         for (let i = 0; i < count; i++) {
             const p = this._positions[i]
-            const s = (0.4 + Math.random() * 0.3) * this.flowerScale
+            
+            // Base size slightly bigger, increased minimum size
+            const baseScale = (0.7 + Math.random() * 0.3) * this.flowerScale
+            
+            // Make it slightly wider
+            const scaleX = baseScale * (1.15 + Math.random() * 0.15)
+            
+            // Height variation (minimum height raised to avoid very small flowers)
+            const scaleY = baseScale * (0.85 + Math.random() * 0.4)
+            
             dummy.position.copy(p)
-            dummy.rotation.set(0, Math.random() * Math.PI * 2, 0)
-            dummy.scale.setScalar(s)
+            dummy.rotation.set(0, 0, 0)
+            dummy.scale.set(scaleX, scaleY, scaleX)
             dummy.updateMatrix()
             this.mesh.setMatrixAt(i, dummy.matrix)
 
             seeds[i] = Math.random()
-            const c = this._colors[i]
-            colors[i * 3] = c.r
-            colors[i * 3 + 1] = c.g
-            colors[i * 3 + 2] = c.b
+            types[i] = this._types[i]
             worldPos[i * 3] = p.x
             worldPos[i * 3 + 1] = p.y
             worldPos[i * 3 + 2] = p.z
         }
 
         this.geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1))
-        this.geometry.setAttribute('aFlowerColor', new THREE.InstancedBufferAttribute(colors, 3))
+        this.geometry.setAttribute('aFlowerType', new THREE.InstancedBufferAttribute(types, 1))
         this.geometry.setAttribute('aInstanceWorldPos', new THREE.InstancedBufferAttribute(worldPos, 3))
 
         this.mesh.instanceMatrix.needsUpdate = true

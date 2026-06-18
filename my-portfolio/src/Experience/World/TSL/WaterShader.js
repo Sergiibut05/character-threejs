@@ -1,139 +1,49 @@
 /**
- * Water Shader – TSL (Anime / Cel-Shaded Voronoi)
- * Port of cortiz2894/water-anime-shader to Three.js TSL.
+ * Water Shader – TSL (Depth-driven Stylized Water)
+ * Ported from the "Water with Caustics" Godot shader approach (binbun) —
+ * https://godotshaders.com/shader/water-with-caustics/ — adapted to TSL.
  *
- * Algorithm:
- *   1. World XZ → fBm noise distortion → Voronoi UV
- *   2. Voronoi F1 (nearest cell) and SmoothF1 (polynomial smooth-min)
- *   3. Edge = F1 − SmoothF1 → cel-shaded threshold → 3-stop color ramp
- *   4. Camera distance fade for infinite-floor illusion
+ * Key idea: water depth is a TRUE WORLD-SPACE vertical column height,
+ * reconstructed from the depth buffer (worldBedY → surfaceY). Camera-invariant
+ * (no "looks different far away", no "swimming"). Single depth read → cheap.
  *
- * Shadow variant (agua001/agua002):
- *   - Same Voronoi, wider threshold
- *   - Black + blue transparent, no distance fade
+ *   1. Base colour: shallow → deep by world depth (Beer-Lambert style).
+ *   2. Edge foam: solid white where the water column is thin (shore/objects),
+ *      dissolved into natural clumps by a STATIC world-space noise (no travel).
+ *   3. Sparse open-water specks that fade in/out IN PLACE (not flowing).
+ *   4. Distance fade for the infinite-floor illusion.
+ *
+ * Reuses the project's cheap texture-based noise (snoise in NoiseNodes).
  */
 import {
     Fn, float, vec2, vec3, vec4,
     positionWorld, positionView, vertexStage,
-    sin, abs, floor, fract, exp,
-    smoothstep, clamp, mix, dot, length,
-    min, max, step, pow,
+    sin, smoothstep, clamp, mix, length,
+    max, pow,
     viewportDepthTexture, perspectiveDepthToViewZ,
-    cameraNear, cameraFar
+    cameraNear, cameraFar, cameraWorldMatrix, screenUV
 } from 'three/tsl'
-
-// ── 2D hash for Voronoi cell seeds ──────────────────────────────────────────
-const hash2 = Fn(([p]) => {
-    const px = dot(p, vec2(127.1, 311.7))
-    const py = dot(p, vec2(269.5, 183.3))
-    return vec2(
-        fract(sin(px).mul(43758.5453)),
-        fract(sin(py).mul(43758.5453))
-    )
-})
-
-// ── Polynomial smooth-min (k = blend radius) ───────────────────────────────
-const smin = Fn(([a, b, k]) => {
-    const h = max(k.sub(abs(a.sub(b))), 0.0).div(k)
-    return min(a, b).sub(h.mul(h).mul(h).mul(k).div(6.0))
-})
-
-// ── Animated cell position (same random offset in both F1 and SF1) ──────────
-const cellPt = Fn(([seed, time, cellSpeed]) => {
-    const phaseX = time.mul(cellSpeed).add(float(6.2831).mul(seed.x))
-    const phaseY = time.mul(cellSpeed).add(float(6.2831).mul(seed.y))
-    return vec2(
-        float(0.5).add(float(0.5).mul(sin(phaseX))),
-        float(0.5).add(float(0.5).mul(sin(phaseY)))
-    )
-})
-
-// ── Voronoi F1: nearest-cell Euclidean distance ─────────────────────────────
-const voronoiF1 = Fn(([p, time, cellSpeed]) => {
-    const i = floor(p)
-    const f = fract(p)
-    const md = float(8.0).toVar()
-
-    const offsets = [
-        vec2(-1, -1), vec2(0, -1), vec2(1, -1),
-        vec2(-1, 0), vec2(0, 0), vec2(1, 0),
-        vec2(-1, 1), vec2(0, 1), vec2(1, 1)
-    ]
-
-    for (const n of offsets) {
-        const pt = cellPt(hash2(i.add(n)), time, cellSpeed)
-        md.assign(min(md, length(n.add(pt).sub(f))))
-    }
-
-    return md
-})
-
-// ── Voronoi SmoothF1: smooth-min over all cell distances ────────────────────
-const voronoiSF1 = Fn(([p, time, cellSpeed, smoothness]) => {
-    const i = floor(p)
-    const f = fract(p)
-    const res = float(8.0).toVar()
-
-    const offsets = [
-        vec2(-1, -1), vec2(0, -1), vec2(1, -1),
-        vec2(-1, 0), vec2(0, 0), vec2(1, 0),
-        vec2(-1, 1), vec2(0, 1), vec2(1, 1)
-    ]
-
-    for (const n of offsets) {
-        const pt = cellPt(hash2(i.add(n)), time, cellSpeed)
-        res.assign(smin(res, length(n.add(pt).sub(f)), smoothness))
-    }
-
-    return res
-})
 
 import { snoise } from './NoiseNodes.js'
 
-// ── 2-octave fBm ───────────────────────────────────────────────────────────
-const fbm = Fn(([p]) => {
-    // Map snoise [-1..1] to [0..1] to match the old vnoise range
-    const noise1 = snoise(p).mul(0.5).add(0.5)
-    const noise2 = snoise(p.mul(2.0)).mul(0.5).add(0.5)
-    return float(0.5).mul(noise1).add(float(0.25).mul(noise2))
-})
-
-// ── Core: noise distortion + Voronoi F1−SF1 edge detection ─────────────────
-const computeAnimeVoronoi = Fn(([
-    wp, time, scale, smoothness, cellSpeed,
-    flowX, flowZ, noiseScale, noiseFlowSpeed, distortAmount
-]) => {
-    const noiseUV = wp.mul(noiseScale).add(vec2(time.mul(noiseFlowSpeed), 0.0))
-    const noiseFac = fbm(noiseUV)
-    const dv = noiseFac.sub(0.5).mul(distortAmount)
-    const distort = vec2(dv, dv)
-
-    const vuv = wp.mul(scale)
-        .add(vec2(flowX, flowZ).mul(time))
-        .add(distort)
-
-    const f1 = voronoiF1(vuv, time, cellSpeed)
-    const sf1 = voronoiSF1(vuv, time, cellSpeed, smoothness)
-
-    return f1.sub(sf1)
-})
-
 /**
- * Anime water surface — 3-stop color ramp with cel-shaded edges
- * and screen-space depth intersection (white line + soft glow where
- * geometry crosses the water plane).
+ * Main water surface — depth-based color + animated shore foam + whitecaps.
  */
 export function createWaterColorNode(uniforms) {
     const {
-        uTime, uScale, uSmoothness, uEdgeThreshold, uEdgeSoftness,
-        uFlowX, uFlowZ, uCellSpeed,
-        uNoiseScale, uNoiseFlowSpeed, uDistortAmount,
-        uDeepColor, uMidColor, uMidPos, uHighlight,
-        uOpacity, uDeepOpacity,
-        uFadeDistance, uFadeStrength, uCamXZ,
-        uLineWidth, uGlowWidth,
-        uLineColor, uLineOpacity,
-        uGlowColor, uGlowOpacity
+        uTime,
+        // Depth color
+        uShallowColor, uDeepWaterColor, uDepthMax, uDepthPower,
+        // Foam color
+        uFoamColor,
+        // Edge foam (depth-based, noise-shaped, animated)
+        uFoamDepth, uFoamScale, uFoamShapeAmount, uFoamExponent, uFoamStrength, uFoamSpeed,
+        // Sparse open-water specks (cartoon noise blobs, fade in place)
+        uSpeckScale, uSpeckThreshold, uSpeckEdge, uSpeckStrength, uSpeckSpeed,
+        // Opacity (shallow = translucent so terrain tints through, deep = solid)
+        uOpacity, uShallowOpacity, uDeepOpacity,
+        // Distance fade
+        uFadeDistance, uFadeStrength, uCamXZ
     } = uniforms
 
     const worldPos = vertexStage(positionWorld)
@@ -141,71 +51,96 @@ export function createWaterColorNode(uniforms) {
 
     return Fn(() => {
         const wp = worldPos.xz
+        const waterViewZ = viewPos.z
 
-        const edge = computeAnimeVoronoi(
-            wp, uTime, uScale, uSmoothness, uCellSpeed,
-            uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
-        )
+        // ── World-space water depth (camera-invariant) ──────────────────
+        // Reconstruct the riverbed WORLD position from the depth buffer and
+        // take the vertical (Y) gap to the water surface. Because it is a real
+        // world height, it does NOT change with camera distance or angle.
+        const reconstructDepth = (uv) => {
+            const sZ = perspectiveDepthToViewZ(viewportDepthTexture(uv), cameraNear, cameraFar)
+            // Scale the view ray (camera at origin) so its z reaches the bed.
+            const bedViewPos = viewPos.mul(sZ.div(waterViewZ))
+            const bedWorldY = cameraWorldMatrix.mul(vec4(bedViewPos, 1.0)).y
+            return max(worldPos.y.sub(bedWorldY), float(0.0))
+        }
 
-        const t = smoothstep(
-            uEdgeThreshold.sub(uEdgeSoftness),
-            uEdgeThreshold.add(uEdgeSoftness),
-            edge
-        )
+        const waterDepth = reconstructDepth(screenUV).toVar()
 
-        const safeMP = max(uMidPos, float(0.0001))
-        const seg0 = clamp(t.div(safeMP), 0.0, 1.0)
-        const seg1 = clamp(
-            t.sub(safeMP).div(max(float(1.0).sub(safeMP), float(0.0001))),
-            0.0, 1.0
+        // ── 1. Base color by depth (Beer-Lambert style absorption) ──────
+        const depthT = pow(
+            clamp(waterDepth.div(max(uDepthMax, float(0.001))), 0.0, 1.0),
+            uDepthPower
         )
-        const inSeg1 = step(safeMP, t)
-        const color = mix(
-            mix(uDeepColor, uMidColor, seg0),
-            mix(uMidColor, uHighlight, seg1),
-            inSeg1
+        const color = mix(uShallowColor, uDeepWaterColor, depthT).toVar()
+
+        // ── 2. Edge foam (depth-based, noise-shaped, ANIMATED) ──────────
+        // Solid white near shore/objects where the water column is thin.
+        // The shaping noise flows along the shore so the foam clumps drift /
+        // breathe. Because it is gated by depth (edgeRaw) it stays at the edge
+        // and never travels across open water.
+        const foamFlow = vec2(uTime.mul(uFoamSpeed), uTime.mul(uFoamSpeed).mul(0.6))
+        const edgeRaw = float(1.0).sub(
+            smoothstep(float(0.0), max(uFoamDepth, float(0.001)), waterDepth)
+        )
+        const foamShape = snoise(wp.mul(uFoamScale).add(foamFlow)).mul(0.5).add(0.5).mul(uFoamShapeAmount)
+        const edgeFoam = pow(
+            clamp(
+                edgeRaw.sub(foamShape).div(max(float(1.0).sub(foamShape), float(0.001))),
+                0.0, 1.0
+            ),
+            uFoamExponent
         ).toVar()
 
-        // ── Depth intersection ──────────────────────────────────────────
-        // Compare viewport depth buffer (opaque objects already rendered)
-        // against the water surface depth → white line + blue glow where
-        // geometry crosses the water plane.
-        const sceneViewZ = perspectiveDepthToViewZ(viewportDepthTexture(), cameraNear, cameraFar)
-        const waterViewZ = viewPos.z
-        const depthDiff = abs(sceneViewZ.sub(waterViewZ))
+        // ── 3. Cartoon noise specks (organic blobs, fade IN PLACE) ──────
+        // Smooth value-noise gives naturally ROUNDED, irregular contours (not
+        // circles). A narrow smoothstep band turns them into crisp cartoon
+        // edges. The noise coords are STATIC (no flow) so blobs never travel;
+        // each blob fades in/out on its own clock via a per-region phase.
+        const speckField = snoise(wp.mul(uSpeckScale)).mul(0.5).add(0.5)
+        const speckPhase = snoise(wp.mul(uSpeckScale.mul(0.5)).add(vec2(11.3, 7.7)))
+        const flick = float(0.5).add(
+            float(0.5).mul(sin(uTime.mul(uSpeckSpeed).add(speckPhase.mul(6.2831))))
+        )
+        // crisp rounded edge: small uSpeckEdge → sharp cartoon cut
+        const speckMask = smoothstep(
+            uSpeckThreshold, uSpeckThreshold.add(uSpeckEdge), speckField
+        )
+        const speckDeep = smoothstep(uFoamDepth, uFoamDepth.mul(2.0), waterDepth)
+        const specks = speckMask
+            .mul(smoothstep(float(0.5), float(0.85), flick))
+            .mul(uSpeckStrength)
+            .mul(speckDeep)
+            .mul(float(1.0).sub(edgeFoam))
 
-        const line = float(1.0).sub(smoothstep(float(0.0), uLineWidth, depthDiff))
-        const glow = exp(depthDiff.negate().div(max(uGlowWidth, float(0.001))))
+        // ── Combine ──────────────────────────────────────────────────────
+        const foam = clamp(max(edgeFoam, specks).mul(uFoamStrength), 0.0, 1.0).toVar()
+        color.assign(mix(color, uFoamColor, foam))
 
-        const lineContrib = line.mul(uLineOpacity)
-        const glowContrib = glow.mul(uGlowOpacity)
-        const intersectionAlpha = max(lineContrib, glowContrib)
-        const intersectionColor = mix(uGlowColor, uLineColor, line)
-
-        color.assign(color.add(intersectionColor.mul(intersectionAlpha)))
-
-        // ── Distance fade ───────────────────────────────────────────────
+        // ── 4. Distance fade (infinite-floor illusion) ──────────────────
         const dist = length(wp.sub(uCamXZ))
         const fade = float(1.0).sub(
             pow(clamp(dist.div(uFadeDistance), 0.0, 1.0), uFadeStrength)
         )
 
-        const alpha = clamp(
-            mix(uDeepOpacity, float(1.0), t).mul(uOpacity).mul(fade).add(intersectionAlpha),
-            0.0, 1.0
-        )
+        // ── Alpha: shallow = translucent (terrain tints through),
+        //          deep = solid, foam fully opaque ──────────────────────
+        const baseAlpha = mix(uShallowOpacity, uDeepOpacity, depthT).mul(uOpacity)
+        const alpha = clamp(max(baseAlpha, foam).mul(fade), 0.0, 1.0)
 
         return vec4(color, alpha)
     })()
 }
 
 /**
- * Shadow layer — same Voronoi, wider threshold, dark tones.
+ * Shadow / shallow layer — very subtle translucent darkening for the
+ * secondary planes (agua.001 / agua.002). It only deepens the existing
+ * water tone slightly (no bright cyan band), so it reads as a soft
+ * shadowed/deeper patch rather than a hard-edged strip.
  */
 export function createWaterShadowColorNode(uniforms) {
     const {
-        uTime, uScale, uSmoothness, uCellSpeed,
-        uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
+        uTime, uDeepWaterColor, uShadowOpacity
     } = uniforms
 
     const worldPos = vertexStage(positionWorld)
@@ -213,20 +148,13 @@ export function createWaterShadowColorNode(uniforms) {
     return Fn(() => {
         const wp = worldPos.xz
 
-        const edge = computeAnimeVoronoi(
-            wp, uTime, uScale, uSmoothness, uCellSpeed,
-            uFlowX, uFlowZ, uNoiseScale, uNoiseFlowSpeed, uDistortAmount
+        const wobble = snoise(wp.mul(0.5).add(vec2(uTime.mul(0.04), 0.0))).mul(0.5).add(0.5)
+
+        const alpha = clamp(
+            uShadowOpacity.mul(float(0.6).add(wobble.mul(0.4))),
+            0.0, 1.0
         )
 
-        const t = smoothstep(float(0.04), float(0.16), edge)
-        const invT = float(1.0).sub(t)
-
-        const shadowColor = vec3(0.0, 0.0, 0.0)
-        const transparentColor = vec3(0.057, 0.561, 1.0)
-
-        const finalColor = mix(transparentColor, shadowColor, invT)
-        const alpha = mix(float(0.05), float(0.6), invT)
-
-        return vec4(finalColor, clamp(alpha, 0.0, 1.0))
+        return vec4(uDeepWaterColor, alpha)
     })()
 }

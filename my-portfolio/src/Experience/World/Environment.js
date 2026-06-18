@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
-import { uniform, mix, positionWorld, cameraPosition, smoothstep, vec3 } from 'three/tsl'
+import {
+    uniform, mix, positionWorld, cameraPosition, smoothstep, vec2, vec3, float,
+    floor, fract, step, texture
+} from 'three/tsl'
+import { hashTexture } from './TSL/NoiseNodes.js'
+import { dayNightTint, dayNightLitTint } from './DayNight.js'
 import {
     syncPropStylizedSunDirection,
     propLitTint,
@@ -9,19 +14,132 @@ import {
     propCoreLit1
 } from './scene/StylizedPropMaterial.js'
 
+const SUN_DISTANCE = 8
+const TWO_PI = Math.PI * 2
+
+/**
+ * Minimum elevation (sin of angle above horizon) for the shadow-casting
+ * light direction. When the active body is near the horizon the shadow
+ * frustum becomes extremely elongated and shadows disappear. Clamping to
+ * this value keeps shadows visible at all times.
+ */
+const MIN_SHADOW_ELEVATION = 0.30
+
+/**
+ * Day/night keyframes over a normalized day [0..1):
+ *   0.00 = midnight · 0.25 = sunrise · 0.50 = noon · 0.75 = sunset
+ * Colours are pre-parsed into THREE.Color once (no per-frame allocation).
+ */
+const CYCLE_STOPS = [
+    // Each phase carries its own grading tint (`tint` + `tintStrength`) that is
+    // multiplied onto the scene materials, plus the sky/light palette.
+    // --- Deep night (kept readable: bluish, never pitch black) ---
+    { name: 'Midnight', t: 0.00, top: '#0a1230', bottom: '#1a2348', sun: '#223052', diskInt: 0.0, haloInt: 0.0,
+      sunLight: '#8a98cf', sunLightInt: 0.45, amb: '#41507f', ambInt: 0.62,
+      hemiSky: '#37456f', hemiGround: '#222a44', hemiInt: 0.55, moonInt: 0.60, nightFactor: 1.00,
+      tint: '#666f8f', tintStrength: 1.0 },
+    // --- First light (pre-dawn) ---
+    { name: 'First light', t: 0.20, top: '#23305e', bottom: '#6a5078', sun: '#ffb27a', diskInt: 0.12, haloInt: 0.18,
+      sunLight: '#9a8fbe', sunLightInt: 0.65, amb: '#535878', ambInt: 0.62,
+      hemiSky: '#566aa0', hemiGround: '#5e5060', hemiInt: 0.55, moonInt: 0.22, nightFactor: 0.58,
+      tint: '#8a82b4', tintStrength: 0.94 },
+    // --- Sunrise (orange horizon) ---
+    { name: 'Sunrise', t: 0.25, top: '#5577b8', bottom: '#ffae73', sun: '#ffd9a0', diskInt: 0.85, haloInt: 0.55,
+      sunLight: '#ffcaa0', sunLightInt: 1.10, amb: '#b9bcd8', ambInt: 0.75,
+      hemiSky: '#9ab8e6', hemiGround: '#ffcba0', hemiInt: 0.60, moonInt: 0.0, nightFactor: 0.15,
+      tint: '#e2bb98', tintStrength: 1.0 },
+    // --- Morning ---
+    { name: 'Morning', t: 0.33, top: '#6aa6ee', bottom: '#dcefff', sun: '#fff2d4', diskInt: 1.0, haloInt: 0.36,
+      sunLight: '#fff0e0', sunLightInt: 1.55, amb: '#eef3ff', ambInt: 0.95,
+      hemiSky: '#cfe2fb', hemiGround: '#fbeccb', hemiInt: 0.70, moonInt: 0.0, nightFactor: 0.0,
+      tint: '#fff5e5', tintStrength: 0.84 },
+    // --- Noon (full day) ---
+    { name: 'Noon', t: 0.50, top: '#4a93e8', bottom: '#dff0ff', sun: '#fff6dc', diskInt: 1.0, haloInt: 0.30,
+      sunLight: '#fff4e6', sunLightInt: 1.70, amb: '#ffffff', ambInt: 1.00,
+      hemiSky: '#dbeafe', hemiGround: '#fef3c7', hemiInt: 0.70, moonInt: 0.0, nightFactor: 0.0,
+      tint: '#f7f4e4', tintStrength: 0.93 },
+    // --- Afternoon / tarde (warm golden) ---
+    { name: 'Afternoon', t: 0.68, top: '#5b9be0', bottom: '#ffe9c2', sun: '#ffe8b8', diskInt: 1.0, haloInt: 0.42,
+      sunLight: '#ffdca8', sunLightInt: 1.50, amb: '#fff2dd', ambInt: 0.90,
+      hemiSky: '#bcd6f2', hemiGround: '#ffe2b0', hemiInt: 0.70, moonInt: 0.0, nightFactor: 0.0,
+      tint: '#ffe3bc', tintStrength: 0.94 },
+    // --- Sunset (strong orange) ---
+    { name: 'Sunset', t: 0.76, top: '#6a5a86', bottom: '#ff7e5a', sun: '#ffb066', diskInt: 0.95, haloInt: 0.75,
+      sunLight: '#ff9e6b', sunLightInt: 1.20, amb: '#c9aeb8', ambInt: 0.70,
+      hemiSky: '#8a7fae', hemiGround: '#ffae84', hemiInt: 0.60, moonInt: 0.0, nightFactor: 0.12,
+      tint: '#c98354', tintStrength: 0.93 },
+    // --- Dusk ---
+    { name: 'Dusk', t: 0.82, top: '#2e3360', bottom: '#8a5a78', sun: '#ff9a66', diskInt: 0.30, haloInt: 0.35,
+      sunLight: '#9a86b6', sunLightInt: 0.60, amb: '#5a5e84', ambInt: 0.58,
+      hemiSky: '#48548e', hemiGround: '#5e5366', hemiInt: 0.52, moonInt: 0.28, nightFactor: 0.55,
+      tint: '#685f77', tintStrength: 0.96 },
+    // --- Night falls ---
+    { name: 'Night', t: 0.90, top: '#0c1430', bottom: '#1a2346', sun: '#223052', diskInt: 0.0, haloInt: 0.0,
+      sunLight: '#8a98cf', sunLightInt: 0.45, amb: '#41507f', ambInt: 0.60,
+      hemiSky: '#37456f', hemiGround: '#222a44', hemiInt: 0.54, moonInt: 0.50, nightFactor: 0.95,
+      tint: '#394b8e', tintStrength: 0.93 }
+]
+
 export default class Environment {
     constructor() {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.debug = this.experience.debug
 
+        // Day/night cycle state
+        this.timeOfDay = 0.5
+        this.cycle = { enabled: true, durationSec: 47 }
+
+        // Tunable params (exposed in the GUI)
+        this.params = {
+            litTintScale: 0.0,
+            nightBrightness: 3.0,
+            sunAzimuthDeg: 180,
+            moonAzimuthDeg: 180,
+            sunArcTilt: 0.45
+        }
+
+        // Reusable scratch objects (no per-frame allocation)
+        this._sunDir = new THREE.Vector3()
+        this._moonDir = new THREE.Vector3()
+        this._tmpColorA = new THREE.Color()
+        this._tmpColorB = new THREE.Color()
+        this._whiteColor = new THREE.Color(1, 1, 1)
+
+        this._prepareCycleStops()
         this.setAmbientLight()
         this.setSunLight()
         this.setSky()
 
+        // Apply the starting time immediately so nothing flashes default colours
+        this._applyTimeOfDay(this.timeOfDay)
+
         if (this.debug.active) {
             this.setDebug()
         }
+    }
+
+    _prepareCycleStops() {
+        this.cycleStops = CYCLE_STOPS.map((s) => ({
+            name: s.name,
+            t: s.t,
+            top: new THREE.Color(s.top),
+            bottom: new THREE.Color(s.bottom),
+            sun: new THREE.Color(s.sun),
+            sunLight: new THREE.Color(s.sunLight),
+            amb: new THREE.Color(s.amb),
+            hemiSky: new THREE.Color(s.hemiSky),
+            hemiGround: new THREE.Color(s.hemiGround),
+            tint: new THREE.Color(s.tint),
+            tintStrength: s.tintStrength,
+            diskInt: s.diskInt,
+            haloInt: s.haloInt,
+            sunLightInt: s.sunLightInt,
+            ambInt: s.ambInt,
+            hemiInt: s.hemiInt,
+            moonInt: s.moonInt,
+            nightFactor: s.nightFactor
+        }))
     }
 
     setAmbientLight() {
@@ -37,9 +155,9 @@ export default class Environment {
         this.sunLight.shadow.camera.near = 0.5
         this.sunLight.shadow.bias = -0.0001
         this.sunLight.shadow.normalBias = 0.04
-        
+
         this._applyShadowQuality()
-        
+
         this.sunLight.position.set(4, 5, -3)
         this.sunLight.target.position.set(0, 0, 0)
         this.scene.add(this.sunLight.target)
@@ -69,20 +187,72 @@ export default class Environment {
     }
 
     setSky() {
+        // Gradient
         this.skyTopColor = uniform(new THREE.Color('#86b8ff'))
         this.skyBottomColor = uniform(new THREE.Color('#f7fbff'))
-        this.skySunColor = uniform(new THREE.Color('#fff4d8'))
-        this.skySunDirection = uniform(this.sunLight.position.clone().normalize())
-        this.skySunIntensity = uniform(0.25)
-        this.skySunSharpness = uniform(640.0)
         this.skyHorizonOffset = uniform(0.08)
 
+        // Sun disk + halo (much more visible than before)
+        this.skySunColor = uniform(new THREE.Color('#fff4d8'))
+        this.skySunDirection = uniform(new THREE.Vector3(0, 1, 0))
+        this.skySunDiskIntensity = uniform(1.0)
+        this.skySunDiskSharpness = uniform(280.0) // lower = bigger disk (was 640)
+        this.skySunHaloIntensity = uniform(0.35)
+        this.skySunHaloSharpness = uniform(7.0)
+
+        // Moon (night)
+        this.skyMoonColor = uniform(new THREE.Color('#cdd6ff'))
+        this.skyMoonDirection = uniform(new THREE.Vector3(0, -1, 0))
+        this.skyMoonIntensity = uniform(0.0)
+        this.skyMoonSharpness = uniform(900.0)
+
+        // Stars (fades in at night)
+        this.skyNightFactor = uniform(0.0)
+        this.skyStarScale = uniform(55.0)      // grid density
+        this.skyStarThreshold = uniform(0.90)  // higher = fewer stars
+        this.skyStarSize = uniform(0.10)       // dot radius (in cell units)
+
         const viewDir = positionWorld.sub(cameraPosition).normalize()
+
+        // Vertical gradient
         const height01 = viewDir.y.mul(0.5).add(0.5).add(this.skyHorizonOffset).clamp(0.0, 1.0)
         const gradient = smoothstep(0.0, 1.0, height01)
         const baseSky = mix(this.skyBottomColor, this.skyTopColor, gradient)
-        const sunDisk = viewDir.dot(this.skySunDirection.normalize()).max(0.0).pow(this.skySunSharpness).mul(this.skySunIntensity)
-        const skyColor = baseSky.add(this.skySunColor.mul(sunDisk))
+
+        // Sun disk + soft halo
+        const sunDot = viewDir.dot(this.skySunDirection.normalize()).max(0.0)
+        const sunDisk = sunDot.pow(this.skySunDiskSharpness).mul(this.skySunDiskIntensity)
+        const sunHalo = sunDot.pow(this.skySunHaloSharpness).mul(this.skySunHaloIntensity)
+        const sunContribution = this.skySunColor.mul(sunDisk.add(sunHalo))
+
+        // Moon disk + tiny glow
+        const moonDot = viewDir.dot(this.skyMoonDirection.normalize()).max(0.0)
+        const moonDisk = moonDot.pow(this.skyMoonSharpness).mul(this.skyMoonIntensity)
+        const moonGlow = moonDot.pow(float(16.0)).mul(this.skyMoonIntensity).mul(0.12)
+        const moonContribution = this.skyMoonColor.mul(moonDisk.add(moonGlow))
+
+        // Stars: round dots on a hashed grid, only above the horizon at night.
+        // Project the sky dome onto a plane, split into cells, and drop one
+        // randomly-placed round dot per "lit" cell (no streaks, just points).
+        const upMask = smoothstep(0.0, 0.18, viewDir.y)
+        const starProj = vec2(viewDir.x, viewDir.z)
+            .div(viewDir.y.abs().add(0.35))
+            .mul(this.skyStarScale)
+        const cell = floor(starProj)
+        const cellFract = fract(starProj)
+        const cellRandom = texture(hashTexture, cell.mul(1 / 256).add(0.5 / 256))
+        const hasStar = step(this.skyStarThreshold, cellRandom.r)
+        // Random dot position inside the cell, kept away from edges (0.25..0.75)
+        const starCenter = vec2(0.25, 0.25).add(vec2(cellRandom.g, cellRandom.b).mul(0.5))
+        const starDist = cellFract.sub(starCenter).length()
+        const starDot = smoothstep(this.skyStarSize, float(0.0), starDist)
+        const stars = starDot.mul(hasStar).mul(cellRandom.a).mul(upMask).mul(this.skyNightFactor)
+        const starContribution = vec3(0.95, 0.97, 1.0).mul(stars)
+
+        const skyColor = baseSky
+            .add(sunContribution)
+            .add(moonContribution)
+            .add(starContribution)
 
         const material = new THREE.MeshBasicNodeMaterial({
             side: THREE.BackSide,
@@ -98,22 +268,228 @@ export default class Environment {
         this.scene.add(this.sky)
     }
 
+    /** Find the keyframe segment for `t` (handles wrap-around) and blend it. */
+    _applyTimeOfDay(t) {
+        const stops = this.cycleStops
+        const n = stops.length
+
+        let i0 = n - 1
+        let i1 = 0
+        for (let i = 0; i < n; i++) {
+            if (stops[i].t > t) {
+                i1 = i
+                i0 = (i - 1 + n) % n
+                break
+            }
+            if (i === n - 1) {
+                i0 = i
+                i1 = 0
+            }
+        }
+
+        const a = stops[i0]
+        const b = stops[i1]
+        let span = b.t - a.t
+        if (span <= 0) span += 1
+        let local = t - a.t
+        if (local < 0) local += 1
+        const f = THREE.MathUtils.clamp(local / span, 0, 1)
+
+        const lerp = THREE.MathUtils.lerp
+        const cA = this._tmpColorA
+        const cB = this._tmpColorB
+
+        // --- Sky uniforms ---
+        this.skyTopColor.value.copy(cA.copy(a.top).lerp(cB.copy(b.top), f))
+        this.skyBottomColor.value.copy(cA.copy(a.bottom).lerp(cB.copy(b.bottom), f))
+        this.skySunColor.value.copy(cA.copy(a.sun).lerp(cB.copy(b.sun), f))
+        this.skySunDiskIntensity.value = lerp(a.diskInt, b.diskInt, f)
+        this.skySunHaloIntensity.value = lerp(a.haloInt, b.haloInt, f)
+        this.skyMoonIntensity.value = lerp(a.moonInt, b.moonInt, f)
+        const nightFactor = lerp(a.nightFactor, b.nightFactor, f)
+        this.skyNightFactor.value = nightFactor
+
+        // --- Sun direction from time of day ---
+        // angle: t=0.25 -> elevation 0 (sunrise), t=0.50 -> elevation +1 (noon)
+        const sunAngle = (t - 0.25) * TWO_PI
+        const sunElev = Math.sin(sunAngle)
+        const sunHoriz = Math.cos(sunAngle)
+        // Base arc: East-West sweep (X) with a constant lean (Z), then spun
+        // around Y by the azimuth so the sun can rise from another side.
+        {
+            let dx = sunHoriz * 0.8
+            let dz = -this.params.sunArcTilt
+            const az = this.params.sunAzimuthDeg * (Math.PI / 180)
+            const ca = Math.cos(az)
+            const sa = Math.sin(az)
+            this._sunDir.set(dx * ca - dz * sa, sunElev, dx * sa + dz * ca).normalize()
+        }
+
+        // --- Moon direction (independent azimuth) ---
+        const moonAngle = (t - 0.75) * TWO_PI   // moon rises at t=0.75
+        const moonElev = Math.sin(moonAngle)
+        const moonHoriz = Math.cos(moonAngle)
+        {
+            let dx = moonHoriz * 0.8
+            let dz = -this.params.sunArcTilt
+            const az = this.params.moonAzimuthDeg * (Math.PI / 180)
+            const ca = Math.cos(az)
+            const sa = Math.sin(az)
+            this._moonDir.set(dx * ca - dz * sa, moonElev, dx * sa + dz * ca).normalize()
+        }
+
+        // Sky shader: real sun & moon positions (visual disks, no smoothing needed)
+        this.skySunDirection.value.copy(this._sunDir)
+        this.skyMoonDirection.value.copy(this._moonDir)
+
+        // --- Lights ---
+        // Smooth crossfade between sun and moon directional light.
+        // sunBlend is driven directly by sunElev (sin of the sun's arc angle):
+        //   sunElev > 0  → sun above horizon → sunBlend → 1
+        //   sunElev < 0  → sun below horizon → sunBlend → 0 (moon takes over)
+        // A smoothstep over a small band around 0 prevents any hard snap.
+        const sunBlend = THREE.MathUtils.smoothstep(sunElev, -0.18, 0.18)
+
+        // Smoothly blended light direction
+        const blendedDir = this._sunDir.clone().multiplyScalar(sunBlend)
+            .add(this._moonDir.clone().multiplyScalar(1 - sunBlend))
+            .normalize()
+
+        // --- Shadow-safe light direction ---
+        // Clamp the elevation so the shadow frustum never becomes too
+        // elongated. This keeps shadows visible even at sunrise/sunset.
+        const shadowDir = blendedDir.clone()
+        if (shadowDir.y < MIN_SHADOW_ELEVATION) {
+            shadowDir.y = MIN_SHADOW_ELEVATION
+            shadowDir.normalize()
+        }
+
+        this.sunLight.position.copy(shadowDir).multiplyScalar(SUN_DISTANCE)
+
+        // --- Centre the shadow camera on the character/camera ---
+        // Without this, the shadow frustum is centred on (0,0,0) and at low
+        // light angles the limited frustum box only covers part of the scene.
+        const character = this.experience.world?.character
+        if (character) {
+            const cp = character.position
+            this.sunLight.target.position.set(cp.x, 0, cp.z)
+            this.sunLight.position.x += cp.x
+            this.sunLight.position.z += cp.z
+            this.sunLight.target.updateMatrixWorld()
+        }
+
+        this.sunLight.color.copy(cA.copy(a.sunLight).lerp(cB.copy(b.sunLight), f))
+        this.sunLight.intensity = lerp(a.sunLightInt, b.sunLightInt, f)
+
+        // Night brightness boost only ramps in as it gets dark, so daytime
+        // lighting is untouched.
+        const brightnessBoost = lerp(1.0, this.params.nightBrightness, nightFactor)
+
+        this.ambientLight.color.copy(cA.copy(a.amb).lerp(cB.copy(b.amb), f))
+        this.ambientLight.intensity = lerp(a.ambInt, b.ambInt, f) * brightnessBoost
+
+        this.skyLight.color.copy(cA.copy(a.hemiSky).lerp(cB.copy(b.hemiSky), f))
+        this.skyLight.groundColor.copy(cA.copy(a.hemiGround).lerp(cB.copy(b.hemiGround), f))
+        this.skyLight.intensity = lerp(a.hemiInt, b.hemiInt, f) * brightnessBoost
+
+        // --- Per-phase grading tint ---
+        // For each side of the segment, build "white -> phase tint" by its
+        // strength, then interpolate the two. UNLIT materials get the full tint;
+        // LIT materials get a scaled-down version so they don't double-darken.
+        const w = this._whiteColor
+
+        // Unlit (full)
+        cA.copy(w).lerp(a.tint, a.tintStrength)
+        cB.copy(w).lerp(b.tint, b.tintStrength)
+        dayNightTint.value.copy(cA).lerp(cB, f)
+
+        // Lit (reduced)
+        const litScale = this.params.litTintScale
+        cA.copy(w).lerp(a.tint, a.tintStrength * litScale)
+        cB.copy(w).lerp(b.tint, b.tintStrength * litScale)
+        dayNightLitTint.value.copy(cA).lerp(cB, f)
+    }
+
     update() {
         const camera = this.experience.camera.instance
+
+        if (this.cycle.enabled && this.cycle.durationSec > 0) {
+            const dt = this.experience.time.delta * 0.001
+            this.timeOfDay = (this.timeOfDay + dt / this.cycle.durationSec) % 1
+            if (this.timeOfDay < 0) this.timeOfDay += 1
+            this._applyTimeOfDay(this.timeOfDay)
+        }
+
         if (this.sky) {
             this.sky.position.copy(camera.position)
-            this.skySunDirection.value.copy(this.sunLight.position).normalize()
         }
+
         syncPropStylizedSunDirection(this.sunLight)
     }
 
     setDebug() {
-        const f = this.debug.ui.addFolder('Environment')
+        const f = this.debug.ui.addFolder('Environment · Day/Night')
         f.close()
-        f.add(this.sunLight, 'intensity', 0, 10, 0.01).name('Sun Intensity')
-        f.add(this.sunLight.position, 'x', -10, 10, 0.01).name('Sun X')
-        f.add(this.sunLight.position, 'y', -10, 10, 0.01).name('Sun Y')
-        f.add(this.sunLight.position, 'z', -10, 10, 0.01).name('Sun Z')
+
+        const cycleCtrl = f.add(this, 'timeOfDay', 0, 1, 0.001).name('Time of day').onChange((v) => {
+            this._applyTimeOfDay(v)
+        })
+        f.add(this.cycle, 'enabled').name('Cycle running')
+        f.add(this.cycle, 'durationSec', 5, 600, 1).name('Day length (s)')
+
+        // Quick jump presets
+        const presets = {
+            sunrise: () => { this.timeOfDay = 0.25; this._applyTimeOfDay(0.25); cycleCtrl.updateDisplay() },
+            noon: () => { this.timeOfDay = 0.50; this._applyTimeOfDay(0.50); cycleCtrl.updateDisplay() },
+            afternoon: () => { this.timeOfDay = 0.68; this._applyTimeOfDay(0.68); cycleCtrl.updateDisplay() },
+            sunset: () => { this.timeOfDay = 0.76; this._applyTimeOfDay(0.76); cycleCtrl.updateDisplay() },
+            night: () => { this.timeOfDay = 0.0; this._applyTimeOfDay(0.0); cycleCtrl.updateDisplay() }
+        }
+        f.add(presets, 'sunrise').name('→ Sunrise')
+        f.add(presets, 'noon').name('→ Noon')
+        f.add(presets, 'afternoon').name('→ Afternoon')
+        f.add(presets, 'sunset').name('→ Sunset')
+        f.add(presets, 'night').name('→ Night')
+
+        // --- Sun direction / disk ---
+        const sun = f.addFolder('Sun')
+        sun.close()
+        sun.add(this.params, 'sunAzimuthDeg', -180, 180, 1).name('Direction (azimuth °)')
+            .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        sun.add(this.params, 'sunArcTilt', 0, 1.5, 0.01).name('Arc tilt')
+            .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+
+        // --- Moon ---
+        const moon = f.addFolder('Moon')
+        moon.close()
+        moon.add(this.params, 'moonAzimuthDeg', -180, 180, 1).name('Direction (azimuth °)')
+            .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        sun.add(this.skySunDiskSharpness, 'value', 60, 800, 1).name('Disk size (sharpness)')
+        sun.add(this.skySunHaloIntensity, 'value', 0, 1.5, 0.01).name('Halo intensity')
+        sun.add(this.skySunHaloSharpness, 'value', 1, 40, 0.1).name('Halo size')
+
+        // --- Per-phase grading tint (Bruno-style, but simple) ---
+        const tints = f.addFolder('Phase tints')
+        tints.close()
+        tints.add(this.params, 'nightBrightness', 0.5, 3.0, 0.05).name('Night light boost')
+            .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        tints.add(this.params, 'litTintScale', 0, 1, 0.01).name('Lit surfaces tint amount')
+            .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        for (const stop of this.cycleStops) {
+            const pf = tints.addFolder(stop.name)
+            pf.close()
+            pf.addColor({ c: '#' + stop.tint.getHexString() }, 'c').name('Tint colour')
+                .onChange((v) => { stop.tint.set(v); this._applyTimeOfDay(this.timeOfDay) })
+            pf.add(stop, 'tintStrength', 0, 1, 0.01).name('Tint strength')
+                .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        }
+
+        // --- Stars ---
+        const stars = f.addFolder('Stars')
+        stars.close()
+        stars.add(this.skyStarScale, 'value', 20, 140, 1).name('Density')
+        stars.add(this.skyStarThreshold, 'value', 0.7, 0.99, 0.005).name('Sparseness')
+        stars.add(this.skyStarSize, 'value', 0.02, 0.3, 0.005).name('Dot size')
 
         const sp = this.debug.ui.addFolder('Stylized props (TSL)')
         sp.close()
