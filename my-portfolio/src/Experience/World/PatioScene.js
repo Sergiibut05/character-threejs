@@ -8,8 +8,8 @@
  *   - GrassBorders   (grass-borders.glb)    matches floor's grass palette
  *   - River          (river.glb)            cel-shaded water shader
  *   - Coblestone     (coblestone.glb + json) instanced cobblestones
- *   - Fence          (fence.glb + json)     instanced fences (Sushi atlas)
- *   - StaticPiece    (bridge / walls / InfoBoard / social-area / social-entrance / house)
+ *   - Fence          (fence.glb + json)     instanced fences (Tiny atlas)
+ *   - StaticPiece    (bridge / walls / InfoBoard / social-area / social-entrance / house / outside-house-things)
  *   - BaseballPitch  (baseball-pitch.glb)   embedded baked field texture
  *   - BlackCave      (black-cave.glb)       pure-black planes, no lighting
  *   - Clouds         (still in environment) — kept here as a separate group of meshes
@@ -96,7 +96,7 @@ export default class PatioScene {
     _setupAtlasTextureFlags() {
         const r = this.resources.items
         // Atlas textures need RGB clamping + linear filter for atlas sampling
-        for (const tex of [r.forestAtlas, r.sushiAtlas]) {
+        for (const tex of [r.forestAtlas, r.sushiAtlas, r.tinyAtlas]) {
             if (!tex) continue
             tex.minFilter = THREE.LinearFilter
             tex.magFilter = THREE.LinearFilter
@@ -147,15 +147,27 @@ export default class PatioScene {
         const r = this.resources.items
 
         const tryBuild = (name) => {
+            // Re-apply atlas flags when decorative atlases arrive (they load after construction)
+            if (name === 'tinyAtlas' || name === 'sushiAtlas') {
+                this._setupAtlasTextureFlags()
+            }
+
             // River (water shader)
             if (name === 'riverModel' && !this.pieces.river && r.riverModel) {
                 this.pieces.river = new River(r.riverModel)
             }
-            // House: wait for BOTH glb + ktx2 — if glb loads first, map was null and texture never applied.
-            if ((name === 'houseModel' || name === 'houseTexture') &&
-                !this.pieces.house && r.houseModel && r.houseTexture) {
+            // Wait for BOTH model and atlas — whichever arrives last triggers it.
+            if ((name === 'houseModel' || name === 'tinyAtlas') &&
+                !this.pieces.house && r.houseModel && r.tinyAtlas) {
                 this.pieces.house = new StaticPiece('house', r.houseModel, {
-                    map: r.houseTexture
+                    map: r.tinyAtlas
+                })
+            }
+            // Wait for BOTH model and atlas — whichever arrives last triggers construction
+            if ((name === 'outsideHouseThingsModel' || name === 'tinyAtlas') &&
+                !this.pieces.outsideHouseThings && r.outsideHouseThingsModel && r.tinyAtlas) {
+                this.pieces.outsideHouseThings = new StaticPiece('outsideHouseThings', r.outsideHouseThingsModel, {
+                    map: r.tinyAtlas
                 })
             }
             // Bridge
@@ -175,7 +187,7 @@ export default class PatioScene {
         this.resources.on('sourceLoaded', tryBuild)
 
         // Also check immediately in case assets loaded from cache already
-        for (const name of ['riverModel', 'houseModel', 'houseTexture', 'bridgeModel', 'infoBoardModel']) {
+        for (const name of ['riverModel', 'houseModel', 'tinyAtlas', 'outsideHouseThingsModel', 'bridgeModel', 'infoBoardModel']) {
             tryBuild(name)
         }
     }
@@ -195,12 +207,14 @@ export default class PatioScene {
             { default: Coblestone },
             { default: Fence },
             { default: BaseballPitch },
-            { default: BlackCave }
+            { default: BlackCave },
+            { default: InstancedProp }
         ] = await Promise.all([
             import('./scene/Coblestone.js'),
             import('./scene/Fence.js'),
             import('./scene/BaseballPitch.js'),
-            import('./scene/BlackCave.js')
+            import('./scene/BlackCave.js'),
+            import('./scene/InstancedProp.js')
         ])
         console.timeEnd('PatioScene · decorative imports')
 
@@ -209,11 +223,21 @@ export default class PatioScene {
         }
 
         if (!this.pieces.fence && r.fenceModel && r.fenceInstances) {
-            this.pieces.fence = new Fence(r.fenceModel, r.fenceInstances, r.sushiAtlas)
+            this.pieces.fence = new Fence(r.fenceModel, r.fenceInstances, r.tinyAtlas)
         }
 
         if (!this.pieces.parkThings && r.parkThingsModel) {
-            this.pieces.parkThings = new StaticPiece('parkThings', r.parkThingsModel, {})
+            this.pieces.parkThings = new StaticPiece('parkThings', r.parkThingsModel, {
+                map: r.forestAtlas || null
+            })
+        }
+
+        if (!this.pieces.parkRock && r.parkRockModel && r.parkRockInstances) {
+            this.pieces.parkRock = new InstancedProp('parkRock', r.parkRockModel, r.parkRockInstances, r.forestAtlas || null)
+        }
+
+        if (!this.pieces.trunk && r.trunkModel && r.trunkInstances) {
+            this.pieces.trunk = new InstancedProp('trunk', r.trunkModel, r.trunkInstances, r.forestAtlas || null)
         }
 
         if (!this.pieces.socialArea && r.socialAreaModel) {
@@ -236,8 +260,15 @@ export default class PatioScene {
         }
 
         // Fallback: build these if they weren't caught by sourceLoaded yet
-        if (!this.pieces.house && r.houseModel && r.houseTexture) {
-            this.pieces.house = new StaticPiece('house', r.houseModel, { map: r.houseTexture })
+        if (!this.pieces.house && r.houseModel) {
+            this.pieces.house = new StaticPiece('house', r.houseModel, {
+                map: r.tinyAtlas || null
+            })
+        }
+        if (!this.pieces.outsideHouseThings && r.outsideHouseThingsModel) {
+            this.pieces.outsideHouseThings = new StaticPiece('outsideHouseThings', r.outsideHouseThingsModel, {
+                map: r.tinyAtlas || null
+            })
         }
         if (!this.pieces.river && r.riverModel) {
             this.pieces.river = new River(r.riverModel)

@@ -57,15 +57,170 @@ body
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    background: #f8f8f7;
+    overflow: hidden;
+    /* cozy pastel sky → meadow */
+    background: linear-gradient(180deg, #eaf4ff 0%, #f3faf1 50%, #dbf0e0 100%);
+}
+
+/* ── Ambient scene: animated day → sunset → night ── */
+.loading-scene {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    --load-cycle: 30s;
+    --orbit-r: 96vh;   /* sun/moon arc radius — big enough to sweep near edges */
+    --orbit-y: -20%;   /* pivot below the horizon so the arc is wide */
+}
+
+/* Sky gradient layers crossfade through the cycle */
+.sky-layer { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
+.sky-day {
+    background: linear-gradient(180deg, #bfe3ff 0%, #e8f6ff 55%, #f3faf1 100%);
+    animation: sky-day var(--load-cycle) linear infinite;
+}
+.sky-sunset {
+    background: linear-gradient(180deg, #ffc59e 0%, #ff9e8a 38%, #ffcf9e 72%, #ffe6c4 100%);
+    animation: sky-sunset var(--load-cycle) linear infinite;
+}
+.sky-night {
+    background: linear-gradient(180deg, #141d3a 0%, #243456 52%, #36546f 100%);
+    animation: sky-night var(--load-cycle) linear infinite;
+}
+@keyframes sky-day    { 0%,12%{opacity:1} 24%{opacity:0} 76%{opacity:0} 90%,100%{opacity:1} }
+@keyframes sky-sunset { 0%,10%{opacity:0} 22%{opacity:1} 36%{opacity:0} 64%{opacity:0} 78%{opacity:1} 90%,100%{opacity:0} }
+@keyframes sky-night  { 0%,34%{opacity:0} 48%{opacity:1} 66%{opacity:1} 80%{opacity:0} 100%{opacity:0} }
+
+/* Sun & moon orbit the horizon together (sun up by day, moon up by night) */
+.loading-celestial {
+    position: absolute;
+    left: 50%;
+    bottom: var(--orbit-y);
+    width: 0;
+    height: 0;
+    will-change: transform;
+    animation: celestial-spin var(--load-cycle) linear infinite;
+}
+@keyframes celestial-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.loading-sun, .loading-moon { position: absolute; left: 0; top: 0; border-radius: 50%; }
+.loading-sun {
+    width: 76px; height: 76px; margin: -38px;
+    transform: translateY(calc(-1 * var(--orbit-r)));
+    background: radial-gradient(circle at 38% 34%, #fff6cf, #ffd96d 58%, #ffc24a);
+    box-shadow: 0 0 50px 8px rgba(255, 206, 92, 0.5);
+}
+.loading-moon {
+    width: 60px; height: 60px; margin: -30px;
+    transform: translateY(var(--orbit-r));
+    /* Soft, near-white body so its edge doesn't read as a grey rim at night. */
+    background: radial-gradient(circle at 42% 40%, #ffffff 0%, #f4f7ff 64%, #e9eefb 100%);
+    box-shadow: 0 0 34px 3px rgba(228, 236, 255, 0.45);
+}
+
+/* Drifting clouds */
+.loading-cloud {
+    position: absolute;
+    width: 132px;
+    height: 46px;
+    background: #ffffff;
+    border-radius: 999px;
+    opacity: 0.9;
+    box-shadow: 0 10px 26px rgba(120, 150, 170, 0.16);
+}
+.loading-cloud::before,
+.loading-cloud::after {
+    content: '';
+    position: absolute;
+    background: #ffffff;
+    border-radius: 50%;
+}
+.loading-cloud::before { width: 58px; height: 58px; top: -26px; left: 22px; }
+.loading-cloud::after  { width: 42px; height: 42px; top: -16px; left: 66px; }
+.loading-cloud.lc1 { top: 18%; transform: scale(0.9);  animation: loading-drift 42s linear infinite; }
+.loading-cloud.lc2 { top: 32%; transform: scale(0.6);  opacity: 0.7; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
+.loading-cloud.lc3 { top: 11%; transform: scale(1.1);  opacity: 0.8; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
+
+@keyframes loading-drift { from { left: -25%; } to { left: 115%; } }
+
+/* Dusk/night veil mutes the sky + clouds as it gets dark */
+.loading-nightveil {
+    position: absolute;
+    inset: 0;
+    background: #131c3a;
+    opacity: 0;
+    will-change: opacity;
+    animation: nightveil var(--load-cycle) linear infinite;
+}
+@keyframes nightveil { 0%,18%{opacity:0} 30%{opacity:.1} 50%{opacity:.4} 70%{opacity:.1} 82%,100%{opacity:0} }
+
+/* Stars (night only) */
+.loading-stars {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    background-image:
+        radial-gradient(1.6px 1.6px at 12% 22%, #fff, transparent),
+        radial-gradient(1.4px 1.4px at 28% 12%, #fff, transparent),
+        radial-gradient(1.8px 1.8px at 42% 28%, #fff, transparent),
+        radial-gradient(1.3px 1.3px at 58% 14%, #fff, transparent),
+        radial-gradient(1.6px 1.6px at 70% 24%, #fff, transparent),
+        radial-gradient(1.4px 1.4px at 84% 10%, #fff, transparent),
+        radial-gradient(1.5px 1.5px at 91% 30%, #fff, transparent),
+        radial-gradient(1.3px 1.3px at 20% 38%, #fff, transparent),
+        radial-gradient(1.5px 1.5px at 50% 40%, #fff, transparent),
+        radial-gradient(1.4px 1.4px at 76% 36%, #fff, transparent),
+        radial-gradient(1.2px 1.2px at 35% 8%, #fff, transparent),
+        radial-gradient(1.3px 1.3px at 64% 42%, #fff, transparent);
+    will-change: opacity;
+    animation: stars-twinkle var(--load-cycle) linear infinite;
+}
+@keyframes stars-twinkle { 0%,34%{opacity:0} 50%{opacity:.95} 66%{opacity:.95} 80%{opacity:0} 100%{opacity:0} }
+
+/* Layered wavy hills (parallax sway + day/night tint) */
+.loading-waves {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 46%;
+}
+.wave { transform-box: fill-box; transform-origin: center bottom; will-change: transform; }
+.wave-1 { fill: #7ec99a; animation: wave-sway-1 11s ease-in-out infinite alternate, wave1-tint var(--load-cycle) linear infinite; }
+.wave-2 { fill: #9fd9af; animation: wave-sway-2 9s  ease-in-out infinite alternate, wave2-tint var(--load-cycle) linear infinite; }
+.wave-3 { fill: #c4e9c8; animation: wave-sway-3 13s ease-in-out infinite alternate, wave3-tint var(--load-cycle) linear infinite; }
+
+@keyframes wave-sway-1 { from { transform: translateX(-16px); } to { transform: translateX(16px); } }
+@keyframes wave-sway-2 { from { transform: translateX(13px); }  to { transform: translateX(-13px); } }
+@keyframes wave-sway-3 { from { transform: translateX(-9px); }   to { transform: translateX(9px); } }
+
+@keyframes wave1-tint { 0%,12%{fill:#7ec99a} 22%{fill:#b8966a} 50%{fill:#1b2c44} 78%{fill:#b8966a} 90%,100%{fill:#7ec99a} }
+@keyframes wave2-tint { 0%,12%{fill:#9fd9af} 22%{fill:#cdaa7d} 50%{fill:#243750} 78%{fill:#cdaa7d} 90%,100%{fill:#9fd9af} }
+@keyframes wave3-tint { 0%,12%{fill:#c4e9c8} 22%{fill:#e3c49c} 50%{fill:#2d4257} 78%{fill:#e3c49c} 90%,100%{fill:#c4e9c8} }
+
+/* Narrow/portrait screens: smaller arc + lower pivot so the sweep reads well. */
+@media (max-width: 760px) {
+    .loading-scene { --orbit-r: 82vh; --orbit-y: -12%; }
+    .loading-sun { width: 62px; height: 62px; margin: -31px; }
+    .loading-moon { width: 50px; height: 50px; margin: -25px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sky-layer, .loading-stars, .loading-celestial, .loading-cloud,
+    .wave, .loading-nightveil { animation: none !important; }
+    .sky-day { opacity: 1; }
+    .loading-sun { transform: translateY(calc(-1 * var(--orbit-r))); }
 }
 
 .cloud-transition-content
 {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 44px;
+    gap: 40px;
     opacity: 0;
     transform: translateY(12px);
     transition: opacity 0.7s ease 0.35s, transform 0.7s ease 0.35s;
@@ -81,12 +236,13 @@ body
 
 .cloud-title
 {
-    font-size: 34px;
-    font-weight: 300;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: rgba(18, 30, 45, 0.6);
+    font-family: 'Fredoka', 'Nunito', 'Quicksand', system-ui, sans-serif;
+    font-size: clamp(40px, 8vw, 56px);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #2f7a52;
     margin: 0;
+    text-shadow: none;
 }
 
 /* ── Button with horizontal fill ── */
@@ -98,22 +254,23 @@ body
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-width: 240px;
-    padding: 20px 68px;
-    border: 1.5px solid rgba(50, 130, 95, 0.18);
-    border-radius: 60px;
-    background: rgba(255, 255, 255, 0.45);
+    min-width: 230px;
+    padding: 18px 56px;
+    border: 1.5px solid rgba(95, 197, 148, 0.45);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    font-family: inherit;
-    font-size: 16px;
+    box-shadow: 0 10px 26px rgba(39, 90, 70, 0.14);
+    font-family: 'Fredoka', 'Nunito', system-ui, sans-serif;
+    font-size: 17px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.06em;
-    color: rgba(25, 45, 55, 0.4);
+    letter-spacing: 0.04em;
+    color: #3f9e6b;
     cursor: default;
     overflow: hidden;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .cloud-btn-fill
@@ -124,13 +281,15 @@ body
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg,
-        rgba(65, 160, 110, 0.07),
-        rgba(100, 190, 80, 0.11)
+        rgba(126, 224, 177, 0.45),
+        rgba(95, 197, 148, 0.6)
     );
     border-radius: inherit;
     pointer-events: none;
     transition: width 0.12s linear;
 }
+
+.cloud-btn.ready .cloud-btn-fill { display: none; }
 
 .cloud-btn-text
 {
@@ -141,12 +300,13 @@ body
 .cloud-btn.ready
 {
     cursor: pointer;
-    color: #1a6b4a;
-    border-color: rgba(50, 140, 95, 0.35);
-    background: rgba(255, 255, 255, 0.55);
-    letter-spacing: 0.12em;
+    color: #ffffff;
+    border-color: transparent;
+    background: linear-gradient(168deg, #5fc594, #41a06e);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     font-variant-numeric: normal;
+    box-shadow: 0 10px 26px rgba(65, 160, 110, 0.3);
     animation: btnPulse 2.5s ease-in-out infinite;
 }
 
@@ -159,9 +319,8 @@ body
 .cloud-btn.ready:hover
 {
     animation: none;
-    background: rgba(255, 255, 255, 0.85);
-    border-color: rgba(50, 140, 95, 0.5);
-    box-shadow: 0 8px 36px rgba(55, 150, 100, 0.14);
+    filter: brightness(1.05);
+    box-shadow: 0 14px 32px rgba(65, 160, 110, 0.34);
     transform: translateY(-2px);
 }
 

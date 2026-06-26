@@ -98,21 +98,27 @@ const allSources = [
         type: 'textureKtx',
         path: '/texture/Atlas-textures/Sushi_Atlas.ktx2',
         modifier: colorTextureModifier,
-        priority: 'decorative'   // only fence + social-area use it (both decorative)
+        priority: 'decorative'   // social-area + social-entrance
+    },
+    {
+        name: 'tinyAtlas',
+        type: 'textureKtx',
+        path: '/texture/Atlas-textures/Tiny_Atlas.ktx2',
+        modifier: colorTextureModifier,
+        priority: 'decorative'
     },
 
     // ─── House ────────────────────────────────────────── decorative (pops in)
     {
         name: 'houseModel',
         type: 'gltfModel',
-        path: '/models/house/house-compressed.glb',
+        path: '/models/house/house_compressed.glb',
         priority: 'decorative'
     },
     {
-        name: 'houseTexture',
-        type: 'textureKtx',
-        path: '/models/house/house-texture.ktx2',
-        modifier: colorTextureModifier,
+        name: 'outsideHouseThingsModel',
+        type: 'gltfModel',
+        path: '/models/house/outside-house/outside-house-things-compressed.glb',
         priority: 'decorative'
     },
 
@@ -200,6 +206,30 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        name: 'parkRockModel',
+        type: 'gltfModel',
+        path: '/models/park-things/park-rock/park-rock-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'parkRockInstances',
+        type: 'json',
+        path: '/models/park-things/park-rock/park-rock-references.json',
+        priority: 'decorative'
+    },
+    {
+        name: 'trunkModel',
+        type: 'gltfModel',
+        path: '/models/park-things/trunk/trunk-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'trunkInstances',
+        type: 'json',
+        path: '/models/park-things/trunk/trunk-references.json',
+        priority: 'decorative'
+    },
+    {
         name: 'socialAreaModel',
         type: 'gltfModel',
         path: '/models/social-area/social-area-compressed.glb',
@@ -269,6 +299,11 @@ const allSources = [
 
     // ─── Activities / characters ──────────────────────────────────
     {
+        // NOTE: loads the UNCOMPRESSED glb on purpose. This file is just an
+        // empty marker node (the "Freesby-minigame-point" anchor, no mesh), and
+        // Draco compression drops node-only glbs entirely — the compressed
+        // sibling ends up with zero nodes, so the anchor would never resolve.
+        // The raw file is < 1 KB, so there is nothing to gain from compressing.
         name: 'activitiesPointsModel',
         type: 'gltfModel',
         path: '/models/activities/activities-points.glb'
@@ -343,18 +378,18 @@ const allSources = [
     },
     {
         name: 'abedulTreeReferences',
-        type: 'gltfModel',
-        path: '/models/trees/Abedul-tree/Abedul-tree-references-compressed.glb'
+        type: 'json',
+        path: '/models/trees/Abedul-tree/abedul-tree-references.json'
     },
     {
         name: 'normalTreeReferences',
-        type: 'gltfModel',
-        path: '/models/trees/Normal-tree/Normal-tree-references-compressed.glb'
+        type: 'json',
+        path: '/models/trees/Normal-tree/normal-tree-references.json'
     },
     {
         name: 'oldTreeReferences',
-        type: 'gltfModel',
-        path: '/models/trees/Old-tree/Old-tree-references-compressed.glb'
+        type: 'json',
+        path: '/models/trees/Old-tree/old-tree-references.json'
     }
 ]
 

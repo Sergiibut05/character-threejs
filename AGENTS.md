@@ -182,6 +182,28 @@ src/
 
 ---
 
+## UI Adaptativa por Input (convención)
+
+La app se juega con **teclado, móvil (táctil) y mando**. El dispositivo activo se rastrea en
+`experience.input` (`Utils/InputDevice.js`, valores `'keyboard' | 'gamepad' | 'touch'`). Reglas
+para CUALQUIER modal/overlay/prompt (ver `my-portfolio/UI_INPUT_PLAN.md`):
+
+1. **El dispositivo manda el glifo**: cualquier "pulsa para X" muestra el botón del **dispositivo
+   activo** mediante `World/ui/InputGlyph.js` (`inputGlyph(action)`). **Nunca** hardcodear "Enter"
+   ni un botón fijo. Acciones semánticas: `confirm, back, sprint, move, aim, tilt, interact,
+   continue, power`. Mapeo: `confirm`=A/Enter/tap, `back`=B/Esc, `sprint`=X(RB)/Shift,
+   `move/aim/tilt`=stick/WASD-◀▶/joystick.
+2. **Móvil = táctil directo**: en `touch` los modales/botones se **tocan**; no se muestran glifos de
+   "pulsa el botón tal" y los **controles virtuales se ocultan** mientras hay un modal abierto
+   (`MobileControls.update` los oculta si existe `.fz-modal-overlay.is-open`).
+3. **Mando/teclado = navegables**: con un modal abierto se navega (dpad/stick/flechas) y se activa
+   con `confirm`; `back` cierra (`GamepadControls._navigateModals`).
+4. **Texto explicativo dinámico**: cualquier texto que mencione controles (tutorial, ayudas) se
+   construye con glifos/labels del dispositivo activo y **cambia** al cambiar de dispositivo
+   (suscribirse a `experience.input.onChange`).
+5. **Glifos**: gamepad = botones redondos con color Xbox (A verde, B rojo, X azul, Y oro); teclado =
+   "keycaps"; táctil = icono de toque/joystick. Todo bajo los tokens de `ui.css` (`.fz-glyph*`).
+
 ## Sistema de Documentación Three.js
 
 Cuando trabajemos con Three.js, se utiliza automáticamente la documentación incluida en `llms-full.txt` del proyecto. Este archivo contiene:

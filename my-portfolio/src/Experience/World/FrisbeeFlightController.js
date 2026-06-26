@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
 /**
  * Simulated frisbee flight — Wii Sports Resort style.
@@ -30,7 +31,13 @@ export default class FrisbeeFlightController {
         this.airDrag = 0.55
         this.spinSpeed = 14
         this.groundY = 0.08
-        this.curveStrength = 6.0
+        // Lateral curve modelled as a capped heading rotation (rad/s at full
+        // tilt). Rotating the velocity instead of pushing it sideways keeps the
+        // speed constant, and capping the TOTAL turn stops a strong curve from
+        // spiralling the disc into an endless loop as air drag slows it down.
+        this.curveRate = 0.95
+        this.maxCurveTurn = Math.PI * 0.42 // ~75°
+        this._curveTurn = 0
 
         // Hand offset — shifted along bone-local X to hold from the edge, not center
         this.handOffset = new THREE.Vector3(0.18, 0.04, 0.07)
@@ -49,22 +56,32 @@ export default class FrisbeeFlightController {
     setupMesh() {
         const gltf = this.resources.items.frisbeeModel
         if (!gltf) return
-        if (this.mesh) return
 
-        this.mesh = gltf.scene.clone()
-        this.mesh.scale.set(0.78, 0.78, 0.78)
+        // Clone the disc once. This runs again when frisbeeTexture streams in
+        // (it can arrive AFTER the model), so we must keep the mesh but re-apply
+        // the material so the texture isn't lost to an early return.
+        if (!this.mesh) {
+            this.mesh = gltf.scene.clone()
+            this.mesh.scale.set(0.78, 0.78, 0.78)
+            this.mesh.visible = false
+            this.scene.add(this.mesh)
+        }
 
         const tex = this.resources.items.frisbeeTexture
+        this._textured = !!tex
         this.mesh.traverse((child) => {
             if (!child.isMesh) return
-            if (tex) {
-                child.material = new THREE.MeshLambertMaterial({ map: tex })
-            }
+            // Legacy MeshLambertMaterial does not bind the compressed KTX2 map
+            // under WebGPU — use the project's TSL node material (texture node)
+            // so the disc actually shows its texture.
+            const old = child.material
+            child.material = createStylizedPropNodeMaterial({
+                map: tex || old?.map || null,
+                color: 0xffffff
+            })
             child.castShadow = true
+            old?.dispose?.()
         })
-
-        this.mesh.visible = false
-        this.scene.add(this.mesh)
     }
 
     // ─── Hand attachment ─────────────────────────────────────────────────
@@ -114,6 +131,7 @@ export default class FrisbeeFlightController {
         this.position.copy(origin)
         this.velocity.copy(direction).multiplyScalar(speed)
         this.curveAmount = tiltAngle || 0
+        this._curveTurn = 0
         this.flightTime = 0
         this._spinAngle = 0
         this.active = true
@@ -149,16 +167,18 @@ export default class FrisbeeFlightController {
         // Gravity
         this.velocity.y -= this.gravity * dt
 
-        // Lateral curve
-        if (Math.abs(this.curveAmount) > 0.01) {
-            const hSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2)
-            if (hSpeed > 0.1) {
-                const perpX = -this.velocity.z / hSpeed
-                const perpZ = this.velocity.x / hSpeed
-                const curveMag = this.curveAmount * this.curveStrength * dt
-                this.velocity.x += perpX * curveMag
-                this.velocity.z += perpZ * curveMag
-            }
+        // Lateral curve — rotate the horizontal heading by a capped amount.
+        if (Math.abs(this.curveAmount) > 0.01 && Math.abs(this._curveTurn) < this.maxCurveTurn) {
+            let dTheta = this.curveAmount * this.curveRate * dt
+            const remaining = this.maxCurveTurn - Math.abs(this._curveTurn)
+            if (Math.abs(dTheta) > remaining) dTheta = Math.sign(dTheta) * remaining
+            this._curveTurn += dTheta
+            const c = Math.cos(dTheta)
+            const s = Math.sin(dTheta)
+            const vx = this.velocity.x
+            const vz = this.velocity.z
+            this.velocity.x = vx * c - vz * s
+            this.velocity.z = vx * s + vz * c
         }
 
         // Integrate position
@@ -191,6 +211,7 @@ export default class FrisbeeFlightController {
         const curve = tiltAngle || 0
         const step = 1 / 60
         let time = 0
+        let turn = 0
 
         for (let i = 0; i < 600; i++) {
             time += step
@@ -200,14 +221,19 @@ export default class FrisbeeFlightController {
             vel.z *= drag
             vel.y -= this.gravity * step
 
-            if (Math.abs(curve) > 0.01) {
-                const hSpeed = Math.sqrt(vel.x ** 2 + vel.z ** 2)
-                if (hSpeed > 0.1) {
-                    const perpX = -vel.z / hSpeed
-                    const perpZ = vel.x / hSpeed
-                    vel.x += perpX * curve * this.curveStrength * step
-                    vel.z += perpZ * curve * this.curveStrength * step
-                }
+            // Same capped heading rotation as update() so the dog runs to the
+            // spot the disc actually reaches.
+            if (Math.abs(curve) > 0.01 && Math.abs(turn) < this.maxCurveTurn) {
+                let dTheta = curve * this.curveRate * step
+                const remaining = this.maxCurveTurn - Math.abs(turn)
+                if (Math.abs(dTheta) > remaining) dTheta = Math.sign(dTheta) * remaining
+                turn += dTheta
+                const c = Math.cos(dTheta)
+                const s = Math.sin(dTheta)
+                const vx = vel.x
+                const vz = vel.z
+                vel.x = vx * c - vz * s
+                vel.z = vx * s + vz * c
             }
 
             pos.x += vel.x * step

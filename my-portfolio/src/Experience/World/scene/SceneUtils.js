@@ -116,6 +116,30 @@ export function blenderTransformToMatrix(position, eulerXYZ, scale, target = new
 }
 
 /**
+ * Convert a references JSON ({ instances: [{ position, rotation, scale }] }) into
+ * an array of lightweight THREE.Object3D whose transform is the Blender→Three
+ * converted placement. Used by reference-driven consumers (Trees, FakeShadow)
+ * that expect Object3D nodes rather than raw matrices.
+ *
+ * Keeps `matrixAutoUpdate` on and writes position/quaternion/scale so any later
+ * `updateWorldMatrix()` reproduces the exact same matrix.
+ */
+export function jsonInstancesToObjects(json, rotationMode) {
+    const list = json?.instances || []
+    const out = []
+    const m = new THREE.Matrix4()
+    for (const inst of list) {
+        blenderTransformToMatrix(inst.position, inst.rotation, inst.scale, m, rotationMode)
+        const obj = new THREE.Object3D()
+        m.decompose(obj.position, obj.quaternion, obj.scale)
+        obj.updateMatrix()
+        obj.updateMatrixWorld(true)
+        out.push(obj)
+    }
+    return out
+}
+
+/**
  * Replace the material of every mesh inside a scene/group with a shared
  * MeshLambertNodeMaterial (core shadow + shadow map) that reuses the provided map.
  */
@@ -145,6 +169,59 @@ export function applyAtlasMaterial(root, map, options = {}) {
     })
 
     return material
+}
+
+/**
+ * De-quantize a single NORMALIZED integer BufferAttribute into a plain Float32
+ * attribute (denormalized values, e.g. -1..1 or 0..1). Returns the new
+ * attribute, or the original when it is already a non-normalized float.
+ */
+function dequantizeAttribute(attr) {
+    if (!attr || !attr.normalized) return attr
+    const { count, itemSize } = attr
+    const out = new Float32Array(count * itemSize)
+    // getX..getW denormalize internally when the attribute is normalized.
+    const getters = [attr.getX, attr.getY, attr.getZ, attr.getW]
+    for (let i = 0; i < count; i++) {
+        for (let c = 0; c < itemSize; c++) {
+            out[i * itemSize + c] = getters[c].call(attr, i)
+        }
+    }
+    return new THREE.BufferAttribute(out, itemSize)
+}
+
+/**
+ * De-quantize every NORMALIZED integer attribute of a geometry (position,
+ * normal, uv, …) into plain Float32 attributes.
+ *
+ * GLBs exported with KHR_mesh_quantization store vertex data as NORMALIZED
+ * integers (e.g. SHORT positions in ±32767, Uint16 UVs in 0..65535). The legacy
+ * WebGL pipeline denormalizes those on the GPU automatically, but this project's
+ * WebGPU/TSL path reads the raw integer values: UVs sample a single texel
+ * (texture looks invisible), and — worse — POSITIONs land at ±32767×scale, so
+ * the mesh is rendered astronomically large while its (correctly denormalized)
+ * bounding sphere stays small, getting it frustum-culled → nothing shows.
+ *
+ * Converting once on the CPU makes the geometry behave like any non-quantized
+ * model. No-op for attributes that are already non-normalized floats.
+ */
+export function dequantizeGeometry(geometry) {
+    if (!geometry?.attributes) return
+    for (const name of Object.keys(geometry.attributes)) {
+        const attr = geometry.attributes[name]
+        if (attr.normalized) geometry.setAttribute(name, dequantizeAttribute(attr))
+    }
+    geometry.computeBoundingBox()
+    geometry.computeBoundingSphere()
+}
+
+/**
+ * Back-compat alias: de-quantize only the UV attribute.
+ * @deprecated use {@link dequantizeGeometry}
+ */
+export function dequantizeUV(geometry) {
+    const uv = geometry?.attributes?.uv
+    if (uv?.normalized) geometry.setAttribute('uv', dequantizeAttribute(uv))
 }
 
 /**

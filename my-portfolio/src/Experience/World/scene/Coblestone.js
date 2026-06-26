@@ -1,72 +1,26 @@
 /**
  * Coblestone — single-mesh InstancedMesh placed via `coblestone_instances.json`.
  *
- * No physics; stylized Standard material for soft highlights. The JSON file
- * stores raw Blender Z-up matrices so we convert each transform on the fly.
+ * No cast shadow; stylized material that reuses the GLB's own base colour. The
+ * JSON stores raw Blender Z-up matrices (rotation included, like the Fence) so
+ * InstancedFromJSON converts each transform on the fly.
  */
 import * as THREE from 'three'
-import Experience from '../../Experience.js'
-import { blenderTransformToMatrix, findMesh } from './SceneUtils.js'
+import InstancedFromJSON from './InstancedFromJSON.js'
 import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 
-const _matrix = new THREE.Matrix4()
-
-export default class Coblestone {
+export default class Coblestone extends InstancedFromJSON {
     constructor(gltf, instances) {
-        this.experience = new Experience()
-        this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
-        this.instancesData = instances?.instances || []
-
-        if (!gltf || !gltf.scene) {
-            console.warn('Coblestone: missing gltf.scene')
-            return
-        }
-        if (this.instancesData.length === 0) {
-            console.warn('Coblestone: no instances in JSON')
-            return
-        }
-
-        const sourceMesh = findMesh(gltf.scene, (m) => m.name.startsWith('cobble_stones'))
-            || findMesh(gltf.scene, () => true)
-
-        if (!sourceMesh) {
-            console.warn('Coblestone: no source mesh found in glb')
-            return
-        }
-
-        const oldMat = sourceMesh.material
-        const baseColor = oldMat?.color?.clone?.() || new THREE.Color(0xab8268)
-        oldMat?.dispose?.()
-
-        this.material = createStylizedPropNodeMaterial({
-            color: baseColor,
-            map: oldMat?.map || null
+        super('Coblestone', gltf, instances, {
+            singleMesh: true,
+            meshFilter: (m) => m.name.startsWith('cobble_stones'),
+            materialFactory: (tpl) =>
+                createStylizedPropNodeMaterial({
+                    color: tpl.material?.color?.clone?.() || new THREE.Color(0xab8268),
+                    map: tpl.material?.map || null
+                }),
+            castShadow: false,
+            dynamic: true
         })
-
-        this.instanced = new THREE.InstancedMesh(
-            sourceMesh.geometry,
-            this.material,
-            this.instancesData.length
-        )
-        this.instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-        this.instanced.castShadow = false
-        this.instanced.receiveShadow = !this.isLow
-        this.instanced.name = 'Coblestone'
-
-        this.rebuildMatrices()
-        this.scene.add(this.instanced)
-        console.log(`✅ Coblestone: ${this.instancesData.length} instances`)
-    }
-
-    rebuildMatrices(rotationMode) {
-        if (!this.instanced) return
-        for (let i = 0; i < this.instancesData.length; i++) {
-            const inst = this.instancesData[i]
-            blenderTransformToMatrix(inst.position, inst.rotation, inst.scale, _matrix, rotationMode)
-            this.instanced.setMatrixAt(i, _matrix)
-        }
-        this.instanced.instanceMatrix.needsUpdate = true
-        this.instanced.computeBoundingSphere?.()
     }
 }

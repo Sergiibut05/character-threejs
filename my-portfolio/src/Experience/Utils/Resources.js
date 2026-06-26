@@ -112,10 +112,20 @@ export default class Resources extends EventEmitter {
             return
         }
 
+        // On error we still call sourceLoaded(null) so the critical counter
+        // advances and 'ready' can never stall on a single bad asset. The error
+        // is logged loudly so missing/404 assets are obvious in the console.
+        const onError = (err) => {
+            console.error(`Resources: failed to load ${source.type} "${source.name}" @ ${source.path}`, err)
+            this.sourceLoaded(source, null)
+        }
+
         if (source.type === 'gltfModel') {
             this.loaders.gltfLoader.load(
                 source.path,
-                (file) => { this.sourceLoaded(source, file) }
+                (file) => { this.sourceLoaded(source, file) },
+                undefined,
+                onError
             )
         }
         else if (source.type === 'texture') {
@@ -124,7 +134,9 @@ export default class Resources extends EventEmitter {
                 (file) => {
                     if (source.modifier) source.modifier(file)
                     this.sourceLoaded(source, file)
-                }
+                },
+                undefined,
+                onError
             )
         }
         else if (source.type === 'textureKtx') {
@@ -133,13 +145,17 @@ export default class Resources extends EventEmitter {
                 (file) => {
                     if (source.modifier) source.modifier(file)
                     this.sourceLoaded(source, file)
-                }
+                },
+                undefined,
+                onError
             )
         }
         else if (source.type === 'cubeTexture') {
             this.loaders.cubeTextureLoader.load(
                 source.path,
-                (file) => { this.sourceLoaded(source, file) }
+                (file) => { this.sourceLoaded(source, file) },
+                undefined,
+                onError
             )
         }
         else if (source.type === 'json') {
@@ -173,7 +189,11 @@ export default class Resources extends EventEmitter {
         }
 
         // Fire per-source event so consumers can lazy-instantiate decorative pieces.
-        this.trigger('sourceLoaded', [source.name, file])
+        try {
+            this.trigger('sourceLoaded', [source.name, file])
+        } catch (err) {
+            console.error(`Resources: a "sourceLoaded" listener threw for ${source.name}`, err)
+        }
 
         if (!this.criticalDone && this.criticalLoaded === this.criticalToLoad) {
             this._onCriticalDone()
@@ -186,7 +206,12 @@ export default class Resources extends EventEmitter {
 
     _onCriticalDone() {
         this.criticalDone = true
-        this.trigger('ready')
+        // A throwing 'ready' listener must NOT prevent decorative streaming.
+        try {
+            this.trigger('ready')
+        } catch (err) {
+            console.error('Resources: a "ready" listener threw', err)
+        }
         // Kick off decorative AFTER critical is done so it doesn't slow it.
         this.startLoadingDecorative()
     }

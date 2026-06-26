@@ -1,0 +1,1232 @@
+/*
+ * Reusable game UI — Animal Crossing + Wii Sports Resort flavour.
+ *
+ * Two coherent visual families under ONE set of tokens (see plan §5):
+ *   - .fz-modal--clean : glass-pastel, rounded, soft — for menus / action UI.
+ *   - .fz-modal--paper : a REFINED letter/paper feel (subtle warm tint, no
+ *                        harsh ruled lines) — for narrative modals.
+ *
+ * Everything is prefixed `fz-` so it never clashes with the legacy `.quality-*`
+ * notebook modal. Imported once from ui/Modal.js (Vite injects it).
+ */
+
+:root {
+    --fz-font-title: 'Fredoka', 'Nunito', 'Quicksand', system-ui, sans-serif;
+    --fz-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* Pastel palette (from style.css tokens) */
+    --fz-cream: #f8fbfa;
+    --fz-green-50: #f2f9f7;
+    --fz-green-100: #d7f2e4;
+    --fz-green-200: #9be4ca;
+    --fz-green-400: #5fc594;
+    --fz-green-500: #41a06e;
+    --fz-ink: #234b3a;
+    --fz-ink-soft: rgba(42, 90, 76, 0.66);
+    --fz-gold: #ffd426;
+    --fz-blue: #5a8af5;
+    --fz-red: #ff6b6b;
+
+    --fz-radius: 22px;
+    --fz-radius-sm: 15px;
+    --fz-radius-pill: 999px;
+    --fz-shadow: 0 18px 44px rgba(39, 90, 70, 0.18), 0 6px 14px rgba(60, 100, 80, 0.09);
+    --fz-shadow-soft: 0 8px 18px rgba(39, 90, 70, 0.12);
+    --fz-z: 2700;
+}
+
+/* ─── Overlay ─────────────────────────────────────────────────────────── */
+.fz-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--fz-z);
+    display: grid;
+    place-items: safe center;
+    padding: max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+    background: rgba(238, 248, 244, 0.42);
+    backdrop-filter: blur(11px);
+    -webkit-backdrop-filter: blur(11px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.26s ease, visibility 0.26s;
+}
+
+.fz-modal-overlay.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* ─── Panel ───────────────────────────────────────────────────────────── */
+.fz-modal {
+    position: relative;
+    width: min(400px, 93vw);
+    box-sizing: border-box;
+    padding: 30px 26px 26px;
+    border-radius: var(--fz-radius);
+    font-family: var(--fz-font-body);
+    color: var(--fz-ink);
+    box-shadow: var(--fz-shadow);
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+    transition: transform 0.32s cubic-bezier(0.22, 1.2, 0.36, 1), opacity 0.24s ease;
+}
+
+.fz-modal-overlay.is-open .fz-modal {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.fz-modal--clean {
+    background: linear-gradient(168deg, #ffffff 0%, var(--fz-green-50) 100%);
+    border: 1.5px solid rgba(120, 195, 160, 0.36);
+}
+
+.fz-modal--paper {
+    background: linear-gradient(165deg, #fffefb 0%, #f7faf6 55%, #f1f7f1 100%);
+    border: 1.5px solid rgba(150, 175, 150, 0.32);
+}
+
+.fz-modal--center .fz-modal-title {
+    text-align: center;
+    margin: 2px 8px 8px;
+}
+
+.fz-modal--center .fz-modal-subtitle {
+    text-align: center;
+}
+
+.fz-modal--lg {
+    width: min(470px, 94vw);
+    padding: 38px 32px 30px;
+}
+
+.fz-modal--lg .fz-modal-title {
+    font-size: 30px;
+    text-align: center;
+    margin: 2px 0 10px;
+}
+
+.fz-modal--lg .fz-modal-subtitle {
+    text-align: center;
+    margin: 0 0 18px;
+}
+
+.fz-modal--lg .fz-result-total {
+    font-size: 76px;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────── */
+.fz-modal-title {
+    margin: 2px 32px 6px 2px;
+    font-family: var(--fz-font-title);
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 1.15;
+    color: var(--fz-ink);
+}
+
+.fz-modal-subtitle {
+    margin: 0 2px 20px;
+    font-size: 16.5px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--fz-ink-soft);
+}
+
+.fz-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(120, 175, 145, 0.12);
+    color: rgba(42, 75, 58, 0.55);
+    font-size: 19px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.fz-modal-close:hover {
+    background: rgba(120, 175, 145, 0.22);
+    color: rgba(42, 75, 58, 0.9);
+    transform: scale(1.06);
+}
+
+.fz-modal-close:focus-visible {
+    outline: 2px solid var(--fz-green-400);
+    outline-offset: 2px;
+}
+
+.fz-modal-body {
+    display: block;
+}
+
+/* Adaptive hint bar (gamepad/keyboard nav legend; hidden on touch) */
+.fz-modal-hints {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 18px;
+    padding-top: 13px;
+    border-top: 1px solid rgba(120, 185, 150, 0.26);
+}
+
+.fz-modal-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--fz-font-body);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--fz-ink-soft);
+}
+
+/* ─── Cards (mode select / choices) ───────────────────────────────────── */
+.fz-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.fz-card {
+    appearance: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    padding: 22px 14px 18px;
+    border-radius: var(--fz-radius-sm);
+    cursor: pointer;
+    text-align: center;
+    font-family: var(--fz-font-body);
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.62);
+    border: 1.5px solid rgba(120, 185, 150, 0.34);
+    box-shadow: var(--fz-shadow-soft);
+    transition: transform 0.18s cubic-bezier(0.22, 1.2, 0.36, 1),
+        background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.fz-card:hover,
+.fz-card:focus {
+    outline: none;
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--fz-green-400);
+    box-shadow: 0 14px 26px rgba(39, 90, 70, 0.16);
+}
+
+/* Stronger ring for the nav-focused card (gamepad/keyboard) */
+.fz-card:focus {
+    box-shadow: 0 14px 26px rgba(39, 90, 70, 0.16), 0 0 0 3px rgba(95, 197, 148, 0.45);
+}
+
+.fz-card:active {
+    transform: translateY(-1px) scale(0.98);
+}
+
+.fz-card-icon {
+    display: flex;
+    line-height: 0;
+    filter: drop-shadow(0 2px 3px rgba(40, 90, 70, 0.16));
+}
+
+.fz-card-icon svg {
+    width: 54px;
+    height: 54px;
+}
+
+.fz-card-title {
+    font-family: var(--fz-font-title);
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.fz-card-desc {
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--fz-ink-soft);
+}
+
+/* ─── Buttons (pill) ──────────────────────────────────────────────────── */
+.fz-btn {
+    appearance: none;
+    font-family: var(--fz-font-title);
+    font-size: 17px;
+    font-weight: 600;
+    padding: 13px 26px;
+    border-radius: var(--fz-radius-pill);
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: transform 0.16s ease, filter 0.16s ease, background 0.16s ease;
+}
+
+.fz-btn:hover { filter: brightness(1.04); transform: translateY(-1px); }
+.fz-btn:active { transform: translateY(0) scale(0.98); }
+.fz-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(95, 197, 148, 0.5); }
+
+.fz-btn--primary {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(65, 160, 110, 0.32);
+}
+
+.fz-btn--ghost {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(120, 185, 150, 0.4);
+    color: var(--fz-ink);
+}
+
+/* ─── HUD (round + score, top-left) ───────────────────────────────────── */
+.fz-hud {
+    position: fixed;
+    top: max(18px, env(safe-area-inset-top));
+    left: max(18px, env(safe-area-inset-left));
+    z-index: 2500;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 18px 22px 19px;
+    min-width: 214px;
+    border-radius: 22px;
+    font-family: var(--fz-font-title);
+    color: var(--fz-ink);
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.9), rgba(242, 249, 247, 0.84));
+    border: 1.5px solid rgba(120, 195, 160, 0.42);
+    box-shadow: var(--fz-shadow);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-hud.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Standalone exit button — top-right, sits under the settings gear. */
+.fz-hud-leave {
+    position: fixed;
+    top: 74px;
+    right: max(18px, env(safe-area-inset-right));
+    z-index: 2500;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(120, 185, 150, 0.42);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--fz-ink);
+    cursor: pointer;
+    box-shadow: var(--fz-shadow-soft);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1.2, 0.36, 1),
+        background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.fz-hud-leave.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.fz-hud-leave:hover {
+    background: rgba(255, 120, 120, 0.14);
+    border-color: rgba(255, 120, 120, 0.5);
+    color: var(--fz-red);
+}
+
+.fz-hud-leave:focus-visible {
+    outline: 2px solid var(--fz-green-400);
+    outline-offset: 2px;
+}
+
+.fz-hud-leave-icon {
+    display: flex;
+    line-height: 0;
+}
+
+.fz-hud-leave-icon svg {
+    width: 21px;
+    height: 21px;
+}
+
+.fz-hud-top {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.fz-hud-icon {
+    display: flex;
+    line-height: 0;
+}
+
+.fz-hud-icon svg {
+    width: 30px;
+    height: 30px;
+}
+
+.fz-hud-round {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--fz-ink);
+}
+
+/* Progress pips */
+.fz-hud-pips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.fz-hud-pip {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: rgba(120, 175, 145, 0.2);
+    border: 1.5px solid rgba(120, 175, 145, 0.3);
+    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.fz-hud-pip.is-balloon {
+    border-color: rgba(255, 120, 100, 0.55);
+}
+
+.fz-hud-pip.is-done {
+    background: var(--fz-green-400);
+    border-color: var(--fz-green-500);
+}
+
+/* Completed-round outcome (set later → wins over the generic .is-done) */
+.fz-hud-pip.res-hit {
+    background: var(--fz-green-400);
+    border-color: var(--fz-green-500);
+}
+
+.fz-hud-pip.res-bull {
+    background: var(--fz-gold);
+    border-color: #e8a200;
+}
+
+.fz-hud-pip.res-miss {
+    background: rgba(255, 120, 110, 0.32);
+    border-color: rgba(230, 95, 85, 0.6);
+}
+
+/* Balloon popped that round — a bright badge ring, visible on any fill */
+.fz-hud-pip.res-balloon {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(255, 180, 40, 0.7);
+}
+
+.fz-hud-pip.is-current {
+    transform: scale(1.45);
+    background: #fff;
+    border-color: var(--fz-green-500);
+    box-shadow: 0 0 0 3px rgba(95, 197, 148, 0.28);
+    animation: fz-pip-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes fz-pip-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(95, 197, 148, 0.28); }
+    50% { box-shadow: 0 0 0 5px rgba(95, 197, 148, 0.14); }
+}
+
+.fz-hud-score {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.fz-hud-score-label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--fz-ink-soft);
+}
+
+.fz-hud-score-value {
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--fz-green-500);
+    transition: transform 0.18s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
+.fz-hud-score-value.is-bumped {
+    transform: scale(1.18);
+}
+
+/* ─── Results screen ──────────────────────────────────────────────────── */
+.fz-result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0 18px;
+}
+
+.fz-result-label {
+    font-family: var(--fz-font-body);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--fz-ink-soft);
+}
+
+.fz-result-total {
+    font-family: var(--fz-font-title);
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--fz-green-500);
+    text-shadow: 0 3px 0 rgba(65, 160, 110, 0.16);
+}
+
+.fz-result-sub {
+    font-family: var(--fz-font-body);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fz-ink-soft);
+    margin-top: 4px;
+}
+
+.fz-btn-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 6px;
+}
+
+/* ─── Stepper (tutorial) ──────────────────────────────────────────────── */
+.fz-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 4px 2px 6px;
+}
+
+.fz-step-icon {
+    display: flex;
+    line-height: 0;
+    filter: drop-shadow(0 3px 5px rgba(40, 90, 70, 0.16));
+}
+
+.fz-step-icon svg {
+    width: 76px;
+    height: 76px;
+}
+
+/* Hero screenshot — natural aspect, capped, rounded. */
+.fz-step-media {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 2px;
+    min-height: 4px;
+}
+
+.fz-step-img {
+    display: block;
+    max-width: 100%;
+    max-height: 210px;
+    width: auto;
+    height: auto;
+    border-radius: 16px;
+    border: 1.5px solid rgba(120, 185, 150, 0.38);
+    box-shadow: var(--fz-shadow-soft);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.fz-step-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin: 6px 0 0;
+    font-family: var(--fz-font-title);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--fz-ink);
+}
+
+.fz-step-title-icon {
+    display: inline-flex;
+    line-height: 0;
+}
+
+.fz-step-title-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.fz-step-text {
+    margin: 0;
+    font-size: 15.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--fz-ink-soft);
+    max-width: 30ch;
+}
+
+.fz-step-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 14px 0 18px;
+}
+
+.fz-step-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: rgba(120, 175, 145, 0.25);
+    transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.fz-step-dot.is-done { background: var(--fz-green-400); }
+
+.fz-step-dot.is-active {
+    background: var(--fz-green-500);
+    transform: scale(1.35);
+}
+
+/* ─── Help "?" button (top-right, under the exit button) ──────────────── */
+.fz-hud-help {
+    position: fixed;
+    top: 130px;
+    right: max(18px, env(safe-area-inset-right));
+    z-index: 2500;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(120, 185, 150, 0.42);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--fz-green-500);
+    cursor: pointer;
+    box-shadow: var(--fz-shadow-soft);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.9);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1.2, 0.36, 1),
+        background 0.16s ease, border-color 0.16s ease;
+}
+
+.fz-hud-help.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.fz-hud-help:hover {
+    background: rgba(95, 197, 148, 0.16);
+    border-color: var(--fz-green-400);
+}
+
+.fz-hud-help:focus-visible {
+    outline: 2px solid var(--fz-green-400);
+    outline-offset: 2px;
+}
+
+.fz-hud-help-icon { display: flex; line-height: 0; }
+.fz-hud-help-icon svg { width: 22px; height: 22px; }
+
+/* ─── Announce (cinematic round/Start text) ───────────────────────────── */
+.fz-announce {
+    position: fixed;
+    inset: 0;
+    z-index: 2400;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+
+.fz-announce-text {
+    font-family: var(--fz-font-title);
+    font-size: clamp(42px, 9vw, 88px);
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow:
+        0 3px 0 rgba(65, 160, 110, 0.55),
+        0 10px 26px rgba(39, 90, 70, 0.4);
+    opacity: 0;
+    transform: scale(0.5) translateY(14px);
+}
+
+.fz-announce.is-playing .fz-announce-text {
+    animation: fz-announce-pop 1.9s cubic-bezier(0.22, 1.3, 0.36, 1);
+}
+
+@keyframes fz-announce-pop {
+    0% { opacity: 0; transform: scale(0.5) translateY(14px); }
+    11% { opacity: 1; transform: scale(1.1) translateY(0); }
+    20% { transform: scale(1) translateY(0); }
+    80% { opacity: 1; transform: scale(1) translateY(0); }
+    100% { opacity: 0; transform: scale(1.04) translateY(-10px); }
+}
+
+/* ─── Hint ("Pulsa para continuar") ───────────────────────────────────── */
+.fz-hint {
+    position: fixed;
+    left: 50%;
+    bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
+    transform: translate(-50%, 12px);
+    z-index: 2450;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 22px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.82);
+    border: 1.5px solid rgba(120, 195, 160, 0.42);
+    box-shadow: var(--fz-shadow-soft);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-hint.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    animation: fz-hint-bob 1.6s ease-in-out infinite;
+}
+
+@keyframes fz-hint-bob {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, -5px); }
+}
+
+/* ─── Input glyphs (button hints, adaptive per device) ────────────────── */
+.fz-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    font-family: var(--fz-font-title);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: middle;
+    border-radius: 7px;
+    user-select: none;
+}
+
+/* Gamepad face buttons — round, Xbox colours */
+.fz-glyph--pad {
+    width: 24px;
+    padding: 0;
+    border-radius: 50%;
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(39, 90, 70, 0.22);
+}
+.fz-glyph--a { background: #34a85d; }
+.fz-glyph--b { background: #d85a5a; }
+.fz-glyph--x { background: #4f7fe0; }
+.fz-glyph--y { background: #e8b22e; }
+.fz-glyph--stick { background: var(--fz-green-500); }
+
+/* Keyboard keycap */
+.fz-glyph--key {
+    padding: 0 9px;
+    color: var(--fz-ink);
+    background: #fff;
+    border: 1.5px solid rgba(120, 185, 150, 0.55);
+    box-shadow: 0 2px 0 rgba(120, 185, 150, 0.4);
+    font-size: 12.5px;
+}
+
+/* Touch (tap) */
+.fz-glyph--touch {
+    width: 24px;
+    padding: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--fz-green-500);
+}
+
+/* ─── Start emblem (leaf) — logo that opens into a titled panel ────────── */
+.fz-emblem {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1400;
+    --p: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    will-change: transform, opacity;
+    transition: opacity 0.25s ease;
+    /* centre the ORBIT (not the whole capsule) on the projected anchor */
+    margin-left: -36px;
+    margin-top: -36px;
+}
+
+.fz-emblem.is-hidden {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+.fz-emblem-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px;
+    border-radius: var(--fz-radius-pill);
+    /* The panel/badge is ALWAYS visible (a round badge when closed); it just
+       widens — revealing the title + button — when the player is in range. */
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.96), rgba(244, 250, 240, 0.94));
+    border: 1.5px solid rgba(120, 195, 160, 0.55);
+    box-shadow:
+        0 7px 18px rgba(39, 90, 70, 0.22),
+        0 2px 5px rgba(39, 90, 70, 0.1),
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transform: scale(calc(0.92 + var(--p) * 0.12));
+    transform-origin: 36px 36px;
+    transition: transform 0.22s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-emblem.is-active .fz-emblem-pill {
+    border-color: rgba(120, 195, 160, 0.7);
+    animation: fz-emblem-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes fz-emblem-breathe {
+    0%, 100% { box-shadow: 0 7px 18px rgba(39, 90, 70, 0.22), 0 2px 5px rgba(39, 90, 70, 0.1), inset 0 1.5px 0 rgba(255, 255, 255, 0.85); }
+    50% { box-shadow: 0 9px 22px rgba(65, 160, 110, 0.3), 0 0 0 4px rgba(95, 197, 148, 0.12), inset 0 1.5px 0 rgba(255, 255, 255, 0.85); }
+}
+
+.fz-emblem-orbit-wrap {
+    flex: none;
+    display: grid;
+    place-items: center;
+    line-height: 0;
+}
+
+.fz-emblem-svg {
+    display: block;
+    width: 58px;
+    height: 58px;
+    filter: drop-shadow(0 2px 5px rgba(40, 90, 70, 0.3));
+}
+
+.fz-emblem.is-active .fz-emblem-svg {
+    filter: drop-shadow(0 2px 5px rgba(40, 90, 70, 0.3))
+        drop-shadow(0 0 5px rgba(95, 197, 148, 0.8));
+}
+
+/* Leaf sways very gently from the top of its stem when in range */
+.fz-emblem-leaf {
+    transform-box: fill-box;
+    transform-origin: 50% 6%;
+}
+
+.fz-emblem.is-active .fz-emblem-leaf {
+    animation: fz-leaf-sway 3.4s ease-in-out infinite;
+}
+
+@keyframes fz-leaf-sway {
+    0%, 100% { transform: rotate(-2.4deg); }
+    50% { transform: rotate(2.4deg); }
+}
+
+/* Reveal — unfolds to the side: big title on top, small button below */
+.fz-emblem-reveal {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width 0.3s cubic-bezier(0.22, 1.2, 0.36, 1),
+        opacity 0.2s ease, margin 0.3s ease;
+}
+
+.fz-emblem.is-active .fz-emblem-reveal {
+    max-width: 320px;
+    opacity: 1;
+    margin: 0 8px 0 9px;
+}
+
+.fz-emblem-label {
+    font-family: var(--fz-font-title);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--fz-ink);
+    white-space: nowrap;
+}
+
+.fz-emblem.is-pressed .fz-emblem-pill {
+    filter: brightness(1.06);
+    transform: scale(calc(0.92 + var(--p) * 0.12)) translateY(2px);
+}
+
+/* ─── Settings modal sections ─────────────────────────────────────────── */
+.fz-card.is-selected {
+    border-color: var(--fz-green-500);
+    background: rgba(215, 242, 228, 0.5);
+    box-shadow: var(--fz-shadow-soft), 0 0 0 2.5px rgba(95, 197, 148, 0.45);
+}
+
+.fz-settings-nav {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.fz-settings-tab {
+    appearance: none;
+    font-family: var(--fz-font-title);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: var(--fz-radius-pill);
+    border: 1.5px solid rgba(120, 185, 150, 0.4);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--fz-ink-soft);
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.fz-settings-tab.is-active {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    color: #fff;
+    border-color: transparent;
+}
+
+.fz-settings-tab--icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fz-tab-icon {
+    display: inline-flex;
+    line-height: 0;
+}
+
+.fz-tab-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.fz-settings-tab:focus-visible {
+    outline: 2px solid var(--fz-green-400);
+    outline-offset: 2px;
+}
+
+/* Controls section — action → glyph rows, grouped by context */
+.fz-ctrl-list { display: flex; flex-direction: column; }
+
+.fz-ctrl-group {
+    font-family: var(--fz-font-title);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--fz-green-500);
+    margin: 14px 0 6px;
+}
+
+.fz-ctrl-group:first-child { margin-top: 0; }
+
+.fz-ctrl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(120, 185, 150, 0.18);
+}
+
+.fz-ctrl-label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--fz-ink);
+}
+
+.fz-ctrl-glyph { display: inline-flex; align-items: center; }
+
+/* ─── Contact form ────────────────────────────────────────────────────── */
+.fz-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    text-align: left;
+    margin-bottom: 4px;
+}
+
+.fz-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.fz-field-label {
+    font-family: var(--fz-font-title);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--fz-ink-soft);
+}
+
+.fz-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--fz-font-body);
+    font-size: 15px;
+    color: var(--fz-ink);
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(120, 185, 150, 0.4);
+    background: rgba(255, 255, 255, 0.72);
+    outline: none;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.fz-input::placeholder { color: rgba(42, 90, 76, 0.42); }
+
+.fz-input:focus {
+    border-color: var(--fz-green-400);
+    box-shadow: 0 0 0 3px rgba(95, 197, 148, 0.2);
+}
+
+.fz-textarea {
+    resize: vertical;
+    min-height: 84px;
+    line-height: 1.4;
+}
+
+.fz-form-error {
+    margin: 0;
+    min-height: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    font-family: var(--fz-font-body);
+    font-size: 13.5px;
+    color: #d2553f;
+    transition: opacity 0.16s ease, max-height 0.16s ease;
+}
+
+.fz-form-error.is-visible {
+    max-height: 40px;
+    opacity: 1;
+}
+
+.fz-contact-sent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 6px 4px 2px;
+}
+
+.fz-sent-check svg {
+    width: 64px;
+    height: 64px;
+    animation: fz-sent-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes fz-sent-pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.fz-sent-title {
+    font-family: var(--fz-font-title);
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--fz-ink);
+}
+
+.fz-sent-text {
+    font-family: var(--fz-font-body);
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--fz-ink-soft);
+    max-width: 320px;
+}
+
+.fz-sent-text b { color: var(--fz-green-500); }
+
+/* ─── Name entry (arcade reels) ───────────────────────────────────────── */
+.fz-reels {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin: 8px 0 6px;
+}
+
+.fz-reel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.fz-reel-letter {
+    width: 58px;
+    height: 66px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--fz-font-title);
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.7);
+    border: 2px solid rgba(120, 185, 150, 0.4);
+    border-radius: 14px;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+}
+
+.fz-reel.is-active .fz-reel-letter {
+    border-color: var(--fz-green-400);
+    box-shadow: 0 0 0 3px rgba(95, 197, 148, 0.25);
+    color: var(--fz-green-500);
+}
+
+.fz-reel-btn {
+    width: 42px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--fz-ink-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.fz-reel-btn:hover {
+    background: rgba(95, 197, 148, 0.16);
+    color: var(--fz-green-500);
+}
+
+.fz-reel-btn svg { width: 22px; height: 22px; }
+
+/* ─── Leaderboard ─────────────────────────────────────────────────────── */
+.fz-result-badge {
+    margin: 2px auto 12px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    font-family: var(--fz-font-title);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fz-green-500);
+    background: linear-gradient(168deg, rgba(95, 197, 148, 0.22), rgba(95, 197, 148, 0.1));
+    box-shadow: inset 0 0 0 2px var(--fz-green-400);
+}
+
+.fz-lb {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 4px 0;
+}
+
+.fz-lb-row {
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-family: var(--fz-font-body);
+    color: var(--fz-ink);
+}
+
+.fz-lb-row:nth-child(odd) { background: rgba(255, 255, 255, 0.42); }
+
+.fz-lb-rank {
+    font-family: var(--fz-font-title);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--fz-ink-soft);
+    text-align: center;
+}
+
+.fz-lb-name {
+    font-family: var(--fz-font-title);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 2px;
+}
+
+.fz-lb-score {
+    font-family: var(--fz-font-title);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--fz-green-500);
+}
+
+.fz-lb-row.is-me {
+    background: linear-gradient(168deg, rgba(95, 197, 148, 0.28), rgba(95, 197, 148, 0.12));
+    box-shadow: inset 0 0 0 2px var(--fz-green-400);
+}
+
+.fz-lb-me-out {
+    margin-top: 10px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    text-align: center;
+    font-family: var(--fz-font-title);
+    font-weight: 700;
+    color: var(--fz-green-500);
+    background: linear-gradient(168deg, rgba(95, 197, 148, 0.22), rgba(95, 197, 148, 0.1));
+    box-shadow: inset 0 0 0 2px var(--fz-green-400);
+}
+
+.fz-lb-empty {
+    text-align: center;
+    padding: 18px 12px;
+    font-family: var(--fz-font-body);
+    color: var(--fz-ink-soft);
+}
+
+@media (max-width: 340px) {
+    .fz-cards { grid-template-columns: 1fr; }
+}

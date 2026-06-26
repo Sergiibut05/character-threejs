@@ -53,6 +53,7 @@ export default class Character {
         this.movementLocked = false
         this.throwPaused = false
         this.throwPauseTime = null
+        this.animationPaused = false // frozen (e.g. tutorial modal open mid-throw)
 
         this.setModel()
         this.setAnimation()
@@ -291,7 +292,9 @@ export default class Character {
 
     _updateState(deltaTime, isMoving) {
         const mobileActions = this.experience.mobileControls?.getActions()
-        this.isSprinting = this.keys.shift || (mobileActions?.button1 ?? false)
+        const padActions = this.experience.gamepad?.getActions()
+        this.isSprinting = this.keys.shift ||
+            (mobileActions?.button1 ?? false) || (padActions?.button1 ?? false)
 
         if (this.state === 'running') this.runDuration += deltaTime
 
@@ -349,6 +352,10 @@ export default class Character {
         const dt = this.time.delta * 0.001
         if (!this.container) return
 
+        // Frozen while a modal (tutorial/help) is open mid-throw — hold the pose
+        // so the wind-up animation doesn't play out (clip) behind the modal.
+        if (this.animationPaused) return
+
         // Check throw pause
         if (this.state === 'throwing' && this.throwPauseTime != null && this.actions.throw) {
             if (this.actions.throw.time >= this.throwPauseTime && !this.throwPaused) {
@@ -375,6 +382,12 @@ export default class Character {
             const m = this.experience.mobileControls.getMovement()
             dir.x += m.x * m.force
             dir.z -= m.y * m.force
+        }
+
+        if (this.experience.gamepad?.isActive()) {
+            const g = this.experience.gamepad.getMovement()
+            dir.x += g.x * g.force
+            dir.z -= g.y * g.force
         }
 
         const isMoving = dir.lengthSq() > 0.0001

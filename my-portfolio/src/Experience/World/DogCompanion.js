@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 
+// Small world-space lift so the dog's feet rest ON the ground instead of
+// sinking a hair below it (the Character model applies the same trick). Tweak
+// if the dog ever looks like it's floating or sunk.
+const DOG_FOOT_LIFT = 0.06
+
 /**
  * AI-driven dog companion for the frisbee minigame.
  * Mimics Wii Sports Resort behaviour:
@@ -43,7 +48,9 @@ export default class DogCompanion {
         this._jumpAscentDur = 0.35
         this._jumpDescentDur = 0.35
         this._jumpSettleDur = 0.5
-        this._jumpHeight = 0.9
+        // Low hop, not a big leap — lets the disc travel more of its arc before
+        // the dog snags it (reads far more naturally).
+        this._jumpHeight = 0.4
 
         // ─── Catch runtime ────────────────────────────────────
         this._catchTimer = 0
@@ -91,8 +98,9 @@ export default class DogCompanion {
         // Flush world matrices so Box3 reads the scaled geometry correctly
         this.model.updateMatrixWorld(true)
         const _box = new THREE.Box3().setFromObject(this.model)
-        // Lift the model inside the container so its feet land exactly at Y=0
-        this.model.position.y = -_box.min.y
+        // Lift the model inside the container so its feet land at Y=0, plus a
+        // small fudge so they don't visually sink into the ground.
+        this.model.position.y = -_box.min.y + DOG_FOOT_LIFT
 
         this.container.add(this.model)
         this.scene.add(this.container)
@@ -143,6 +151,19 @@ export default class DogCompanion {
         this.container.visible = true
         this.state = 'idleAnchor'
         this._playAction('idle')
+    }
+
+    /**
+     * Re-settle the anchored idle dog onto a corrected ground height. Used once
+     * the baseball-pitch bbox becomes available (the GLB anchor Y floats above
+     * the visual field surface).
+     */
+    setAnchorGroundY(groundY) {
+        if (this.state !== 'idleAnchor' || !this.container) return
+        this._groundY = groundY
+        if (this._anchorPos) this._anchorPos.y = groundY
+        this.position.y = groundY
+        this.container.position.y = groundY
     }
 
     show(playerPosition, playerYaw, groundY = 0) {
@@ -239,6 +260,27 @@ export default class DogCompanion {
         this.returnTarget.y = 0
         this.state = 'postWalk'
         this._playAction('walk')
+    }
+
+    /**
+     * Pre-round "gesture" placeholder (plan §4.E.2): a happy double hop with a
+     * little wiggle. Composed from a transform animation over the idle clip —
+     * safe because idle/idleAnchor don't drive position each frame. Resolves
+     * when finished.
+     */
+    async playGesture() {
+        if (!this.container) return
+        if (this.state !== 'idle' && this.state !== 'idleAnchor') return
+
+        const baseY = this.container.position.y
+        const baseRot = this.container.rotation.y
+        await this.experience.animateValue(0, 1, 1200, (t) => {
+            const hop = Math.abs(Math.sin(t * Math.PI * 2)) // two bounces
+            this.container.position.y = baseY + hop * 0.45
+            this.container.rotation.y = baseRot + Math.sin(t * Math.PI * 6) * 0.12 // wiggle
+        })
+        this.container.position.y = baseY
+        this.container.rotation.y = baseRot
     }
 
     // ─── Per-frame ──────────────────────────────────────────────────────

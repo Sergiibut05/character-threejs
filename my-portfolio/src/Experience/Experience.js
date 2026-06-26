@@ -8,7 +8,9 @@ import Renderer from './Renderer.js'
 import Resources from './Utils/Resources.js'
 import World from './World/World.js'
 import MobileControls from './Utils/MobileControls.js'
-import QualitySettingsUI from './Utils/QualitySettingsUI.js'
+import GamepadControls from './Utils/GamepadControls.js'
+import InputDevice from './Utils/InputDevice.js'
+import SettingsModal from './World/ui/SettingsModal.js'
 import sources from './sources.js'
 
 let instance = null
@@ -39,9 +41,11 @@ export default class Experience {
 
         this.camera = new Camera()
         this.renderer = new Renderer()
+        this.input = new InputDevice() // before World so UI can read the active device
         this.world = new World()
         this.mobileControls = new MobileControls()
-        this.qualitySettingsUi = new QualitySettingsUI(this)
+        this.gamepad = new GamepadControls()
+        this.settingsUi = new SettingsModal(this)
 
         // Cloud transition elements
         this.cloudTransition = document.getElementById('cloud-transition')
@@ -252,6 +256,7 @@ export default class Experience {
 
         // Full interactive experience
         this.mobileControls.update()
+        this.gamepad.update()
         this.camera.update()
         this.world.update()
         this.renderer.update()

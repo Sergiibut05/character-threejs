@@ -1,16 +1,11 @@
 /**
- * River — applies materials to the three planes of `river.glb`:
- *   - "agua"      → main water surface (depth color + intersection foam)
- *   - "agua.001"  → solid ground (dirt riverbed), NOT water
- *   - "agua.002"  → shadow / shallow water layer
+ * River — applies the water shader to the single "agua" mesh of `river.glb`.
  */
 import * as THREE from 'three'
 import { uniform, vec4 } from 'three/tsl'
 import Experience from '../../Experience.js'
-import { createWaterColorNode, createWaterShadowColorNode } from '../TSL/WaterShader.js'
-import { createFloorColorNode } from '../TSL/FloorShader.js'
-import { createDefaultFloorUniforms } from './Floor.js'
-import { dayNightTint, dayNightLitTint } from '../DayNight.js'
+import { createWaterColorNode } from '../TSL/WaterShader.js'
+import { dayNightTint } from '../DayNight.js'
 
 export default class River {
     constructor(gltf, options = {}) {
@@ -61,40 +56,14 @@ export default class River {
             uCamXZ: uniform(new THREE.Vector2(0, 0))
         }
 
-        const shadowUniforms = {
-            uTime: this.uTime,
-            uDeepWaterColor: this.uniforms.uDeepWaterColor,
-            uShadowOpacity: uniform(0.25)
-        }
-
-        this._applyWater(this.root.getObjectByName('agua'), shadowUniforms)
-
-        // agua.001 → solid ground (dirt riverbed), not water.
-        const groundNames = ['agua.001', 'agua001']
-        const groundSeen = new Set()
-        for (const name of groundNames) {
-            const mesh = this.root.getObjectByName(name)
-            if (!mesh || groundSeen.has(mesh.uuid)) continue
-            groundSeen.add(mesh.uuid)
-            this._applyGround(mesh)
-        }
-
-        // agua.002 → shadow / shallow water layer.
-        const shadowNames = ['agua.002', 'agua002']
-        const shadowSeen = new Set()
-        for (const name of shadowNames) {
-            const mesh = this.root.getObjectByName(name)
-            if (!mesh || shadowSeen.has(mesh.uuid)) continue
-            shadowSeen.add(mesh.uuid)
-            this._applyShadow(mesh, shadowUniforms)
-        }
+        this._applyWater(this.root.getObjectByName('agua'))
 
         this.scene.add(this.root)
 
         if (this.debug?.active) this._setupGUI()
     }
 
-    _applyWater(mesh, _shadowUniforms) {
+    _applyWater(mesh) {
         if (!mesh) {
             console.warn('River: agua mesh not found')
             return
@@ -115,42 +84,6 @@ export default class River {
         mesh.receiveShadow = false
         mesh.renderOrder = 1
         this.waterMesh = mesh
-    }
-
-    _applyGround(mesh) {
-        // Reuse the floor's dirt shader so the riverbed matches the banks.
-        this.floorUniforms = this.floorUniforms || createDefaultFloorUniforms()
-        const mat = new THREE.MeshLambertNodeMaterial({
-            side: THREE.DoubleSide,
-            depthWrite: true
-        })
-        mat.colorNode = createFloorColorNode(this.floorUniforms, { mode: 'dirt' })
-            .mul(vec4(dayNightLitTint, 1.0))
-
-        mesh.material?.dispose?.()
-        mesh.material = mat
-        mesh.castShadow = false
-        mesh.receiveShadow = true
-        mesh.renderOrder = 0
-        this.groundMesh = mesh
-    }
-
-    _applyShadow(mesh, shadowUniforms) {
-        const mat = new THREE.MeshBasicNodeMaterial({
-            side: THREE.DoubleSide,
-            transparent: true,
-            depthWrite: false
-        })
-        mat.fragmentNode = createWaterShadowColorNode(shadowUniforms).mul(vec4(dayNightTint, 1.0))
-        mat.blending = THREE.CustomBlending
-        mat.blendSrc = THREE.SrcAlphaFactor
-        mat.blendDst = THREE.OneMinusSrcAlphaFactor
-
-        mesh.material?.dispose?.()
-        mesh.material = mat
-        mesh.castShadow = false
-        mesh.receiveShadow = false
-        mesh.renderOrder = 0
     }
 
     update() {

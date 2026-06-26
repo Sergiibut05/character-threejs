@@ -4,17 +4,22 @@ import Environment from './Environment.js'
 import Character from './Character.js'
 import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
+import Mailbox from './Mailbox.js'
+import Door from './Door.js'
+import ScoreboardScreen from './ScoreboardScreen.js'
 import Ground from './Ground.js'
 import Grass from './Grass.js'
 import Flowers from './Flowers.js'
 import Fireflies from './Fireflies.js'
 import Fire from './Fire.js'
 import PatioScene from './PatioScene.js'
+import { jsonInstancesToObjects } from './scene/SceneUtils.js'
 import Trees from './Trees.js'
 import Bushes from './Bushes.js'
 import FakeShadow from './FakeShadow.js'
 import ActivityPrompt from './ActivityPrompt.js'
 import FrisbeeMinigame from './FrisbeeMinigame.js'
+import FrisbeeSession from './FrisbeeSession.js'
 
 export default class World {
     constructor() {
@@ -38,6 +43,7 @@ export default class World {
                 this.character = new Character()
                 this.activityPrompt = new ActivityPrompt()
                 this.frisbeeMinigame = new FrisbeeMinigame()
+                this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
                 this.raycaster = new Raycaster()
                 this._showDogAtAnchor()
 
@@ -78,9 +84,25 @@ export default class World {
         // Flowers + fireflies — decorate the grass zones with vibes
         this.setupMeadowDecor()
 
-            // Stylized TSL fire — test instance near world center
             this.fire = new Fire()
-            this.fire.addFire(new THREE.Vector3(2, 0, 0), 1.0)
+            // Known fire location in Blender Z-up space (the 'fire-point' empty
+            // is no longer exported into park-things.glb). Converted to Three
+            // Y-up with the standard (bx, bz, -by) swap.
+            const FIRE_POINT_THREE = new THREE.Vector3(-14.1581, 0.204325, 3.11002)
+            const FIRE_SCALE = 1.2
+            const _placeFire = (name) => {
+                if (name !== 'parkThingsModel') return
+                const firePoint = this.resources.items.parkThingsModel?.scene?.getObjectByName('fire-point')
+                if (firePoint) {
+                    firePoint.updateWorldMatrix(true, false)
+                    const pos = new THREE.Vector3().setFromMatrixPosition(firePoint.matrixWorld)
+                    this.fire.addFire(pos, FIRE_SCALE)
+                } else {
+                    this.fire.addFire(FIRE_POINT_THREE.clone(), FIRE_SCALE)
+                }
+                this.resources.off('sourceLoaded', _placeFire)
+            }
+            this.resources.on('sourceLoaded', _placeFire)
 
             // Trees — instanced per type from reference models
             this.setupTrees()
@@ -97,6 +119,12 @@ export default class World {
             this.raycaster = new Raycaster()
             this.activityPrompt = new ActivityPrompt()
             this.frisbeeMinigame = new FrisbeeMinigame()
+            this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
+            this.mailbox = new Mailbox() // resolves the mailbox node lazily
+            this.door = new Door() // resolves the house `door` node lazily
+            // Live ranking screen: auto-attaches the canvas texture to a mesh
+            // named "scoreboard" when you import your own object (see file).
+            this.scoreboardScreen = new ScoreboardScreen()
 
             this._showDogAtAnchor()
 
@@ -189,15 +217,26 @@ export default class World {
         })
     }
 
+    _jsonToRefs(json) {
+        // Blender Z-up → Three Y-up conversion (position, rotation, scale).
+        // The raw JSON values must NOT be used directly: doing so put every
+        // tree on one plane (Blender depth Y became Three's up axis).
+        //
+        // Trees are authored upright in Blender (no +π/2 X baseline like the
+        // fence) and the export now writes their real world rotation, so we use
+        // the true change-of-basis 'conjugate' mode. The global 'rawNegZ'
+        // shortcut would tilt every tree on its heading rotation.
+        return jsonInstancesToObjects(json, 'conjugate')
+    }
+
     setupTrees() {
         const res = this.resources.items
 
-        // Each tree type: visual model scene, reference model children, leaf colors
         const treeConfigs = [
             {
                 name: 'Abedul',
                 visual: res.abedulTreeVisual?.scene,
-                references: res.abedulTreeReferences?.scene?.children,
+                references: this._jsonToRefs(res.abedulTreeReferences),
                 colorA: '#663000',
                 colorB: '#ff5e00',
                 foliageOpts: { shadowOffset: 0.181, threshold: 0.3, seeThroughEdgeMin: 0.06973, seeThroughEdgeMax: 0.348654, colorAPresence: 0.09 }
@@ -205,7 +244,7 @@ export default class World {
             {
                 name: 'Normal',
                 visual: res.normalTreeVisual?.scene,
-                references: res.normalTreeReferences?.scene?.children,
+                references: this._jsonToRefs(res.normalTreeReferences),
                 colorA: '#3b7500',
                 colorB: '#4e9301',
                 foliageOpts: { shadowOffset: 1.0, threshold: 0.3, seeThroughEdgeMin: 0.06973, seeThroughEdgeMax: 0.348654, colorAPresence: 0.5 }
@@ -213,7 +252,7 @@ export default class World {
             {
                 name: 'Old',
                 visual: res.oldTreeVisual?.scene,
-                references: res.oldTreeReferences?.scene?.children,
+                references: this._jsonToRefs(res.oldTreeReferences),
                 colorA: '#d01616',
                 colorB: '#bf4745',
                 foliageOpts: { shadowOffset: 0.041, threshold: 0.3, seeThroughEdgeMin: 0.275, seeThroughEdgeMax: 0.707, colorAPresence: 0.835 }
@@ -222,19 +261,12 @@ export default class World {
 
         this.trees = []
         for (const cfg of treeConfigs) {
-            if (!cfg.visual || !cfg.references || cfg.references.length === 0) {
+            if (!cfg.visual || cfg.references.length === 0) {
                 console.warn(`Trees: skipping "${cfg.name}" — missing visual or references`)
                 continue
             }
 
-            // Filter only treeBody* references from the reference file
-            const bodyRefs = cfg.references.filter(c => c.name.startsWith('treeBody'))
-            if (bodyRefs.length === 0) {
-                console.warn(`Trees: skipping "${cfg.name}" — no treeBody* found in references`)
-                continue
-            }
-
-            const tree = new Trees(cfg.name, cfg.visual, bodyRefs, cfg.colorA, cfg.colorB, cfg.foliageOpts || {})
+            const tree = new Trees(cfg.name, cfg.visual, cfg.references, cfg.colorA, cfg.colorB, cfg.foliageOpts || {})
             this.trees.push(tree)
         }
     }
@@ -253,6 +285,10 @@ export default class World {
 
     getPitchBBox() {
         return this.patioScene?.pieces?.baseballPitch?.getBoundingBox?.() ?? null
+    }
+
+    getPitchOrientedBounds() {
+        return this.patioScene?.pieces?.baseballPitch?.getOrientedBounds?.() ?? null
     }
 
     _showDogAtAnchor() {
@@ -315,6 +351,9 @@ export default class World {
         if (this.frisbeeMinigame) {
             this.frisbeeMinigame.update()
         }
+        if (this.frisbeeSession) {
+            this.frisbeeSession.update()
+        }
 
         // Update physics
         if (this.physics && this.physics.world) {
@@ -324,6 +363,15 @@ export default class World {
         // Update raycaster for hover detection
         if (this.raycaster) {
             this.raycaster.update()
+        }
+        if (this.mailbox) {
+            this.mailbox.update()
+        }
+        if (this.door) {
+            this.door.update()
+        }
+        if (this.scoreboardScreen) {
+            this.scoreboardScreen.update()
         }
 
         // Update interactive objects (check proximity to character)

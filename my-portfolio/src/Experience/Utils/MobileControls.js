@@ -1,5 +1,42 @@
 import nipplejs from 'nipplejs'
 
+// Shared button look — rounded glass, soft shadow (matches the game UI).
+const BTN_BASE_CSS = `
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 8px 18px rgba(39, 90, 70, 0.18);
+    transition: transform 0.14s ease, filter 0.14s ease;
+`
+
+const ICON_RUN = `
+<svg viewBox="0 0 24 24" fill="none" width="28" height="28" aria-hidden="true">
+  <path d="M4 8h9M3 12h11M5 16h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M15 7l4.5 5-4.5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`
+
+const ICON_DISC = `
+<svg viewBox="0 0 24 24" fill="none" width="30" height="30" aria-hidden="true">
+  <ellipse cx="12" cy="13.5" rx="8.5" ry="3.6" fill="rgba(255,255,255,0.28)" stroke="currentColor" stroke-width="2"/>
+  <ellipse cx="12" cy="11.2" rx="8.5" ry="3.6" fill="rgba(255,255,255,0.5)" stroke="currentColor" stroke-width="2"/>
+</svg>`
+
+// Generic "interact" (tap hand) — the world action button outside minigames.
+const ICON_INTERACT = `
+<svg viewBox="0 0 24 24" fill="none" width="27" height="27" aria-hidden="true">
+  <path d="M9 11V6a1.7 1.7 0 0 1 3.4 0v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M12.4 11V9.4a1.6 1.6 0 0 1 3.2 0V11M15.6 11v-.6a1.6 1.6 0 0 1 3.2 0V15a4.6 4.6 0 0 1-4.6 4.6h-1.7a4.6 4.6 0 0 1-3.7-1.9l-2-2.7a1.6 1.6 0 0 1 2.4-2l1.1 1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`
+
+const ACTION_ICONS = { interact: ICON_INTERACT, frisbee: ICON_DISC }
+
 export default class MobileControls
 {
     constructor()
@@ -117,70 +154,45 @@ export default class MobileControls
 
     createActionButtons()
     {
-        // Button 1
+        // Sprint button (secondary, glass-pastel) — a "dash" icon.
         this.button1 = document.createElement('button')
         this.button1.id = 'action-button-1'
-        this.button1.textContent = '\u{1F3C3}'
-        this.button1.style.cssText = `
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            background: rgba(255, 180, 50, 0.7);
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            transition: all 0.2s ease;
+        this.button1.setAttribute('aria-label', 'Correr')
+        this.button1.innerHTML = ICON_RUN
+        this.button1.style.cssText = BTN_BASE_CSS + `
+            background: rgba(255, 255, 255, 0.55);
+            border: 2px solid rgba(120, 185, 150, 0.5);
+            color: #234b3a;
         `
 
-        // Button 2
+        // Primary action button (filled green). Context-aware icon: a generic
+        // "interact" in the world, the frisbee disc inside the minigame.
         this.button2 = document.createElement('button')
         this.button2.id = 'action-button-2'
-        this.button2.textContent = 'B'
-        this.button2.style.cssText = `
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            background: rgba(255, 100, 100, 0.7);
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            transition: all 0.2s ease;
+        this.button2.setAttribute('aria-label', 'Acción')
+        this.button2.innerHTML = ICON_INTERACT
+        this.button2.style.cssText = BTN_BASE_CSS + `
+            background: linear-gradient(168deg, #5fc594, #41a06e);
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            color: #fff;
         `
 
-        // Add event listeners
-        this.button1.addEventListener('touchstart', (e) => {
-            e.preventDefault()
-            this.actions.button1 = true
-            this.button1.style.transform = 'scale(0.9)'
-            this.button1.style.background = 'rgba(255, 180, 50, 0.9)'
-        })
-
-        this.button1.addEventListener('touchend', (e) => {
-            e.preventDefault()
-            this.actions.button1 = false
-            this.button1.style.transform = 'scale(1)'
-            this.button1.style.background = 'rgba(255, 180, 50, 0.7)'
-        })
-
-        this.button2.addEventListener('touchstart', (e) => {
-            e.preventDefault()
-            this.actions.button2 = true
-            this.button2.style.transform = 'scale(0.9)'
-            this.button2.style.background = 'rgba(255, 100, 100, 0.9)'
-        })
-
-        this.button2.addEventListener('touchend', (e) => {
-            e.preventDefault()
-            this.actions.button2 = false
-            this.button2.style.transform = 'scale(1)'
-            this.button2.style.background = 'rgba(255, 100, 100, 0.7)'
-        })
+        const press = (btn, key) => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault()
+                this.actions[key] = true
+                btn.style.transform = 'scale(0.9)'
+                btn.style.filter = 'brightness(1.08)'
+            })
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault()
+                this.actions[key] = false
+                btn.style.transform = 'scale(1)'
+                btn.style.filter = 'none'
+            })
+        }
+        press(this.button1, 'button1')
+        press(this.button2, 'button2')
 
         this.buttonsArea.appendChild(this.button1)
         this.buttonsArea.appendChild(this.button2)
@@ -198,6 +210,18 @@ export default class MobileControls
         return { ...this.actions }
     }
 
+    // Swap the primary action button icon by context ('interact' | 'frisbee').
+    setActionIcon(name)
+    {
+        if (this.button2 && ACTION_ICONS[name]) this.button2.innerHTML = ACTION_ICONS[name]
+    }
+
+    // Show/hide the sprint button (useless inside the frisbee minigame).
+    setSprintVisible(visible)
+    {
+        if (this.button1) this.button1.style.display = visible ? '' : 'none'
+    }
+
     // Check if controls are active (mobile mode)
     isActive()
     {
@@ -207,7 +231,15 @@ export default class MobileControls
     // Update method (called each frame)
     update()
     {
-        // Could add additional logic here if needed
+        // On touch, modals are tapped directly — hide the virtual controls while
+        // any modal is open so they don't sit under it (plan §2).
+        if (this.container) {
+            const modalOpen = !!document.querySelector('.fz-modal-overlay.is-open')
+            const display = modalOpen ? 'none' : ''
+            if (this.container.style.display !== display) {
+                this.container.style.display = display
+            }
+        }
     }
 
     // Cleanup method

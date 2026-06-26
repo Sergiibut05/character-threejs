@@ -31,15 +31,15 @@ const TARGETS = [
         genmipmap: true
     },
     {
-        in: 'texture/slabs/slabs.png',
-        out: 'texture/slabs/slabs.ktx2',
-        srgb: false,
+        in: 'texture/Atlas-textures/Tiny_Atlas.png',
+        out: 'texture/Atlas-textures/Tiny_Atlas.ktx2',
+        srgb: true,
         genmipmap: true
     },
     {
-        in: 'models/house/house-texture.png',
-        out: 'models/house/house-texture.ktx2',
-        srgb: true,
+        in: 'texture/slabs/slabs.png',
+        out: 'texture/slabs/slabs.ktx2',
+        srgb: false,
         genmipmap: true
     },
     {

@@ -17,6 +17,9 @@ export default class Camera {
         this.frisbeeTarget = null
         this.baseFov = 35
         this._throwYaw = 0
+        // Bumped whenever a cinematic starts; running cinematics bail if their
+        // captured token is stale (lets one shot cancel a previous one cleanly).
+        this._cineToken = 0
 
         // frisbeeAim camera tuning
         const isMobileAim = this.checkIfMobile()
@@ -82,6 +85,10 @@ export default class Camera {
 
 
     update() {
+        // Cinematic shots drive instance.position/lookAt directly (round-start
+        // descend, entry pan…), so update() yields the camera entirely.
+        if (this.mode === 'cinematic') return
+
         if (this.mode === 'free') {
             this.controls.update()
             return
@@ -163,6 +170,175 @@ export default class Camera {
         this.instance.updateProjectionMatrix()
     }
 
+    // Resolve the frisbeeAim framing (pos + lookAt) for the current character.
+    _aimPose(posOut, lookOut) {
+        const c = this.experience.world?.character
+        if (!c) return false
+        const yaw = c.container.rotation.y
+        posOut.set(
+            c.position.x - Math.sin(yaw) * this.aimBehindDist,
+            c.position.y + this.aimHeight,
+            c.position.z - Math.cos(yaw) * this.aimBehindDist
+        )
+        lookOut.set(c.position.x, c.position.y + this.aimLookHeight, c.position.z)
+        return true
+    }
+
+    // Compute the elevated/back start pose for the round-start descend.
+    _descendStartPose(posOut, lookOut) {
+        const c = this.experience.world?.character
+        if (!c) return false
+        const yaw = c.container.rotation.y
+        posOut.set(
+            c.position.x - Math.sin(yaw) * this.aimBehindDist * 1.5,
+            c.position.y + this.aimHeight + 3.4,
+            c.position.z - Math.cos(yaw) * this.aimBehindDist * 1.5
+        )
+        lookOut.set(c.position.x, c.position.y + this.aimLookHeight + 0.6, c.position.z)
+        return true
+    }
+
+    /**
+     * Snap the camera to the elevated start pose (cinematic mode) WITHOUT
+     * animating. Called when arming a throw so the iris/reveal already shows the
+     * high shot — the later descend then has nothing to teleport from.
+     */
+    primeRoundStartDescend() {
+        const startPos = new THREE.Vector3()
+        const startLook = new THREE.Vector3()
+        if (!this._descendStartPose(startPos, startLook)) return
+        ++this._cineToken // invalidate any in-flight cinematic (e.g. the pan)
+        this._cineStartPos = startPos
+        this._cineStartLook = startLook
+        this.setMode('cinematic')
+        this.instance.fov = this.baseFov
+        this.instance.updateProjectionMatrix()
+        this.instance.position.copy(startPos)
+        this.instance.lookAt(startLook)
+    }
+
+    /**
+     * Round-start cinematic (plan §4.E): descend from the elevated pose (set by
+     * primeRoundStartDescend, or computed now) into the aim framing, then hand
+     * over to frisbeeAim. Yields if a throw switches the camera mode mid-descend.
+     */
+    async playRoundStartDescend(durationMs = 1700) {
+        const c = this.experience.world?.character
+        if (!c) return
+
+        const token = ++this._cineToken
+        const aimPos = new THREE.Vector3()
+        const aimLook = new THREE.Vector3()
+        this._aimPose(aimPos, aimLook)
+
+        const startPos = this._cineStartPos || this.instance.position.clone()
+        const startLook = this._cineStartLook || aimLook.clone().setY(aimLook.y + 0.6)
+        this._cineStartPos = null
+        this._cineStartLook = null
+
+        this.setMode('cinematic')
+        this.instance.fov = this.baseFov
+        this.instance.updateProjectionMatrix()
+
+        const _p = new THREE.Vector3()
+        const _l = new THREE.Vector3()
+        await this.experience.animateValue(0, 1, durationMs, (t) => {
+            if (this._cineToken !== token || this.mode !== 'cinematic') return // bailed
+            const e = 1 - Math.pow(1 - t, 3) // easeOutCubic
+            _p.lerpVectors(startPos, aimPos, e)
+            _l.lerpVectors(startLook, aimLook, e)
+            this.instance.position.copy(_p)
+            this.instance.lookAt(_l)
+        })
+
+        if (this._cineToken === token && this.mode === 'cinematic') {
+            this.smoothPosition.copy(aimPos)
+            this.smoothLookAt.copy(aimLook)
+            this.setMode('frisbeeAim')
+        }
+    }
+
+    /**
+     * Entry cinematic (plan §4.E.1): a slow pan in FRONT of the character + dog
+     * (right → left) with a gentle push-in. Leaves the camera held at the end
+     * pose (cinematic mode) for the caller to wait on a "continue" press.
+     */
+    async playEntryPan(durationMs = 8000) {
+        const world = this.experience.world
+        const c = world?.character
+        if (!c) return
+
+        const token = ++this._cineToken
+        this.setMode('cinematic')
+        this.instance.fov = this.baseFov
+        this.instance.updateProjectionMatrix()
+
+        // Face the pitch so "from the front" is well-defined.
+        let yaw = c.container.rotation.y
+        const bbox = world.getPitchBBox?.()
+        if (bbox) {
+            const ctr = new THREE.Vector3()
+            bbox.getCenter(ctr)
+            yaw = Math.atan2(ctr.x - c.position.x, ctr.z - c.position.z)
+        }
+        const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
+        const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+
+        const target = c.position.clone()
+        const dog = world.frisbeeMinigame?.dog
+        if (dog?.container?.visible) target.lerp(dog.position, 0.4)
+        target.y += 0.8
+
+        const frontDist = 5.5
+        const height = 1.0 // low, near eye level
+        const side = 3.8
+        const startPos = target.clone().addScaledVector(fwd, frontDist).addScaledVector(right, side)
+        startPos.y += height
+        const endPos = target.clone().addScaledVector(fwd, frontDist).addScaledVector(right, -side)
+        endPos.y += height - 0.15
+
+        const _p = new THREE.Vector3()
+        await this.experience.animateValue(0, 1, durationMs, (t) => {
+            if (this._cineToken !== token || this.mode !== 'cinematic') return
+            const e = t * t * (3 - 2 * t) // smoothstep
+            _p.lerpVectors(startPos, endPos, e)
+            _p.addScaledVector(fwd, -Math.sin(e * Math.PI) * 0.7) // gentle push-in
+            this.instance.position.copy(_p)
+            this.instance.lookAt(target)
+        })
+    }
+
+    /**
+     * Move the camera to frame the dog from the front (for its pre-round
+     * gesture). Holds at the end pose (cinematic mode).
+     */
+    async frameDog(durationMs = 1400) {
+        const dog = this.experience.world?.frisbeeMinigame?.dog
+        if (!dog?.container) return
+
+        const token = ++this._cineToken
+        this.setMode('cinematic')
+        this.instance.fov = this.baseFov
+        this.instance.updateProjectionMatrix()
+
+        const yaw = dog.container.rotation.y
+        const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
+        const target = dog.position.clone()
+        target.y += 0.4
+        const endPos = dog.position.clone().addScaledVector(fwd, 3.0)
+        endPos.y += 1.4
+
+        const startPos = this.instance.position.clone()
+        const _p = new THREE.Vector3()
+        await this.experience.animateValue(0, 1, durationMs, (t) => {
+            if (this._cineToken !== token || this.mode !== 'cinematic') return
+            const e = t * t * (3 - 2 * t)
+            _p.lerpVectors(startPos, endPos, e)
+            this.instance.position.copy(_p)
+            this.instance.lookAt(target)
+        })
+    }
+
     setMode(mode) {
         this.mode = mode
         this.controls.enabled = this.mode === 'free'
@@ -181,6 +357,15 @@ export default class Camera {
                 this.smoothLookAt.copy(cp)
                 this.smoothPosition.copy(cp).add(this.cameraOffset)
             }
+        }
+
+        if (this.mode === 'frisbeeAim') {
+            // frisbeeFlight narrows the FOV (auto-zoom); reset it so re-arming a
+            // throw (next round) frames the character like the first round
+            // instead of staying zoomed-in/"glued" to it.
+            this._catchSmoothLook = false
+            this.instance.fov = this.baseFov
+            this.instance.updateProjectionMatrix()
         }
 
         if (this.mode === 'frisbeeFlight') {

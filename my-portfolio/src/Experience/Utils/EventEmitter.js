@@ -45,7 +45,7 @@ export default class EventEmitter
         return this
     }
 
-    off(_names)
+    off(_names, callback)
     {
         // Errors
         if(typeof _names === 'undefined' || _names === '')
@@ -56,6 +56,30 @@ export default class EventEmitter
 
         // Resolve names
         const names = this.resolveNames(_names)
+
+        // Remove either a single callback (when provided) or the whole list for
+        // an event. Returns true when the namespace's event list is now empty.
+        const removeFrom = (namespace, value) =>
+        {
+            const list = this.callbacks[ namespace ]?.[ value ]
+            if(!(list instanceof Array)) return false
+
+            if(typeof callback === 'function')
+            {
+                // Remove ONLY the matching callback — leave other listeners
+                // (e.g. another subsystem's handler for the same event) intact.
+                const filtered = list.filter((cb) => cb !== callback)
+                if(filtered.length > 0)
+                {
+                    this.callbacks[ namespace ][ value ] = filtered
+                    return false
+                }
+            }
+
+            // No callback given (remove all) or list became empty.
+            delete this.callbacks[ namespace ][ value ]
+            return Object.keys(this.callbacks[ namespace ]).length === 0
+        }
 
         // Each name
         names.forEach((_name) =>
@@ -78,24 +102,15 @@ export default class EventEmitter
                     // Try to remove from each namespace
                     for(const namespace in this.callbacks)
                     {
-                        if(this.callbacks[ namespace ] instanceof Object && this.callbacks[ namespace ][ name.value ] instanceof Array)
-                        {
-                            delete this.callbacks[ namespace ][ name.value ]
-
-                            // Remove namespace if empty
-                            if(Object.keys(this.callbacks[ namespace ]).length === 0)
-                                delete this.callbacks[ namespace ]
-                        }
+                        if(removeFrom(namespace, name.value))
+                            delete this.callbacks[ namespace ]
                     }
                 }
 
                 // Specified namespace
-                else if(this.callbacks[ name.namespace ] instanceof Object && this.callbacks[ name.namespace ][ name.value ] instanceof Array)
+                else if(this.callbacks[ name.namespace ] instanceof Object)
                 {
-                    delete this.callbacks[ name.namespace ][ name.value ]
-
-                    // Remove namespace if empty
-                    if(Object.keys(this.callbacks[ name.namespace ]).length === 0)
+                    if(removeFrom(name.namespace, name.value))
                         delete this.callbacks[ name.namespace ]
                 }
             }
@@ -125,6 +140,24 @@ export default class EventEmitter
         // Resolve name
         name = this.resolveName(name[ 0 ])
 
+        // Run a single listener in isolation: one throwing callback must NOT
+        // prevent the remaining listeners for the same event from running.
+        const runCallback = (callback) =>
+        {
+            try
+            {
+                result = callback.apply(this, args)
+            }
+            catch(err)
+            {
+                console.error(`EventEmitter: listener for "${name.value}" threw`, err)
+                result = undefined
+            }
+
+            if(typeof finalResult === 'undefined')
+                finalResult = result
+        }
+
         // Default namespace
         if(name.namespace === 'base')
         {
@@ -133,15 +166,7 @@ export default class EventEmitter
             {
                 if(this.callbacks[ namespace ] instanceof Object && this.callbacks[ namespace ][ name.value ] instanceof Array)
                 {
-                    this.callbacks[ namespace ][ name.value ].forEach(function(callback)
-                    {
-                        result = callback.apply(this, args)
-
-                        if(typeof finalResult === 'undefined')
-                        {
-                            finalResult = result
-                        }
-                    })
+                    this.callbacks[ namespace ][ name.value ].forEach(runCallback)
                 }
             }
         }
@@ -155,13 +180,7 @@ export default class EventEmitter
                 return this
             }
 
-            this.callbacks[ name.namespace ][ name.value ].forEach(function(callback)
-            {
-                result = callback.apply(this, args)
-
-                if(typeof finalResult === 'undefined')
-                    finalResult = result
-            })
+            this.callbacks[ name.namespace ][ name.value ].forEach(runCallback)
         }
 
         return finalResult

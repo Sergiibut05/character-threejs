@@ -34,16 +34,18 @@ export default class ScoreFeedback {
         const dz = catchPos.z - targetCenter.z
         const dist = Math.sqrt(dx * dx + dz * dz)
 
+        // Ring radii MUST match the visual bullseye (ObjectiveMarker): catching
+        // far from centre can no longer score like a near hit.
         let zone, pts, color
-        if (dist <= 2) {
+        if (dist <= 1.0) {
             zone = 'PERFECTO!'
             pts = 100
             color = '#ffd426'
-        } else if (dist <= 5) {
+        } else if (dist <= 2.4) {
             zone = 'GENIAL!'
             pts = 50
             color = '#40c864'
-        } else if (dist <= 10) {
+        } else if (dist <= 3.8) {
             zone = 'BIEN!'
             pts = 10
             color = '#5a8af5'

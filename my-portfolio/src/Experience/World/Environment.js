@@ -17,6 +17,12 @@ import {
 const SUN_DISTANCE = 8
 const TWO_PI = Math.PI * 2
 
+// Reusable temporaries for shadow texel-snapping (no per-frame allocation).
+const _worldUp = new THREE.Vector3(0, 1, 0)
+const _shadowRight = new THREE.Vector3()
+const _shadowUp = new THREE.Vector3()
+const _shadowCenter = new THREE.Vector3()
+
 /**
  * Minimum elevation (sin of angle above horizon) for the shadow-casting
  * light direction. When the active body is near the horizon the shadow
@@ -366,15 +372,42 @@ export default class Environment {
 
         this.sunLight.position.copy(shadowDir).multiplyScalar(SUN_DISTANCE)
 
-        // --- Centre the shadow camera on the character/camera ---
+        // --- Centre the shadow camera on the character (texel-snapped) ---
         // Without this, the shadow frustum is centred on (0,0,0) and at low
         // light angles the limited frustum box only covers part of the scene.
+        //
+        // The centre is SNAPPED to whole shadow-map texels in the light's view
+        // plane. If we followed the character at continuous float coords the
+        // world→texel mapping would slide a fraction of a texel every frame and
+        // the shadow edges would crawl/shimmer while moving. Snapping keeps the
+        // mapping stable so shadows stay rock-steady.
         const character = this.experience.world?.character
         if (character) {
+            const quality = this.experience.quality
             const cp = character.position
-            this.sunLight.target.position.set(cp.x, 0, cp.z)
-            this.sunLight.position.x += cp.x
-            this.sunLight.position.z += cp.z
+
+            // Texel-plane basis. Matches DirectionalLightShadow's lookAt camera
+            // (up = +Y): right = normalize(up × dir), up' = dir × right.
+            _shadowRight.crossVectors(_worldUp, shadowDir)
+            if (_shadowRight.lengthSq() < 1e-6) _shadowRight.set(1, 0, 0)
+            _shadowRight.normalize()
+            _shadowUp.crossVectors(shadowDir, _shadowRight) // already unit length
+
+            // World size of one shadow-map texel along those axes.
+            const texel = (2 * quality.shadowCameraSize) / quality.shadowMapSize
+
+            _shadowCenter.set(cp.x, 0, cp.z)
+            const along = _shadowCenter.dot(shadowDir)
+            const a = Math.round(_shadowCenter.dot(_shadowRight) / texel) * texel
+            const b = Math.round(_shadowCenter.dot(_shadowUp) / texel) * texel
+
+            // Reconstruct the snapped centre, then place target + light from it.
+            _shadowCenter.copy(_shadowRight).multiplyScalar(a)
+                .addScaledVector(_shadowUp, b)
+                .addScaledVector(shadowDir, along)
+
+            this.sunLight.target.position.copy(_shadowCenter)
+            this.sunLight.position.copy(_shadowCenter).addScaledVector(shadowDir, SUN_DISTANCE)
             this.sunLight.target.updateMatrixWorld()
         }
 

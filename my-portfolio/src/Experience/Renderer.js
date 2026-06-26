@@ -65,21 +65,20 @@ export default class Renderer {
     _buildPostProcessingPipeline() {
         const scenePass = pass(this.scene, this.camera.instance)
         
-        // 1. Outline Pass
+        // 1. Outline Pass — only the VISIBLE edge is drawn; the hidden edge is
+        // dropped so the white outline can't shine through objects (the player,
+        // props…) that sit between the outlined object and the camera.
         const visibleEdgeColor = uniform(new THREE.Color('#ffffff'))
-        const hiddenEdgeColor = uniform(new THREE.Color('#ffffff'))
         const edgeStrength = float(2.0)
 
         const outlinePass = outline(this.scene, this.camera.instance, {
             selectedObjects: this.selectedObjects,
-            edgeThickness: float(1.5),
+            edgeThickness: float(2.4),
             edgeGlow: float(0.15)
         })
 
-        const { visibleEdge, hiddenEdge } = outlinePass
-        const outlineColor = visibleEdge.mul(visibleEdgeColor)
-            .add(hiddenEdge.mul(hiddenEdgeColor))
-            .mul(edgeStrength)
+        const { visibleEdge } = outlinePass
+        const outlineColor = visibleEdge.mul(visibleEdgeColor).mul(edgeStrength)
 
         let composited = outlineColor.add(scenePass)
 

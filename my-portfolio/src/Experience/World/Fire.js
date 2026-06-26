@@ -57,44 +57,46 @@ export default class Fire {
         this.lights = []
 
         // ── Flame shape ──
-        this.uElongation = uniform(1.25)   // vertical stretch of the cone
-        this.uSwayAmt    = uniform(0.06)   // how much the tip sways
+        this.uElongation = uniform(1.2)    // vertical stretch of the cone
+        this.uSwayAmt    = uniform(0.05)   // how much the tip sways
 
         // ── Noise / erosion ──
-        this.uSpeed      = uniform(1.7)    // overall scroll speed
-        this.uNoiseFreq  = uniform(9.0)    // XZ frequency (higher = smaller features)
-        this.uNoiseFreqY = uniform(5.0)    // Y frequency (n2 = this × 1.4)
-        this.uErodeBase  = uniform(0.02)   // threshold at the base (0 = always solid)
-        this.uErodeTop   = uniform(0.80)   // threshold at the tip  (1 = never visible)
-        this.uErodePow   = uniform(1.3)    // curve exponent (>1 = more solid low)
-        this.uRimWidth   = uniform(0.16)   // width of the white-hot rim
+        this.uSpeed      = uniform(3.6)    // overall scroll speed
+        this.uNoiseFreq  = uniform(16.0)   // XZ frequency (higher = smaller features)
+        this.uNoiseFreqY = uniform(7.0)    // Y frequency (n2 = this × 1.4)
+        this.uErodeBase  = uniform(0.0)    // threshold at the base (0 = always solid)
+        this.uErodeTop   = uniform(0.75)   // threshold at the tip  (1 = never visible)
+        this.uErodePow   = uniform(1.85)   // curve exponent (>1 = more solid low)
+        this.uRimWidth   = uniform(0.25)   // width of the white-hot rim
 
         // ── Colour ──
         this.uColorCore  = uniform(new THREE.Color('#fff7d6'))
-        this.uCoreBoost  = uniform(2.4)                         // HDR push → bloom
+        this.uCoreBoost  = uniform(3.1)                         // HDR push → bloom
         this.uColorMid   = uniform(new THREE.Color('#ff9a2a'))
         this.uColorOuter = uniform(new THREE.Color('#ff4d12'))
 
         // ── Embers ──
         this.uEmberColor       = uniform(new THREE.Color('#ffac4d'))
-        this.uEmberSize        = uniform(0.045)
-        this.uEmberBrightness  = uniform(2.0)
-        this.uEmberRise        = uniform(1.9)   // max rise height (× scale)
-        this.uEmberDrift       = uniform(0.55)  // lateral drift amount (× scale)
-        this.uEmberCycleSpeed  = uniform(0.5)   // how fast embers loop
+        this.uEmberSize        = uniform(0.035)
+        this.uEmberBrightness  = uniform(3.7)
+        this.uEmberRise        = uniform(1.6)   // max rise height (× scale)
+        this.uEmberDrift       = uniform(0.8)   // lateral drift amount (× scale)
+        this.uEmberCycleSpeed  = uniform(0.6)   // how fast embers loop
 
         // ── Halo / glow ──
         this.uGlowColor    = uniform(new THREE.Color('#ff7a30'))
-        this.uGlowStrength = uniform(0.28)
-        this.uGlowSize     = uniform(1.6)       // halo sprite scale (× fire scale)
+        this.uGlowStrength = uniform(0.54)
+        this.uGlowSize     = uniform(1.2)       // halo sprite scale (× fire scale)
         this.uGlowHeight   = uniform(0.45)      // halo center height offset (× scale)
 
         // ── Point-light (CPU side) ──
-        this.lightBaseIntensity = options.lightIntensity ?? 3.0
-        this.lightDistance      = 6.0
-        this.lightFlicker1      = 0.16
-        this.lightFlicker2      = 0.10
-        this.lightFlicker3      = 0.06
+        this.lightBaseIntensity = options.lightIntensity ?? 4.4
+        this.lightDistance      = 8.5
+        this.lightFlicker1      = 0.07
+        this.lightFlicker2      = 0.04
+        this.lightFlicker3      = 0.01
+
+        this._debugScale = { value: 1.2 }
 
         this._buildFlames()
         this._buildEmbers()
@@ -328,6 +330,23 @@ export default class Fire {
         return i
     }
 
+    setFireScale(index, newScale) {
+        if (index < 0 || index >= this.fireCount) return
+        const base = index * 4
+        this._flameData[base + 3] = newScale
+        this._glowData[base + 3] = newScale
+        for (let e = 0; e < this.embersPerFire; e++) {
+            this._emberData[(index * this.embersPerFire + e) * 4 + 3] = newScale
+        }
+        this._flameBuffer.value.needsUpdate = true
+        this._glowBuffer.value.needsUpdate = true
+        this._emberBuffer.value.needsUpdate = true
+        if (this.lights[index]) {
+            this.lights[index].userData.baseIntensity = this.lightBaseIntensity * newScale
+            this.lights[index].distance = this.lightDistance * newScale
+        }
+    }
+
     update() {
         // Smooth campfire flicker: three sines at non-harmonic frequencies.
         // Only CPU cost of the whole system (a few Math.sin per frame).
@@ -349,6 +368,8 @@ export default class Fire {
 
         // ── Shape ──────────────────────────────────────────────────────
         const fShape = root.addFolder('Shape')
+        fShape.add(this._debugScale, 'value', 0.1, 5.0, 0.05).name('Scale')
+            .onChange(v => { for (let i = 0; i < this.fireCount; i++) this.setFireScale(i, v) })
         fShape.add(this.uElongation, 'value', 0.5, 3.0, 0.05).name('Elongation')
         fShape.add(this.uSwayAmt,    'value', 0.0, 0.3, 0.005).name('Sway Amount')
 

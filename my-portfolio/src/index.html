@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio</title>
-    <link rel="icon" type="image/svg+xml" href="/texture/coqui/coqui.svg">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="apple-touch-icon" href="/favicon-180.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -21,8 +23,27 @@
 
     <!-- Cloud transition overlay (slides in after orbit, contains loading UI) -->
     <div class="cloud-transition" id="cloud-transition">
+        <div class="loading-scene" aria-hidden="true">
+            <span class="sky-layer sky-day"></span>
+            <span class="sky-layer sky-sunset"></span>
+            <span class="sky-layer sky-night"></span>
+            <div class="loading-celestial">
+                <span class="loading-sun"></span>
+                <span class="loading-moon"></span>
+            </div>
+            <span class="loading-cloud lc1"></span>
+            <span class="loading-cloud lc2"></span>
+            <span class="loading-cloud lc3"></span>
+            <span class="loading-nightveil"></span>
+            <span class="loading-stars"></span>
+            <svg class="loading-waves" viewBox="0 0 1440 320" preserveAspectRatio="none" aria-hidden="true">
+                <path class="wave wave-3" d="M-200,150 C140,95 380,162 720,120 C1060,80 1300,150 1640,112 L1640,320 L-200,320 Z"/>
+                <path class="wave wave-2" d="M-200,212 C160,256 430,166 720,206 C1020,246 1260,180 1640,226 L1640,320 L-200,320 Z"/>
+                <path class="wave wave-1" d="M-200,252 C120,208 350,300 640,262 C940,222 1250,300 1640,256 L1640,320 L-200,320 Z"/>
+            </svg>
+        </div>
         <div class="cloud-transition-content">
-            <h1 class="cloud-title">Portfolio</h1>
+            <h1 class="cloud-title">Sergii's Portfolio</h1>
             <button class="cloud-btn" id="loading-enter-btn" disabled>
                 <span class="cloud-btn-fill" id="progress-fill"></span>
                 <span class="cloud-btn-text" id="progress-btn-text">0%</span>
@@ -44,20 +65,7 @@
         </svg>
     </button>
 
-    <div class="quality-modal-overlay" id="quality-modal-overlay" aria-hidden="true">
-        <div class="quality-modal" id="quality-modal" role="dialog" aria-modal="true"
-            aria-labelledby="quality-modal-title">
-            <button type="button" class="quality-modal-close" aria-label="Cerrar">&times;</button>
-            <div class="quality-modal-paper-top" aria-hidden="true"></div>
-            <h2 class="quality-modal-title" id="quality-modal-title">Calidad</h2>
-            <div class="quality-cards" role="group" aria-label="Presets">
-                <button type="button" class="quality-card" id="quality-card-high" data-quality-level="0"
-                    aria-pressed="false">Alta</button>
-                <button type="button" class="quality-card" id="quality-card-low" data-quality-level="1"
-                    aria-pressed="false">Ligera</button>
-            </div>
-        </div>
-    </div>
+    <!-- Quality settings now live in the central SettingsModal (World/ui). -->
 
     <!-- Modal Overlay -->
     <div class="modal-overlay">
