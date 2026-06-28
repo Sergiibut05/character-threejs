@@ -1,8 +1,12 @@
 import './ui.css'
+import './audio.css'
 import Modal from './Modal.js'
 import { createModeCard } from './Card.js'
 import { inputGlyph } from './InputGlyph.js'
-import { iconScenery, iconBolt, iconKeyboard, iconGamepad, iconMobile } from './icons.js'
+import {
+    iconScenery, iconBolt, iconKeyboard, iconGamepad, iconMobile,
+    iconMusic, iconVolume, iconMute, iconPrev, iconNext
+} from './icons.js'
 
 // Controls shown per device, grouped by context.
 const CONTROL_GROUPS = [
@@ -33,7 +37,7 @@ export default class SettingsModal {
         this.modal.append(this.nav)
         this.modal.append(this.content)
 
-        this._registerSection({ id: 'quality', label: 'Calidad', build: (c) => this._buildQuality(c) })
+        this._registerSection({ id: 'general', label: 'General', build: (c) => this._buildGeneral(c) })
         this._registerSection({ id: 'controls', label: 'Controles', build: (c) => this._buildControls(c) })
 
         // Keep the quality cards in sync with external changes.
@@ -63,6 +67,7 @@ export default class SettingsModal {
     addSection(section) { this._registerSection(section) }
 
     _select(i) {
+        this._teardownSound()
         this.activeIndex = i
         const tabs = this.nav.children
         for (let k = 0; k < tabs.length; k++) tabs[k].classList.toggle('is-active', k === i)
@@ -70,7 +75,15 @@ export default class SettingsModal {
         this.sections[i].build(this.content)
     }
 
-    // ─── Calidad section ─────────────────────────────────────────────────
+    // ─── General section (Calidad + Sonido) ──────────────────────────────
+    _buildGeneral(container) {
+        const qHead = _el('div', 'fz-sound-heading')
+        qHead.textContent = 'Calidad'
+        container.appendChild(qHead)
+        this._buildQuality(container)
+        this._buildSound(container)
+    }
+
     _buildQuality(container) {
         const grid = _el('div', 'fz-cards')
         const make = (level, icon, title, desc) => {
@@ -82,6 +95,102 @@ export default class SettingsModal {
         make(1, iconBolt, 'Ligera', 'Mejor rendimiento')
         container.appendChild(grid)
         this._syncQuality()
+    }
+
+    // ─── Sonido sub-section ──────────────────────────────────────────────
+    _buildSound(container) {
+        const audio = this.experience.audio
+        if (!audio) return
+
+        const wrap = _el('div', 'fz-sound')
+        const heading = _el('div', 'fz-sound-heading')
+        heading.textContent = 'Sonido'
+        wrap.appendChild(heading)
+
+        // Now-playing preview card
+        const np = _el('div', 'fz-np')
+        const cover = _el('div', 'fz-np-cover')
+        const info = _el('div', 'fz-np-info')
+        const title = _el('div', 'fz-np-title')
+        const prog = _el('div', 'fz-np-progress')
+        const cur = _el('span'); cur.textContent = '0:00'
+        const bar = _el('div', 'fz-np-bar')
+        const fill = _el('div', 'fz-np-bar-fill'); bar.appendChild(fill)
+        const dur = _el('span'); dur.textContent = '0:00'
+        prog.append(cur, bar, dur)
+        info.append(title, prog)
+        const controls = _el('div', 'fz-np-controls')
+        controls.append(
+            _iconBtn(iconPrev, 'Canción anterior', () => audio.prev()),
+            _iconBtn(iconNext, 'Siguiente canción', () => audio.next())
+        )
+        np.append(cover, info, controls)
+        wrap.appendChild(np)
+
+        // Volume row (mute toggle + slider)
+        const volRow = _el('div', 'fz-vol-row')
+        const muteBtn = _iconBtn(iconVolume, 'Silenciar', () => audio.toggleMute())
+        const vol = document.createElement('input')
+        vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'
+        vol.className = 'fz-vol'
+        vol.value = String(audio.getVolume())
+        vol.addEventListener('input', () => audio.setVolume(parseFloat(vol.value)))
+        volRow.append(muteBtn, vol)
+        wrap.appendChild(volRow)
+
+        container.appendChild(wrap)
+
+        // ── Render helpers ──
+        const fmt = (s) => {
+            s = Math.max(0, Math.floor(s || 0))
+            return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+        }
+        const setCover = (url) => {
+            if (url) { cover.style.backgroundImage = `url("${url}")`; cover.classList.remove('is-placeholder'); cover.innerHTML = '' }
+            else { cover.style.backgroundImage = ''; cover.classList.add('is-placeholder'); cover.innerHTML = iconMusic }
+        }
+        const renderTrack = () => {
+            const s = audio.getNowPlaying()
+            if (!s) { title.textContent = 'Sin música'; setCover(null); dur.textContent = '0:00'; return }
+            title.textContent = s.title || ''
+            setCover(s.cover)
+            dur.textContent = fmt(s.duration)
+        }
+        const renderProgress = () => {
+            const s = audio.getNowPlaying()
+            if (!s) { fill.style.width = '0%'; cur.textContent = '0:00'; return }
+            fill.style.width = (s.duration ? Math.min(100, (s.position / s.duration) * 100) : 0) + '%'
+            cur.textContent = fmt(s.position)
+        }
+        const renderControls = () => {
+            const m = audio.isMuted()
+            muteBtn.innerHTML = m ? iconMute : iconVolume
+            muteBtn.classList.toggle('is-on', !m)
+            muteBtn.setAttribute('aria-pressed', String(m))
+            vol.value = String(audio.getVolume())
+        }
+
+        renderTrack(); renderProgress(); renderControls()
+
+        // ── Live updates while the panel is open ──
+        this._soundTimer = setInterval(renderProgress, 500)
+        this._onTrackChange = () => { renderTrack(); renderProgress() }
+        this._onMuteChange = renderControls
+        this._onVolChange = renderControls
+        audio.on('trackchange', this._onTrackChange)
+        audio.on('mutechange', this._onMuteChange)
+        audio.on('volumechange', this._onVolChange)
+    }
+
+    _teardownSound() {
+        if (this._soundTimer) { clearInterval(this._soundTimer); this._soundTimer = null }
+        const audio = this.experience.audio
+        if (audio) {
+            if (this._onTrackChange) audio.off('trackchange', this._onTrackChange)
+            if (this._onMuteChange) audio.off('mutechange', this._onMuteChange)
+            if (this._onVolChange) audio.off('volumechange', this._onVolChange)
+        }
+        this._onTrackChange = this._onMuteChange = this._onVolChange = null
     }
 
     _syncQuality() {
@@ -147,6 +256,7 @@ export default class SettingsModal {
     close() { this.modal.close() }
 
     _onClosed() {
+        this._teardownSound()
         const character = this.experience.world?.character
         if (character && this._prevLocked !== undefined) {
             character.movementLocked = this._prevLocked
@@ -167,4 +277,14 @@ function _el(tag, className) {
     const node = document.createElement(tag)
     if (className) node.className = className
     return node
+}
+
+function _iconBtn(svg, label, onClick) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'fz-icon-btn'
+    b.setAttribute('aria-label', label)
+    if (svg) b.innerHTML = svg
+    b.addEventListener('click', onClick)
+    return b
 }

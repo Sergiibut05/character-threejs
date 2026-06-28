@@ -1,0 +1,223 @@
+/* ─── Audio UI: "Now playing" toast + settings sound section ─────────────
+   Uses the shared design tokens defined in ui.css (:root --fz-*). */
+
+/* ── Now-playing toast (top-right) ──────────────────────────────────── */
+.fz-toast {
+    position: fixed;
+    /* Sit just BELOW the settings gear (top:12px, 46px tall) so it never covers it. */
+    top: max(68px, calc(env(safe-area-inset-top, 0px) + 56px));
+    right: max(14px, env(safe-area-inset-right, 0px));
+    z-index: 2650;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px 10px 10px;
+    max-width: min(320px, 80vw);
+    background: linear-gradient(168deg, #ffffff 0%, var(--fz-green-50) 100%);
+    border: 2px solid var(--fz-green-200);
+    border-radius: var(--fz-radius-sm);
+    box-shadow: var(--fz-shadow);
+    font-family: var(--fz-font-body);
+    pointer-events: none;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+}
+
+.fz-toast.is-visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.fz-toast-cover {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--fz-green-100);
+    box-shadow: var(--fz-shadow-soft);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.fz-toast-cover.is-placeholder svg { width: 30px; height: 30px; }
+.fz-toast-cover svg { width: 30px; height: 30px; }
+
+.fz-toast-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fz-toast-kicker {
+    font-family: var(--fz-font-title);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fz-green-500);
+}
+
+.fz-toast-title {
+    font-family: var(--fz-font-title);
+    font-size: 0.95rem;
+    color: var(--fz-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-toast { transition: opacity 0.3s ease; transform: none; }
+}
+
+/* ── Settings: sound section ────────────────────────────────────────── */
+.fz-sound {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 2px dashed var(--fz-green-100);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fz-sound-heading {
+    font-family: var(--fz-font-title);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fz-ink-soft);
+}
+
+/* Now-playing card (preview) */
+.fz-np {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    background: var(--fz-green-50);
+    border: 2px solid var(--fz-green-100);
+    border-radius: var(--fz-radius-sm);
+}
+
+.fz-np-cover {
+    flex: 0 0 auto;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--fz-green-100);
+    box-shadow: var(--fz-shadow-soft);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+.fz-np-cover svg { width: 32px; height: 32px; }
+
+.fz-np-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fz-np-title {
+    font-family: var(--fz-font-title);
+    font-size: 1rem;
+    color: var(--fz-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fz-np-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--fz-ink-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+.fz-np-bar {
+    flex: 1 1 auto;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--fz-green-100);
+    overflow: hidden;
+}
+
+.fz-np-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--fz-green-400), var(--fz-green-500));
+    transition: width 0.25s linear;
+}
+
+/* Transport (prev / next) */
+.fz-np-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.fz-icon-btn {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--fz-radius-pill);
+    border: 2px solid var(--fz-green-200);
+    background: #ffffff;
+    color: var(--fz-green-500);
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.fz-icon-btn svg { width: 22px; height: 22px; }
+.fz-icon-btn:hover { background: var(--fz-green-50); border-color: var(--fz-green-400); transform: translateY(-1px); }
+.fz-icon-btn:active { transform: translateY(0) scale(0.96); }
+.fz-icon-btn.is-on { background: var(--fz-green-400); border-color: var(--fz-green-500); color: #fff; }
+
+/* Volume row */
+.fz-vol-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fz-vol {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--fz-green-100);
+    outline: none;
+    cursor: pointer;
+}
+.fz-vol::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--fz-green-400);
+    border: 3px solid #fff;
+    box-shadow: var(--fz-shadow-soft);
+    cursor: pointer;
+}
+.fz-vol::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--fz-green-400);
+    border: 3px solid #fff;
+    box-shadow: var(--fz-shadow-soft);
+    cursor: pointer;
+}
+.fz-vol:disabled { opacity: 0.5; cursor: default; }

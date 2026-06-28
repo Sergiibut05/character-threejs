@@ -116,3 +116,41 @@ export const iconPower = `
   <rect x="8.5" y="21.5" width="17" height="5" rx="2.5" fill="#ffd84d"/>
   <path d="M28 13.5v21" stroke="#ff6b4a" stroke-width="3.2" stroke-linecap="round"/>
 </svg>`
+
+// ─── Audio icons ─────────────────────────────────────────────────────────
+
+// Music note — soundtrack / now playing.
+export const iconMusic = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M20 30V11l16-3.5V26" stroke="#41a06e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="15.5" cy="31.5" r="5" fill="#9be4ca" stroke="#41a06e" stroke-width="2.6"/>
+  <circle cx="31.5" cy="27.5" r="5" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6"/>
+</svg>`
+
+// Speaker with sound waves — audio on. currentColor so it follows state.
+export const iconVolume = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M9 19h6l8-6v22l-8-6H9V19Z" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M30 18a8 8 0 0 1 0 12M34.5 13.5a14 14 0 0 1 0 21" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+</svg>`
+
+// Speaker muted (with an X). currentColor.
+export const iconMute = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M9 19h6l8-6v22l-8-6H9V19Z" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M30 19l10 10M40 19 30 29" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+</svg>`
+
+// Previous track — skip back.
+export const iconPrev = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M14 12v24" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M36 13 19 24l17 11V13Z" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
+</svg>`
+
+// Next track — skip forward.
+export const iconNext = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M34 12v24" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M12 13l17 11-17 11V13Z" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
+</svg>`

@@ -31,9 +31,14 @@ export default class Character {
 
         // State machine: idle | walking | running | resting
         this.state = 'idle'
+        // Seconds the character has stood still (drives idle effects like MusicNotes).
+        // Reset to 0 the moment the player moves, throws, or a minigame locks movement.
+        this.idleTime = 0
         this.runDuration = 0
         this.restAfterRunThreshold = 2.0
         this.isSprinting = false
+        // Idle (happy) animation plays slightly faster while humming/singing.
+        this.singIdleSpeed = 1.18
 
         // Blinking
         this.blinkTimer = 0
@@ -41,10 +46,13 @@ export default class Character {
         this.isBlinking = false
         this.blinkDuration = 0.12
 
-        // Atlas UV offsets (2x2 grid)
-        this._uvOpen = new THREE.Vector2(0, 0)
-        this._uvClosed = new THREE.Vector2(0, 0.5)
-        this._uvRest = new THREE.Vector2(0.5, 0)
+        // Atlas UV offsets (2x2 grid). repeat is (0.5, 0.5).
+        // V axis is flipped (KTX2 flipY=false), so v=0 is the TOP row:
+        //   (0,0)=top-left  (0.5,0)=top-right  (0,0.5)=bottom-left  (0.5,0.5)=bottom-right
+        this._uvOpen = new THREE.Vector2(0, 0)          // top-left:    normal, eyes open
+        this._uvClosed = new THREE.Vector2(0.5, 0)      // top-right:   normal, eyes closed (blink)
+        this._uvSingOpen = new THREE.Vector2(0, 0.5)    // bottom-left: singing, eyes open
+        this._uvSingClosed = new THREE.Vector2(0.5, 0.5)// bottom-right:singing, eyes closed (blink)
 
         // Input
         this.keys = { w: false, a: false, s: false, d: false, shift: false }
@@ -323,9 +331,22 @@ export default class Character {
     _updateBlinking(deltaTime) {
         if (!this.atlas) return
 
+        // Tired after running: hold the closed-eye (top-right) face, no blinking.
         if (this.state === 'resting') {
-            this.atlas.offset.copy(this._uvRest)
+            this.atlas.offset.copy(this._uvClosed)
             return
+        }
+
+        // While idle long enough for the music notes to appear, swap to the
+        // "singing" face pair. Blinking works the same on either pair: it just
+        // alternates between the open and closed variant of the active face.
+        const singing = this.experience.world?.musicNotes?.isSinging === true
+        const openUV = singing ? this._uvSingOpen : this._uvOpen
+        const closedUV = singing ? this._uvSingClosed : this._uvClosed
+
+        // Subtly speed up the idle (humming) loop while singing.
+        if (this.actions?.happy) {
+            this.actions.happy.setEffectiveTimeScale(singing ? this.singIdleSpeed : 1.0)
         }
 
         this.blinkTimer += deltaTime
@@ -335,15 +356,15 @@ export default class Character {
                 this.isBlinking = false
                 this.blinkTimer = 0
                 this.nextBlinkTime = this._randomBlinkInterval()
-                this.atlas.offset.copy(this._uvOpen)
             }
         } else {
             if (this.blinkTimer >= this.nextBlinkTime) {
                 this.isBlinking = true
                 this.blinkTimer = 0
-                this.atlas.offset.copy(this._uvClosed)
             }
         }
+
+        this.atlas.offset.copy(this.isBlinking ? closedUV : openUV)
     }
 
     // ─── Main update ────────────────────────────────────────────────────
@@ -354,7 +375,7 @@ export default class Character {
 
         // Frozen while a modal (tutorial/help) is open mid-throw — hold the pose
         // so the wind-up animation doesn't play out (clip) behind the modal.
-        if (this.animationPaused) return
+        if (this.animationPaused) { this.idleTime = 0; return }
 
         // Check throw pause
         if (this.state === 'throwing' && this.throwPauseTime != null && this.actions.throw) {
@@ -366,6 +387,7 @@ export default class Character {
 
         // When movement is locked (minigame), only update mixer
         if (this.movementLocked) {
+            this.idleTime = 0
             this._updateBlinking(dt)
             if (this.mixer) this.mixer.update(dt)
             return
@@ -391,6 +413,9 @@ export default class Character {
         }
 
         const isMoving = dir.lengthSq() > 0.0001
+
+        // Idle timer — drives idle-only effects (e.g. MusicNotes).
+        this.idleTime = isMoving ? 0 : this.idleTime + dt
 
         // State machine
         this._updateState(dt, isMoving)

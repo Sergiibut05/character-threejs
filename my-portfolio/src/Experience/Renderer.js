@@ -64,7 +64,7 @@ export default class Renderer {
 
     _buildPostProcessingPipeline() {
         const scenePass = pass(this.scene, this.camera.instance)
-        
+
         // 1. Outline Pass — only the VISIBLE edge is drawn; the hidden edge is
         // dropped so the white outline can't shine through objects (the player,
         // props…) that sit between the outlined object and the camera.
@@ -82,13 +82,11 @@ export default class Renderer {
 
         let composited = outlineColor.add(scenePass)
 
-        // 1b. Bloom (High quality only) — threshold 1.0 so ONLY HDR emissive
-        // surfaces glow (fire core/embers are boosted above 1.0), the rest of
-        // the pastel scene stays untouched.
-        if (!this.quality.isLow) {
-            const bloomPass = bloom(scenePass.getTextureNode(), 0.5, 0.4, 1.0)
-            composited = composited.add(bloomPass)
-        }
+        // 1b. Bloom (threshold 1.0) — only HDR surfaces above 1.0 glow: fire
+        // core/embers and the lamp glass (its emissive is luminance-normalised
+        // above 1.0 so a saturated colour still blooms). Pastel scene untouched.
+        const bloomPass = bloom(scenePass.getTextureNode(), 0.5, 0.6, 1.0)
+        composited = composited.add(bloomPass)
 
         // 2. Tilt-Shift Blur (Both Qualities)
         // Reduced intensity: radius 3 for High, 2 for Low to save GPU.

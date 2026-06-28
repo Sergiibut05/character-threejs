@@ -146,7 +146,7 @@ export default class Flowers {
     setMaterial() {
         this.uTime = uniform(0)
         this.uWindStrength = uniform(0.05)
-        this.uWindSpeed = uniform(1.0)
+        this.uWindSpeed = uniform(1.9)
         this.uCharacterPosition = uniform(new THREE.Vector3(0, 0, 0))
         this.uViewRadius = uniform(this.viewRadius)
         this.uViewFadeBand = uniform(this.viewFadeBand)

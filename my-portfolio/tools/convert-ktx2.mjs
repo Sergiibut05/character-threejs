@@ -19,6 +19,14 @@ const FORCE = process.argv.includes('--force')
 
 const TARGETS = [
     {
+        // Character face atlas (2x2). Loader uses generateMipmaps:false +
+        // LinearFilter, so encode WITHOUT mipmaps to match.
+        in: 'models/human/human-atlas.png',
+        out: 'models/human/human-atlas.ktx2',
+        srgb: true,
+        genmipmap: false
+    },
+    {
         in: 'texture/Atlas-textures/Forest_Atlas.png',
         out: 'texture/Atlas-textures/Forest_Atlas.ktx2',
         srgb: true,

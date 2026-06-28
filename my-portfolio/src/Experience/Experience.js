@@ -10,6 +10,7 @@ import World from './World/World.js'
 import MobileControls from './Utils/MobileControls.js'
 import GamepadControls from './Utils/GamepadControls.js'
 import InputDevice from './Utils/InputDevice.js'
+import AudioManager from './Utils/AudioManager.js'
 import SettingsModal from './World/ui/SettingsModal.js'
 import sources from './sources.js'
 
@@ -45,6 +46,7 @@ export default class Experience {
         this.world = new World()
         this.mobileControls = new MobileControls()
         this.gamepad = new GamepadControls()
+        this.audio = new AudioManager(this)
         this.settingsUi = new SettingsModal(this)
 
         // Cloud transition elements
@@ -184,6 +186,11 @@ export default class Experience {
 
         // Start rendering scene immediately under the iris.
         this.ready = true
+
+        // Kick off the soundtrack — this click is the user gesture that unlocks
+        // audio autoplay. AudioManager handles its own delay + fade-in so the
+        // music swells in just as the iris opens.
+        this.audio?.startSoundtrack()
 
         // Start from full black instantly to avoid a visible frame leak.
         this.renderer.setIrisTransitionEnabled(true)

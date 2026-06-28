@@ -6,12 +6,14 @@ import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Mailbox from './Mailbox.js'
 import Door from './Door.js'
+import StreetLamps from './StreetLamps.js'
 import ScoreboardScreen from './ScoreboardScreen.js'
 import Ground from './Ground.js'
 import Grass from './Grass.js'
 import Flowers from './Flowers.js'
 import Fireflies from './Fireflies.js'
 import Fire from './Fire.js'
+import MusicNotes from './MusicNotes.js'
 import PatioScene from './PatioScene.js'
 import { jsonInstancesToObjects } from './scene/SceneUtils.js'
 import Trees from './Trees.js'
@@ -41,6 +43,7 @@ export default class World {
             if (this.isDevLightMode) {
                 this.ground = new Ground()
                 this.character = new Character()
+                this.musicNotes = new MusicNotes()
                 this.activityPrompt = new ActivityPrompt()
                 this.frisbeeMinigame = new FrisbeeMinigame()
                 this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
@@ -77,6 +80,9 @@ export default class World {
 
             // Character
             this.character = new Character()
+
+            // Idle musical notes (Animal-Crossing "humming" while standing still)
+            this.musicNotes = new MusicNotes()
 
             // Grass — placed on grass regions from the ground mesh vertex colors
             this.setupGrass()
@@ -122,6 +128,7 @@ export default class World {
             this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
             this.mailbox = new Mailbox() // resolves the mailbox node lazily
             this.door = new Door() // resolves the house `door` node lazily
+            this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
             // Live ranking screen: auto-attaches the canvas texture to a mesh
             // named "scoreboard" when you import your own object (see file).
             this.scoreboardScreen = new ScoreboardScreen()
@@ -347,6 +354,11 @@ export default class World {
             this.character.update()
         }
 
+        // Idle musical notes (depends on character.idleTime updated above)
+        if (this.musicNotes) {
+            this.musicNotes.update()
+        }
+
         // Frisbee minigame (includes pre-physics forces)
         if (this.frisbeeMinigame) {
             this.frisbeeMinigame.update()
@@ -369,6 +381,9 @@ export default class World {
         }
         if (this.door) {
             this.door.update()
+        }
+        if (this.streetLamps) {
+            this.streetLamps.update()
         }
         if (this.scoreboardScreen) {
             this.scoreboardScreen.update()

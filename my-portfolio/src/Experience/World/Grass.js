@@ -117,7 +117,7 @@ export default class Grass {
 
         // Wind
         this.uWindStrength = uniform(0.10)
-        this.uWindSpeed = uniform(1.0)
+        this.uWindSpeed = uniform(1.9)
 
         // Character grass parting
         this.uCharacterPosition = uniform(new THREE.Vector3(0, 0, 0))

@@ -230,6 +230,18 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        name: 'postModel',
+        type: 'gltfModel',
+        path: '/models/posts/post-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'postReferences',
+        type: 'json',
+        path: '/models/posts/post-references.json',
+        priority: 'decorative'
+    },
+    {
         name: 'socialAreaModel',
         type: 'gltfModel',
         path: '/models/social-area/social-area-compressed.glb',

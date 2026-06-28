@@ -257,6 +257,8 @@ export default class FrisbeeSession {
         this.round = 1
         this.score = 0
         this._announcedRound = 0
+        // Silence the world soundtrack while inside the minigame.
+        this.experience.audio?.suspendForMinigame()
         this._tutorialPending = !this._tutorialSeen() // shown at the first windUp
         this.minigame.roundStartCinematic = true
         this.experience.mobileControls?.setActionIcon?.('frisbee')
@@ -571,6 +573,8 @@ export default class FrisbeeSession {
     _endSession() {
         this.active = false
         this._helpShown = false
+        // Bring the world soundtrack back as we return to free roam.
+        this.experience.audio?.resumeAfterMinigame()
         window.removeEventListener('keydown', this._onKeyDown, true)
         this.minigame.onThrowComplete = null
         this.minigame.roundStartCinematic = false
