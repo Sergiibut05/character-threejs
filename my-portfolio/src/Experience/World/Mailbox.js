@@ -22,7 +22,7 @@ export default class Mailbox {
         this.isHovered = false
         this.isNear = false
         this.isHighlighted = false
-        this.proximityRadius = 1.8
+        this.proximityRadius = 1.15
 
         this.contact = null
         this._prevMobileB = false

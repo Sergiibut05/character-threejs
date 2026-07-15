@@ -347,6 +347,18 @@ export default class Fire {
         }
     }
 
+    /** Min XZ distance from (x,z) to any active fire — for proximity audio. */
+    nearestFireDistanceXZ(x, z) {
+        let min = Infinity
+        for (let i = 0; i < this.fireCount; i++) {
+            const dx = this._flameData[i * 4] - x
+            const dz = this._flameData[i * 4 + 2] - z
+            const d = Math.hypot(dx, dz)
+            if (d < min) min = d
+        }
+        return min
+    }
+
     update() {
         // Smooth campfire flicker: three sines at non-harmonic frequencies.
         // Only CPU cost of the whole system (a few Math.sin per frame).

@@ -1,5 +1,8 @@
 import * as THREE from 'three'
-import { pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs, vec2, vec4, max, length } from 'three/tsl'
+import {
+    pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs,
+    vec2, vec4, max, length
+} from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
@@ -15,6 +18,18 @@ export default class Renderer {
         this.quality = this.experience.quality
 
         this.selectedObjects = []
+
+        // Outline tuning (see _buildPostProcessingPipeline). Uniform-driven so
+        // the debug GUI adjusts them live without rebuilding the pipeline.
+        this.uEdgeThickness = uniform(2.4)
+        this.uEdgeSuppress = uniform(1.6)
+
+        if (this.experience.debug?.active) {
+            const f = this.experience.debug.ui.addFolder('Outline')
+            f.close()
+            f.add(this.uEdgeThickness, 'value', 0.5, 5, 0.1).name('Grosor')
+            f.add(this.uEdgeSuppress, 'value', 0, 4, 0.1).name('Recorte oclusión')
+        }
 
         this.setInstance()
     }
@@ -65,26 +80,31 @@ export default class Renderer {
     _buildPostProcessingPipeline() {
         const scenePass = pass(this.scene, this.camera.instance)
 
-        // 1. Outline Pass — only the VISIBLE edge is drawn; the hidden edge is
-        // dropped so the white outline can't shine through objects (the player,
-        // props…) that sit between the outlined object and the camera.
+        // 1. Outline Pass. The node's composite already clips the edge INSIDE
+        // the object's own footprint (mask.r), but knows nothing about outside
+        // occluders: the blur-dilated edge bled onto the character standing in
+        // front. Fix: the node ALSO outputs the `hiddenEdge` field — the edge
+        // where the object is depth-occluded (i.e. exactly where something like
+        // the character covers it). Using that blurred field as a SUPPRESSOR on
+        // the visible edge erases the outline right where an occluder overlaps
+        // it, and leaves untouched edges at full strength.
         const visibleEdgeColor = uniform(new THREE.Color('#ffffff'))
         const edgeStrength = float(2.0)
 
         const outlinePass = outline(this.scene, this.camera.instance, {
             selectedObjects: this.selectedObjects,
-            edgeThickness: float(2.4),
+            edgeThickness: this.uEdgeThickness,
             edgeGlow: float(0.15)
         })
 
-        const { visibleEdge } = outlinePass
-        const outlineColor = visibleEdge.mul(visibleEdgeColor).mul(edgeStrength)
+        const { visibleEdge, hiddenEdge } = outlinePass
+        const occluderCut = hiddenEdge.mul(this.uEdgeSuppress).oneMinus().clamp(0.0, 1.0)
+        const outlineColor = visibleEdge.mul(occluderCut).mul(visibleEdgeColor).mul(edgeStrength)
 
         let composited = outlineColor.add(scenePass)
 
         // 1b. Bloom (threshold 1.0) — only HDR surfaces above 1.0 glow: fire
-        // core/embers and the lamp glass (its emissive is luminance-normalised
-        // above 1.0 so a saturated colour still blooms). Pastel scene untouched.
+        // core/embers and the lamp glass. Pastel scene untouched.
         const bloomPass = bloom(scenePass.getTextureNode(), 0.5, 0.6, 1.0)
         composited = composited.add(bloomPass)
 

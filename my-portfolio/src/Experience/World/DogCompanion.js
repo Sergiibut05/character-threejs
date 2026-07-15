@@ -203,7 +203,11 @@ export default class DogCompanion {
         this.chaseElapsed = 0
 
         const dist = this.position.distanceTo(this.landingPoint)
-        const arriveTime = Math.max(flightDuration * this.arrivalMargin, 0.5)
+        // Bad throw: the dog gives up at the halfway point and must already be
+        // standing there when the camera cuts to it at mid-flight (Wii-style),
+        // so it aims to arrive around 45% of the flight, not at the end.
+        const arriveFactor = this._badThrow ? 0.45 : this.arrivalMargin
+        const arriveTime = Math.max(flightDuration * arriveFactor, 0.5)
         this.chaseSpeed = THREE.MathUtils.clamp(
             dist / arriveTime,
             this.minRunSpeed,
@@ -243,21 +247,35 @@ export default class DogCompanion {
     }
 
     /**
-     * @param {number} cameraYaw — the throw yaw so the dog walks perpendicular to the camera view
+     * @param {number} cameraYaw — throw yaw, used as fallback when the camera is unavailable
      */
     startPostCatchWalk(cameraYaw) {
-        // Walk roughly perpendicular to the camera (left or right)
-        // Pick the side closest to the dog's current facing
-        const dogYaw = this.container.rotation.y
-        const perpL = cameraYaw + Math.PI * 0.5
-        const perpR = cameraYaw - Math.PI * 0.5
-        const diffL = Math.abs(Math.atan2(Math.sin(perpL - dogYaw), Math.cos(perpL - dogYaw)))
-        const diffR = Math.abs(Math.atan2(Math.sin(perpR - dogYaw), Math.cos(perpR - dogYaw)))
-        const walkYaw = diffL < diffR ? perpL : perpR
+        // Wii-style presentation: after the catch the dog turns around (a natural
+        // walking arc, see _updatePostWalk) and trots a few steps TOWARD the
+        // camera, with a small lateral offset so it doesn't march into the lens.
+        const cam = this.experience.camera?.instance
+        const dir = new THREE.Vector3()
+        if (cam) {
+            dir.subVectors(cam.position, this.position)
+            dir.y = 0
+        }
+        if (dir.lengthSq() < 0.01) {
+            // Fallback: straight back along the throw direction.
+            dir.set(Math.sin(cameraYaw + Math.PI), 0, Math.cos(cameraYaw + Math.PI))
+        }
+        const distToCam = dir.length()
+        dir.normalize()
 
-        const dir = new THREE.Vector3(Math.sin(walkYaw), 0, Math.cos(walkYaw))
-        this.returnTarget.copy(this.position).addScaledVector(dir, 2.5)
+        // Never walk past (or into) the camera on very short catches.
+        const walkDist = Math.min(3.0, Math.max(1.0, distToCam - 3.0))
+        const side = new THREE.Vector3(-dir.z, 0, dir.x)
+        const sideSign = Math.random() < 0.5 ? 1 : -1
+
+        this.returnTarget.copy(this.position)
+            .addScaledVector(dir, walkDist)
+            .addScaledVector(side, sideSign * 0.8)
         this.returnTarget.y = 0
+        this._postWalkTimer = 0
         this.state = 'postWalk'
         this._playAction('walk')
     }
@@ -401,20 +419,29 @@ export default class DogCompanion {
     }
 
     _updatePostWalk(dt) {
+        this._postWalkTimer = (this._postWalkTimer ?? 0) + dt
+
         const toTarget = _v3.subVectors(this.returnTarget, this.position)
         toTarget.y = 0
         const dist = toTarget.length()
 
-        if (dist < 0.3) {
+        // Done on arrival — or after a safety timeout (the steering arc could
+        // in theory orbit a too-tight target forever).
+        if (dist < 0.5 || this._postWalkTimer > 4) {
             this.state = 'done'
             this._playAction('idle')
             return
         }
 
+        // Natural turn: steer toward the target but MOVE along the current
+        // facing (same scheme as the chase) → the ~180° turn back toward the
+        // camera reads as a walking arc instead of a pivot-and-slide.
         toTarget.normalize()
-        this.position.addScaledVector(toTarget, this.walkSpeed * dt)
+        this._rotateToward(toTarget, dt, 5)
+        const yaw = this.container.rotation.y
+        _v3b.set(Math.sin(yaw), 0, Math.cos(yaw))
+        this.position.addScaledVector(_v3b, this.walkSpeed * dt)
         this.position.y = this._groundY
-        this._rotateToward(toTarget, dt)
         this.container.position.copy(this.position)
     }
 

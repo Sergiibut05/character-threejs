@@ -11,8 +11,10 @@
  */
 
 :root {
+    /* Nunito is actually LOADED (style.css imports it alongside Fredoka) —
+       'Inter' never was, so body text used to fall back to the system font. */
     --fz-font-title: 'Fredoka', 'Nunito', 'Quicksand', system-ui, sans-serif;
-    --fz-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --fz-font-body: 'Nunito', 'Quicksand', system-ui, -apple-system, sans-serif;
 
     /* Pastel palette (from style.css tokens) */
     --fz-cream: #f8fbfa;
@@ -64,7 +66,10 @@
 /* ─── Panel ───────────────────────────────────────────────────────────── */
 .fz-modal {
     position: relative;
-    width: min(400px, 93vw);
+    /* 100% = the overlay's padded content box. A vw-based width could exceed
+       it on narrow phones; the overflow + `safe center` then left-snapped the
+       panel and ate the right padding → modal looked shifted right. */
+    width: min(400px, 100%);
     box-sizing: border-box;
     padding: 30px 26px 26px;
     border-radius: var(--fz-radius);
@@ -101,7 +106,7 @@
 }
 
 .fz-modal--lg {
-    width: min(470px, 94vw);
+    width: min(560px, 100%);
     padding: 38px 32px 30px;
 }
 
@@ -158,9 +163,13 @@
 }
 
 .fz-modal-close:hover {
-    background: rgba(120, 175, 145, 0.22);
-    color: rgba(42, 75, 58, 0.9);
-    transform: scale(1.06);
+    background: rgba(255, 107, 107, 0.16);
+    color: var(--fz-red);
+    transform: rotate(90deg) scale(1.15);
+}
+
+.fz-modal-close:active {
+    transform: rotate(90deg) scale(0.95);
 }
 
 .fz-modal-close:focus-visible {
@@ -913,12 +922,18 @@
     margin-bottom: 18px;
 }
 
+/* Section headings placed directly in the settings content (e.g. "Calidad")
+   need breathing room before the cards below them. */
+.fz-settings-content > .fz-sound-heading {
+    margin-bottom: 12px;
+}
+
 .fz-settings-tab {
     appearance: none;
     font-family: var(--fz-font-title);
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
-    padding: 8px 18px;
+    padding: 10px 22px;
     border-radius: var(--fz-radius-pill);
     border: 1.5px solid rgba(120, 185, 150, 0.4);
     background: rgba(255, 255, 255, 0.6);
@@ -993,6 +1008,11 @@
     gap: 13px;
     text-align: left;
     margin-bottom: 4px;
+    /* The lg modal grew to 560px — full-width inputs read as too wide.
+       Keep the form itself at a comfortable measure, centred. */
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .fz-field {

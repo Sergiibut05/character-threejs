@@ -154,3 +154,70 @@ export const iconNext = `
   <path d="M34 12v24" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
   <path d="M12 13l17 11-17 11V13Z" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
 </svg>`
+
+// ─── Profile / house-interior icons ─────────────────────────────────────
+
+// Award ribbon — certificates (gold, matches the trophy).
+export const iconBadge = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <circle cx="24" cy="19" r="11.5" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6"/>
+  <circle cx="24" cy="19" r="5.4" fill="#fff3bf" stroke="#e8a200" stroke-width="1.8"/>
+  <path d="M18 28.5 14.5 41l9.5-5 9.5 5L30 28.5" fill="#5a8af5" stroke="#3f6ad0" stroke-width="2.4" stroke-linejoin="round"/>
+</svg>`
+
+// GitHub mark (simplified, currentColor).
+export const iconGithub = `
+<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+  <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.58 9.58 0 0 1 5 0c1.91-1.3 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/>
+</svg>`
+
+// LinkedIn mark (simplified, currentColor).
+export const iconLinkedin = `
+<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+  <path d="M4.98 3.5a2.5 2.5 0 1 1-.02 5 2.5 2.5 0 0 1 .02-5ZM3 9h4v12H3V9Zm7 0h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.5c0-1.31-.03-3-1.83-3-1.83 0-2.11 1.43-2.11 2.9V21h-4V9Z"/>
+</svg>`
+
+// Envelope — email (currentColor).
+export const iconMail = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <rect x="3" y="5.5" width="18" height="13" rx="2.5" stroke="currentColor" stroke-width="2"/>
+  <path d="m4.5 8 7.5 5.5L19.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`
+
+// Isometric cube — 3D / rendering (currentColor).
+export const iconCube = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <path d="M12 2.8 21 7.6v8.8L12 21.2 3 16.4V7.6l9-4.8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M3.4 7.8 12 12.4l8.6-4.6M12 12.4v8.4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+</svg>`
+
+// Bouncing ball with motion arc — physics (currentColor).
+export const iconPhysics = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <circle cx="15.5" cy="15.5" r="4.5" stroke="currentColor" stroke-width="2"/>
+  <path d="M3 13.5C3.5 8 6.5 4.5 11 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 3.6"/>
+  <path d="M4.5 19.5h15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>`
+
+// Database cylinder — Firebase / storage (currentColor).
+export const iconDatabase = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <ellipse cx="12" cy="5.5" rx="7.5" ry="3" stroke="currentColor" stroke-width="2"/>
+  <path d="M4.5 5.5v13c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-13" stroke="currentColor" stroke-width="2"/>
+  <path d="M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3" stroke="currentColor" stroke-width="2"/>
+</svg>`
+
+// Paint palette — art / models (currentColor).
+export const iconPalette = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <path d="M12 3a9 9 0 1 0 0 18c1.4 0 2.2-.9 2.2-2 0-.6-.3-1-.6-1.4-.3-.4-.6-.8-.6-1.4 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.6C20.4 5.8 16.6 3 12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="8" cy="9" r="1.35" fill="currentColor"/>
+  <circle cx="12.5" cy="7" r="1.35" fill="currentColor"/>
+  <circle cx="7.5" cy="14" r="1.35" fill="currentColor"/>
+</svg>`
+
+// Heart — credits / thanks (currentColor).
+export const iconHeart = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+  <path d="M12 20.5S4 15.4 4 9.9C4 7.2 6.1 5 8.7 5c1.5 0 2.8.8 3.3 1.9C12.5 5.8 13.8 5 15.3 5 17.9 5 20 7.2 20 9.9c0 5.5-8 10.6-8 10.6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+</svg>`

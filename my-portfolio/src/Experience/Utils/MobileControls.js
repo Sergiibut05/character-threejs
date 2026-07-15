@@ -220,6 +220,10 @@ export default class MobileControls
     setSprintVisible(visible)
     {
         if (this.button1) this.button1.style.display = visible ? '' : 'none'
+        // With the sprint hidden (minigame) only the throw button remains — raise
+        // it to the midpoint of where the two world buttons sit (64px buttons +
+        // 10px gap → the midpoint is 37px above the lone button's spot).
+        if (this.button2) this.button2.style.marginBottom = visible ? '' : '37px'
     }
 
     // Check if controls are active (mobile mode)

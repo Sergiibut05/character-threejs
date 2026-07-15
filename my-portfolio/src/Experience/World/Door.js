@@ -5,9 +5,10 @@ import Experience from '../Experience.js'
 const DOOR_NODES = ['door', 'house_door']
 
 /**
- * Door — the `door` + `house_door` nodes from house.glb become a highlight-only
- * interactive: their edges glow WHITE (shared outline pass) when the player is
- * near or hovers them with the mouse. No action yet — added later.
+ * Door — the `door` + `house_door` nodes from house.glb become interactive:
+ * their edges glow WHITE (shared outline pass) when the player is near or
+ * hovers them, and pressing the action button (A / Enter / tap / click)
+ * teleports into the house interior (World.houseInterior).
  */
 export default class Door {
     constructor() {
@@ -22,7 +23,14 @@ export default class Door {
         this.isHovered = false
         this.isNear = false
         this.isHighlighted = false
-        this.proximityRadius = 1.8
+        // Measured from the door node's centre; the house collider keeps the
+        // character ~1u away from the slab, so the effective window was tiny.
+        this.proximityRadius = 2.4
+
+        this._prevMobileB = false
+        this._prevPadA = false
+        this._onKeyDown = (e) => { if (e.key === 'Enter') this._tryInteract() }
+        window.addEventListener('keydown', this._onKeyDown)
 
         this._resolve()
     }
@@ -75,7 +83,16 @@ export default class Door {
         document.body.style.cursor = ''
     }
 
-    onClick() { /* no action yet */ }
+    onClick() { this._tryInteract() }
+
+    // ─── Interaction: step into the house ────────────────────────────────
+    _tryInteract() {
+        if (!(this.isNear || this.isHovered)) return
+        if (document.querySelector('.fz-modal-overlay.is-open')) return // a modal is open
+        const mg = this.experience.world?.frisbeeMinigame
+        if (mg && mg.state !== 'idle') return // mid-minigame
+        this.experience.world?.houseInterior?.enter()
+    }
 
     _updateHighlight() {
         const should = this.isHovered || this.isNear
@@ -95,9 +112,19 @@ export default class Door {
             const near = this.position.distanceTo(character.position) < this.proximityRadius
             if (near !== this.isNear) { this.isNear = near; this._updateHighlight() }
         }
+
+        // Mobile action button + gamepad A (rising edge) when near/hovered.
+        const mb = this.experience.mobileControls?.getActions?.().button2 === true
+        if (mb && !this._prevMobileB) this._tryInteract()
+        this._prevMobileB = mb
+
+        const pa = this.experience.gamepad?.getActions?.().button2 === true
+        if (pa && !this._prevPadA) this._tryInteract()
+        this._prevPadA = pa
     }
 
     destroy() {
+        window.removeEventListener('keydown', this._onKeyDown)
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         this.experience.world?.raycaster?.removeInteractiveObject?.(this)
     }

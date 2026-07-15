@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d": "^0.19.3",
+    "firebase": "^12.16.0",
     "howler": "^2.2.4",
     "lil-gui": "^0.20.0",
     "nipplejs": "^0.10.2",

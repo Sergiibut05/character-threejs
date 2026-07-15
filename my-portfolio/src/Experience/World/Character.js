@@ -40,6 +40,15 @@ export default class Character {
         // Idle (happy) animation plays slightly faster while humming/singing.
         this.singIdleSpeed = 1.18
 
+        // Footprints: stamped every stride while walking on dirt (see World).
+        this.strideWalk = 0.7         // metres between prints when walking
+        this.strideRun = 1.15         // metres between prints when sprinting
+        this.strideStartDelay = 0     // extra metres before the FIRST print after stopping
+        this.footSpacing = 0.09       // lateral offset of each print from the centreline (±)
+        this._strideAcc = 0
+        this._strideFresh = true
+        this._footSide = 1
+
         // Blinking
         this.blinkTimer = 0
         this.nextBlinkTime = this._randomBlinkInterval()
@@ -256,6 +265,28 @@ export default class Character {
         this.container.position.copy(this.position)
     }
 
+    /**
+     * Instant teleport (house enter/exit — hidden behind the iris).
+     * @param {number} x world X
+     * @param {number} groundY world Y of the FLOOR at the destination
+     * @param {number} z world Z
+     * @param {number} [yaw] facing after the jump
+     */
+    teleportTo(x, groundY, z, yaw) {
+        this.position.set(x, groundY + this.capsuleCenterY + 0.15, z)
+        this.verticalVelocity = 0
+        if (this.rigidBody) {
+            this.rigidBody.setTranslation(
+                { x: this.position.x, y: this.position.y, z: this.position.z }, true
+            )
+        }
+        this.container.position.copy(this.position)
+        if (yaw !== undefined) this.container.rotation.y = yaw
+        this.previousPosition.copy(this.position)
+        this._strideAcc = 0
+        this._strideFresh = true
+    }
+
     // ─── Throw animation ─────────────────────────────────────────────────
 
     startThrowAnimation(pauseAtTime) {
@@ -458,6 +489,31 @@ export default class Character {
 
             this.isGrounded = this.characterController.computedGrounded()
             if (this.isGrounded && this.verticalVelocity < 0) this.verticalVelocity = 0
+
+            // Footprints — every stride of ACTUAL horizontal movement while
+            // grounded, alternating feet. World.stampFootprint() only stamps
+            // when the spot is dirt/sand.
+            if (isMoving && this.isGrounded) {
+                this._strideAcc += Math.hypot(corrected.x, corrected.z)
+                const strideLen = (this.isSprinting ? this.strideRun : this.strideWalk) +
+                    (this._strideFresh ? this.strideStartDelay : 0)
+                if (this._strideAcc >= strideLen) {
+                    this._strideAcc = 0
+                    this._strideFresh = false
+                    this._footSide = -this._footSide
+                    const yaw = this.container.rotation.y
+                    const off = this.footSpacing * this._footSide
+                    this.experience.world?.stampFootprint?.(
+                        this.position.x + Math.cos(yaw) * off,
+                        this.groundY + 0.03,
+                        this.position.z - Math.sin(yaw) * off,
+                        yaw
+                    )
+                }
+            } else {
+                this._strideAcc = 0
+                this._strideFresh = true
+            }
 
             // Smooth rotation — exponential decay, shortest path, no overshoot
             if (isMoving) {

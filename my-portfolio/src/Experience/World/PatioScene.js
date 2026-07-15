@@ -170,6 +170,15 @@ export default class PatioScene {
                     map: r.tinyAtlas
                 })
             }
+            // Scoreboard (physical leaderboard by the pitch). The 'scoreboard'
+            // plane gets the atlas material first; ScoreboardScreen polls the
+            // scene by name and swaps it for the live ranking canvas itself.
+            if ((name === 'scoreboardModel' || name === 'tinyAtlas') &&
+                !this.pieces.scoreboard && r.scoreboardModel && r.tinyAtlas) {
+                this.pieces.scoreboard = new StaticPiece('scoreboard', r.scoreboardModel, {
+                    map: r.tinyAtlas
+                })
+            }
             // Bridge
             if (name === 'bridgeModel' && !this.pieces.bridge && r.bridgeModel) {
                 this.pieces.bridge = new StaticPiece('bridge', r.bridgeModel, {
@@ -187,7 +196,7 @@ export default class PatioScene {
         this.resources.on('sourceLoaded', tryBuild)
 
         // Also check immediately in case assets loaded from cache already
-        for (const name of ['riverModel', 'houseModel', 'tinyAtlas', 'outsideHouseThingsModel', 'bridgeModel', 'infoBoardModel']) {
+        for (const name of ['riverModel', 'houseModel', 'tinyAtlas', 'outsideHouseThingsModel', 'bridgeModel', 'infoBoardModel', 'scoreboardModel']) {
             tryBuild(name)
         }
     }

@@ -128,6 +128,19 @@ export default class Raycaster
     {
         if(this.interactiveObjects.length === 0) return
 
+        // While a modal is open the overlay eats mousemove, so the canvas
+        // keeps the LAST mouse position — the stale hover would stick and the
+        // body 'pointer' cursor would show all over the modal. Clear it.
+        if(document.querySelector('.fz-modal-overlay.is-open'))
+        {
+            if(this.hoveredObject)
+            {
+                this.hoveredObject.onUnhover()
+                this.hoveredObject = null
+            }
+            return
+        }
+
         // Perform raycast
         this.raycaster.setFromCamera(this.mouse, this.camera.instance)
         

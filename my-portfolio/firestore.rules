@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Firestore rules for the frisbee leaderboard.
+// Paste into: Firebase Console → Firestore Database → Rules (or deploy with
+// `firebase deploy --only firestore:rules`).
+//
+// Model: anyone can READ scores and CREATE a well-formed score; nobody can
+// update or delete (records are immutable, so nobody can wipe the board).
+// Shape is strictly validated so garbage/cheat payloads get rejected:
+//   name    → 1-3 chars, A-Z only (the arcade initials the game submits)
+//   score   → integer 0..1500 (the maximum a competitive session can yield)
+//   t       → client timestamp (ms) used for tie-breaking
+//   created → MUST be the server timestamp (prevents forged/backdated docs)
+//
+// Note: with an unauthenticated client, per-user rate limiting isn't possible
+// from rules alone. If spam ever becomes a problem, enable Firebase App Check
+// (reCAPTCHA v3) — no code changes needed beyond initialization.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /scores/{scoreId} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(['name', 'score', 't', 'created']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() >= 1 &&
+        request.resource.data.name.size() <= 3 &&
+        request.resource.data.name.matches('[A-Z?]+') &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 1500 &&
+        request.resource.data.t is int &&
+        request.resource.data.created == request.time;
+
+      allow update, delete: if false;
+    }
+  }
+}

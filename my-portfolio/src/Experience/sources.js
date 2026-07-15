@@ -274,6 +274,38 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        // Physical leaderboard by the pitch. Contains 'leaderboard' (structure,
+        // Tiny atlas) + a plane named 'scoreboard' that ScoreboardScreen
+        // auto-detects and paints with the live top-10 canvas.
+        name: 'scoreboardModel',
+        type: 'gltfModel',
+        path: '/models/baseball-pitch/scoreboard-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        // 128px CPU-readable sand mask of the pitch texture (white = sand
+        // diamond). Generated offline from the embedded webp; used by
+        // BaseballPitch.isOnSand() so footprints only stamp on dirt/sand.
+        name: 'pitchSandMaskCpu',
+        type: 'texture',
+        path: '/models/baseball-pitch/sand-mask-cpu.png',
+        priority: 'decorative'
+    },
+    // ─── House interior (far-offset "island"; entered via the house door) ──
+    {
+        name: 'interiorModel',
+        type: 'gltfModel',
+        path: '/models/interior/interior-compressed.glb',
+        priority: 'decorative'   // loads in the background; door gates on it
+    },
+    {
+        // Objects with their own baked textures/colors (user-compressed).
+        name: 'interiorSpecialModel',
+        type: 'gltfModel',
+        path: '/models/interior/interior-special-things-compressed.glb',
+        priority: 'decorative'
+    },
+    {
         name: 'blackCaveModel',
         type: 'gltfModel',
         path: '/models/black-cave/black-cave-compressed.glb',

@@ -92,12 +92,15 @@
     color: var(--fz-ink-soft);
 }
 
-/* Now-playing card (preview) */
+/* Now-playing card (preview). Fixed parts (cover + transport buttons) must
+   never push past the modal on narrow phones: slimmer gaps + wrap fallback
+   (controls drop to a second row instead of overflowing right). */
 .fz-np {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
-    padding: 12px;
+    gap: 10px 12px;
+    padding: 10px 12px;
     background: var(--fz-green-50);
     border: 2px solid var(--fz-green-100);
     border-radius: var(--fz-radius-sm);
@@ -105,8 +108,8 @@
 
 .fz-np-cover {
     flex: 0 0 auto;
-    width: 60px;
-    height: 60px;
+    width: 54px;
+    height: 54px;
     border-radius: 12px;
     background-size: cover;
     background-position: center;
@@ -119,7 +122,8 @@
 .fz-np-cover svg { width: 32px; height: 32px; }
 
 .fz-np-info {
-    flex: 1 1 auto;
+    /* Basis 140px: below that the controls wrap instead of overflowing. */
+    flex: 1 1 140px;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -164,6 +168,7 @@
 .fz-np-controls {
     display: flex;
     gap: 8px;
+    margin-left: auto; /* stays right-aligned, also when wrapped to row 2 */
 }
 
 .fz-icon-btn {
@@ -182,6 +187,54 @@
 .fz-icon-btn:hover { background: var(--fz-green-50); border-color: var(--fz-green-400); transform: translateY(-1px); }
 .fz-icon-btn:active { transform: translateY(0) scale(0.96); }
 .fz-icon-btn.is-on { background: var(--fz-green-400); border-color: var(--fz-green-500); color: #fff; }
+
+.fz-sfx-desc {
+    font-size: 0.82rem;
+    color: var(--fz-ink-soft);
+    line-height: 1.4;
+    margin-top: -4px;
+}
+
+/* ── Settings: connection status (leaderboard server) ───────────────── */
+.fz-conn-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fz-conn-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #b9c4bd;
+    flex: 0 0 auto;
+}
+
+.fz-conn-dot[data-status="online"] { background: var(--fz-green-400); box-shadow: 0 0 0 4px rgba(95, 197, 148, 0.22); }
+.fz-conn-dot[data-status="offline"] { background: var(--fz-red); box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.18); }
+.fz-conn-dot[data-status="connecting"] { background: var(--fz-gold); animation: fz-conn-pulse 1s ease-in-out infinite; }
+.fz-conn-dot[data-status="disabled"] { background: #b9c4bd; }
+
+@keyframes fz-conn-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.fz-conn-label {
+    font-family: var(--fz-font-title);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fz-ink);
+}
+
+.fz-conn-hint {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--fz-ink-soft);
+    margin-top: -6px;
+}
 
 /* Volume row */
 .fz-vol-row {

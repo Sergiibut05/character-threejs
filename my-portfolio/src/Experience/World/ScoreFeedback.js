@@ -5,6 +5,8 @@
 export default class ScoreFeedback {
     constructor() {
         this._hideTimeout = null
+        // Dark bluish-purple (tunable from the Frisbee debug folder).
+        this.badColor = '#5f4bd8'
         this.setupUI()
     }
 
@@ -79,7 +81,7 @@ export default class ScoreFeedback {
     }
 
     showBadThrow() {
-        this._show('BAD THROW!', null, '#ff4444')
+        this._show('BAD!', null, this.badColor)
     }
 
     hide() {

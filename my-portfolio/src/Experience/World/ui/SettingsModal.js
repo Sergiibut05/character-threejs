@@ -7,6 +7,15 @@ import {
     iconScenery, iconBolt, iconKeyboard, iconGamepad, iconMobile,
     iconMusic, iconVolume, iconMute, iconPrev, iconNext
 } from './icons.js'
+import { leaderboardStatus, getLeaderboardStatus } from '../../Utils/Leaderboard.js'
+
+// Connection status → UI label + dot colour class.
+const CONN_LABELS = {
+    online: 'En línea',
+    offline: 'Sin conexión',
+    connecting: 'Conectando…',
+    disabled: 'No configurado'
+}
 
 // Controls shown per device, grouped by context.
 const CONTROL_GROUPS = [
@@ -38,6 +47,7 @@ export default class SettingsModal {
         this.modal.append(this.content)
 
         this._registerSection({ id: 'general', label: 'General', build: (c) => this._buildGeneral(c) })
+        this._registerSection({ id: 'sfx', label: 'Efectos', build: (c) => this._buildSfx(c) })
         this._registerSection({ id: 'controls', label: 'Controles', build: (c) => this._buildControls(c) })
 
         // Keep the quality cards in sync with external changes.
@@ -75,13 +85,47 @@ export default class SettingsModal {
         this.sections[i].build(this.content)
     }
 
-    // ─── General section (Calidad + Sonido) ──────────────────────────────
+    // ─── General section (Calidad + Sonido + Conexión) ───────────────────
     _buildGeneral(container) {
         const qHead = _el('div', 'fz-sound-heading')
         qHead.textContent = 'Calidad'
         container.appendChild(qHead)
         this._buildQuality(container)
         this._buildSound(container)
+        this._buildConnection(container)
+    }
+
+    // ─── Conexión (leaderboard server status) ────────────────────────────
+    _buildConnection(container) {
+        const wrap = _el('div', 'fz-sound')
+        const heading = _el('div', 'fz-sound-heading')
+        heading.textContent = 'Conexión'
+        wrap.appendChild(heading)
+
+        const row = _el('div', 'fz-conn-row')
+        const dot = _el('span', 'fz-conn-dot')
+        const label = _el('span', 'fz-conn-label')
+        const hint = _el('span', 'fz-conn-hint')
+        row.append(dot, label)
+        wrap.appendChild(row)
+        wrap.appendChild(hint)
+        container.appendChild(wrap)
+
+        const render = (status) => {
+            dot.dataset.status = status
+            label.textContent = CONN_LABELS[status] || status
+            hint.textContent = status === 'online'
+                ? 'Ranking online activo: tus récords se guardan en el servidor.'
+                : status === 'offline'
+                    ? 'Sin servidor ahora mismo — las puntuaciones se guardan en este dispositivo y se subirán al reconectar.'
+                    : status === 'connecting'
+                        ? 'Comprobando conexión con el servidor…'
+                        : 'Ranking online no configurado — las puntuaciones se guardan en este dispositivo.'
+        }
+        render(getLeaderboardStatus())
+
+        this._onConnChange = (s) => render(s)
+        leaderboardStatus.on('change', this._onConnChange)
     }
 
     _buildQuality(container) {
@@ -182,6 +226,43 @@ export default class SettingsModal {
         audio.on('volumechange', this._onVolChange)
     }
 
+    // ─── Efectos section (SFX volume) ────────────────────────────────────
+    _buildSfx(container) {
+        const audio = this.experience.audio
+        if (!audio) return
+
+        const wrap = _el('div', 'fz-sound')
+        const heading = _el('div', 'fz-sound-heading')
+        heading.textContent = 'Efectos de sonido'
+        wrap.appendChild(heading)
+
+        const desc = _el('div', 'fz-sfx-desc')
+        desc.textContent = 'Ambiente, fuego y agua según te mueves por el mundo.'
+        wrap.appendChild(desc)
+
+        const volRow = _el('div', 'fz-vol-row')
+        const muteBtn = _iconBtn(audio.isSfxMuted() ? iconMute : iconVolume, 'Silenciar efectos', () => {
+            audio.toggleSfxMute(); render()
+        })
+        const vol = document.createElement('input')
+        vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'
+        vol.className = 'fz-vol'
+        vol.value = String(audio.getSfxVolume())
+        vol.addEventListener('input', () => { audio.setSfxVolume(parseFloat(vol.value)); render() })
+        volRow.append(muteBtn, vol)
+        wrap.appendChild(volRow)
+        container.appendChild(wrap)
+
+        const render = () => {
+            const m = audio.isSfxMuted()
+            muteBtn.innerHTML = m ? iconMute : iconVolume
+            muteBtn.classList.toggle('is-on', !m)
+            muteBtn.setAttribute('aria-pressed', String(m))
+            vol.value = String(audio.getSfxVolume())
+        }
+        render()
+    }
+
     _teardownSound() {
         if (this._soundTimer) { clearInterval(this._soundTimer); this._soundTimer = null }
         const audio = this.experience.audio
@@ -191,6 +272,11 @@ export default class SettingsModal {
             if (this._onVolChange) audio.off('volumechange', this._onVolChange)
         }
         this._onTrackChange = this._onMuteChange = this._onVolChange = null
+
+        if (this._onConnChange) {
+            leaderboardStatus.off('change', this._onConnChange)
+            this._onConnChange = null
+        }
     }
 
     _syncQuality() {

@@ -266,6 +266,7 @@ export default class Experience {
         this.gamepad.update()
         this.camera.update()
         this.world.update()
+        this.audio?.update()
         this.renderer.update()
     }
 }

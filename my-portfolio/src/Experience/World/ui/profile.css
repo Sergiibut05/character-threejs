@@ -1,0 +1,286 @@
+/* ─── Profile UI: trophy (certificates) + computer (about/exp/BTS) ────────
+   Uses the shared design tokens from ui.css (:root --fz-*).
+   Readability first: Nunito at ≥14px, generous line-height, no boxes-in-boxes. */
+
+/* Scrollable modal body for content-heavy modals */
+.fz-profile-scroll {
+    max-height: min(56vh, 520px);
+    overflow-y: auto;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fz-green-200) transparent;
+}
+
+/* ── Certificates (trophy) ──────────────────────────────────────────── */
+.fz-certs {
+    display: flex;
+    flex-direction: column;
+}
+
+.fz-cert {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 11px 10px;
+    border-radius: var(--fz-radius-sm);
+    text-decoration: none;
+    color: inherit;
+}
+
+.fz-cert + .fz-cert {
+    border-top: 1.5px dashed var(--fz-green-100);
+}
+
+.fz-cert-body { flex: 1 1 auto; min-width: 0; }
+
+/* Clickable rows: tinted hover + a chevron sliding in on the right. */
+a.fz-cert { cursor: pointer; transition: background 0.15s ease; }
+
+a.fz-cert::after {
+    content: '→';
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--fz-green-500);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+a.fz-cert:hover {
+    background: var(--fz-green-100);
+}
+
+a.fz-cert:hover::after {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+a.fz-cert:focus-visible {
+    outline: 2px solid var(--fz-green-400);
+    outline-offset: -2px;
+}
+
+.fz-cert-icon {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+}
+
+.fz-cert-icon svg { width: 37px; height: 37px; }
+
+.fz-cert-title {
+    font-family: var(--fz-font-body);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--fz-ink);
+}
+
+.fz-cert-meta {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fz-ink-soft);
+    margin-top: 2px;
+}
+
+.fz-cert-meta strong {
+    color: var(--fz-green-500);
+    font-weight: 700;
+}
+
+/* ── Section headings & prose ───────────────────────────────────────── */
+.fz-profile-heading {
+    font-family: var(--fz-font-title);
+    font-size: 18.5px;
+    font-weight: 600;
+    color: var(--fz-ink);
+    margin: 20px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fz-profile-heading:first-child { margin-top: 0; }
+
+.fz-profile-heading::after {
+    content: '';
+    flex: 1;
+    height: 1.5px;
+    background: var(--fz-green-100);
+    border-radius: 1px;
+}
+
+.fz-profile-text {
+    font-family: var(--fz-font-body);
+    font-size: 17.5px;
+    font-weight: 600;
+    line-height: 1.65;
+    color: var(--fz-ink);
+}
+
+.fz-profile-text + .fz-profile-text { margin-top: 10px; }
+
+/* Social links row */
+.fz-profile-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 18px;
+}
+
+.fz-profile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 19px;
+    border-radius: var(--fz-radius-pill);
+    border: 1.5px solid var(--fz-green-200);
+    background: rgba(255, 255, 255, 0.65);
+    font-family: var(--fz-font-title);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fz-ink);
+    text-decoration: none;
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.fz-profile-link svg { width: 19px; height: 19px; color: var(--fz-green-500); }
+
+.fz-profile-link:hover {
+    background: #fff;
+    border-color: var(--fz-green-400);
+    transform: translateY(-1px);
+}
+
+/* ── Experience / education entries ─────────────────────────────────── */
+.fz-xp {
+    padding: 10px 4px;
+}
+
+.fz-xp + .fz-xp { border-top: 1.5px dashed var(--fz-green-100); }
+
+.fz-xp-role {
+    font-family: var(--fz-font-body);
+    font-size: 17.5px;
+    font-weight: 800;
+    color: var(--fz-ink);
+}
+
+.fz-xp-org {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--fz-green-500);
+    margin-top: 1px;
+}
+
+.fz-xp-period {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--fz-ink-soft);
+    margin-top: 1px;
+}
+
+.fz-xp-detail {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.55;
+    color: var(--fz-ink-soft);
+    margin-top: 5px;
+}
+
+/* Skill chips */
+.fz-skill-group { margin-bottom: 12px; }
+
+.fz-skill-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fz-ink-soft);
+    margin-bottom: 6px;
+}
+
+.fz-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fz-chip {
+    padding: 5px 14px;
+    border-radius: var(--fz-radius-pill);
+    background: var(--fz-green-100);
+    font-family: var(--fz-font-body);
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--fz-ink);
+}
+
+/* ── Behind the scenes — fluid editorial flow, no boxes ─────────────── */
+.fz-bts-intro {
+    font-family: var(--fz-font-body);
+    font-size: 17.5px;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--fz-ink);
+    margin-bottom: 4px;
+}
+
+.fz-bts-section { margin-top: 18px; }
+
+.fz-bts-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--fz-font-title);
+    font-size: 18.5px;
+    font-weight: 600;
+    color: var(--fz-ink);
+    margin-bottom: 5px;
+}
+
+.fz-bts-head svg {
+    width: 23px;
+    height: 23px;
+    color: var(--fz-green-500);
+    flex: 0 0 auto;
+}
+
+.fz-bts-body {
+    font-family: var(--fz-font-body);
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.62;
+    color: var(--fz-ink-soft);
+}
+
+.fz-bts-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-family: var(--fz-font-body);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fz-green-500);
+    text-decoration: none;
+}
+
+.fz-bts-link::after { content: '→'; }
+.fz-bts-link:hover { text-decoration: underline; }
+
+/* Credits — softly separated closing note */
+.fz-bts-credits {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1.5px dashed var(--fz-green-100);
+}
+
+.fz-bts-credits .fz-bts-head svg { color: var(--fz-red); }
+
+.fz-bts-credit-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 8px;
+}

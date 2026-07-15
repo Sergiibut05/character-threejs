@@ -86,6 +86,29 @@ export default class River {
         this.waterMesh = mesh
     }
 
+    /**
+     * Flat [x0,z0, x1,z1, …] world-space samples of the water surface (cached),
+     * downsampled to ≤ ~600 points. Used for proximity audio: distance to the
+     * NEAREST sample, not an AABB (the river winds, so its box covers the map).
+     */
+    getWaterSamples() {
+        if (this._waterSamples) return this._waterSamples
+        const pos = this.waterMesh?.geometry?.attributes?.position
+        if (!pos) return null
+
+        this.waterMesh.updateWorldMatrix(true, false)
+        const mat = this.waterMesh.matrixWorld
+        const v = new THREE.Vector3()
+        const stride = Math.max(1, Math.floor(pos.count / 600))
+        const out = []
+        for (let i = 0; i < pos.count; i += stride) {
+            v.fromBufferAttribute(pos, i).applyMatrix4(mat)
+            out.push(v.x, v.z)
+        }
+        this._waterSamples = out
+        return out
+    }
+
     update() {
         if (this.uTime) this.uTime.value = this.time.elapsed * 0.001
         if (this.uniforms.uCamXZ) {

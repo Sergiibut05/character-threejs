@@ -357,6 +357,114 @@ export default class Floor {
         return positions
     }
 
+    // ─── CPU dirt query (footprints) ─────────────────────────────────────
+
+    /**
+     * True when world (x,z) lands on dirt: on a pure-dirt floor mesh, or on a
+     * grass-floor mesh where the baked mask says "dirt" (low grass blend —
+     * the exact same response the shader and the grass spawner use).
+     */
+    isDirtAt(x, z) {
+        if (this._surfCache === undefined) this._surfCache = this._buildSurfaceCache()
+        const C = this._surfCache
+        if (!C) return false
+
+        for (const m of C.dirt) {
+            if (x < m.minX || x > m.maxX || z < m.minZ || z > m.maxZ) continue
+            if (this._findTriangle2D(m.tris, x, z)) return true
+        }
+
+        for (const m of C.grass) {
+            if (x < m.minX || x > m.maxX || z < m.minZ || z > m.maxZ) continue
+            const hit = this._findTriangle2D(m.tris, x, z)
+            if (!hit) continue
+            if (!m.sampler) return false
+            const { tri, w0, w1, w2 } = hit
+            const u = tri.ua * w0 + tri.ub * w1 + tri.uc * w2
+            const v = tri.va * w0 + tri.vb * w1 + tri.vc * w2
+            const low = this.uniforms.uGrassMaskLow?.value ?? 0.45
+            const high = this.uniforms.uGrassMaskHigh?.value ?? 0.62
+            return grassMaskBlendCpu(m.sampler(u, v), low, high) < 0.3
+        }
+        return false
+    }
+
+    /** One-time CPU cache: XZ triangles (+uvs for grass meshes) per floor mesh. */
+    _buildSurfaceCache() {
+        const collect = (mesh, withUv) => {
+            const geometry = mesh.geometry
+            const posAttr = geometry.attributes.position
+            const uvAttr = geometry.attributes.uv
+            if (!posAttr || (withUv && !uvAttr)) return null
+
+            mesh.updateWorldMatrix(true, false)
+            const wm = mesh.matrixWorld
+            const indexArray = geometry.index ? geometry.index.array : null
+            const faceCount = indexArray ? indexArray.length / 3 : posAttr.count / 3
+
+            const tris = []
+            let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+            for (let f = 0; f < faceCount; f++) {
+                const iA = indexArray ? indexArray[f * 3] : f * 3
+                const iB = indexArray ? indexArray[f * 3 + 1] : f * 3 + 1
+                const iC = indexArray ? indexArray[f * 3 + 2] : f * 3 + 2
+                _vA.set(posAttr.getX(iA), posAttr.getY(iA), posAttr.getZ(iA)).applyMatrix4(wm)
+                _vB.set(posAttr.getX(iB), posAttr.getY(iB), posAttr.getZ(iB)).applyMatrix4(wm)
+                _vC.set(posAttr.getX(iC), posAttr.getY(iC), posAttr.getZ(iC)).applyMatrix4(wm)
+
+                const denom = (_vB.z - _vC.z) * (_vA.x - _vC.x) + (_vC.x - _vB.x) * (_vA.z - _vC.z)
+                if (Math.abs(denom) < 1e-8) continue
+
+                const tri = {
+                    ax: _vA.x, az: _vA.z, bx: _vB.x, bz: _vB.z, cx: _vC.x, cz: _vC.z,
+                    invDenom: 1 / denom
+                }
+                if (withUv) {
+                    tri.ua = uvAttr.getX(iA); tri.va = uvAttr.getY(iA)
+                    tri.ub = uvAttr.getX(iB); tri.vb = uvAttr.getY(iB)
+                    tri.uc = uvAttr.getX(iC); tri.vc = uvAttr.getY(iC)
+                }
+                tris.push(tri)
+                minX = Math.min(minX, _vA.x, _vB.x, _vC.x)
+                maxX = Math.max(maxX, _vA.x, _vB.x, _vC.x)
+                minZ = Math.min(minZ, _vA.z, _vB.z, _vC.z)
+                maxZ = Math.max(maxZ, _vA.z, _vB.z, _vC.z)
+            }
+            return tris.length ? { tris, minX, maxX, minZ, maxZ } : null
+        }
+
+        const dirt = []
+        for (const mesh of this.dirtMeshes) {
+            const d = collect(mesh, false)
+            if (d) dirt.push(d)
+        }
+        const grass = []
+        const flipCpuV = (this.uniforms.uGrassSpawnFlipMaskV?.value ?? 0) > 0.5
+        for (const mesh of this.grassMeshes) {
+            const g = collect(mesh, true)
+            if (!g) continue
+            const cpuImage = this.maskCpuImages[mesh.name] || null
+            g.sampler = cpuImage ? this._buildMaskSampler(cpuImage, flipCpuV) : null
+            grass.push(g)
+        }
+        if (!dirt.length && !grass.length) return null
+        return { dirt, grass }
+    }
+
+    /** Barycentric point-in-triangle over XZ; returns weights for uv interpolation. */
+    _findTriangle2D(tris, x, z) {
+        for (const t of tris) {
+            const w0 = ((t.bz - t.cz) * (x - t.cx) + (t.cx - t.bx) * (z - t.cz)) * t.invDenom
+            if (w0 < -1e-4 || w0 > 1.0001) continue
+            const w1 = ((t.cz - t.az) * (x - t.cx) + (t.ax - t.cx) * (z - t.cz)) * t.invDenom
+            if (w1 < -1e-4) continue
+            const w2 = 1 - w0 - w1
+            if (w2 < -1e-4) continue
+            return { tri: t, w0, w1, w2 }
+        }
+        return null
+    }
+
     /**
      * @param {boolean} flipV Use `v` instead of `(1-v)` for row index if PNG differs from GPU UV.
      */

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { texture, uv } from 'three/tsl'
+import { texture, uv, vec2 } from 'three/tsl'
 import Experience from '../Experience.js'
 import Leaderboard from '../Utils/Leaderboard.js'
 
@@ -60,9 +60,13 @@ export default class ScoreboardScreen {
         const mat = new THREE.MeshStandardNodeMaterial()
         mat.roughness = 0.6
         mat.metalness = 0.0
-        mat.colorNode = texture(this.texture, uv())
+        // The plane's UVs land the canvas upside down — flip ONLY the V axis
+        // (flipping both mirrored the text left-to-right).
+        const uvNode = uv()
+        const uvFlipped = vec2(uvNode.x, uvNode.y.oneMinus())
+        mat.colorNode = texture(this.texture, uvFlipped)
         // Self-lit a touch so the screen reads in shade like a display.
-        mat.emissiveNode = texture(this.texture, uv()).mul(0.25)
+        mat.emissiveNode = texture(this.texture, uvFlipped).mul(0.25)
         mesh.material?.dispose?.()
         mesh.material = mat
         this.material = mat
@@ -119,11 +123,18 @@ export default class ScoreboardScreen {
         ctx.fill()
         ctx.fillStyle = '#41a06e'
         ctx.fillRect(0, headH - 12, w, 24)
-        ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillStyle = '#ffffff'
         ctx.font = `bold ${Math.round(headH * 0.46)}px sans-serif`
-        ctx.fillText('🏆 RANKING', w / 2, headH * 0.52)
+        // Hand-drawn trophy icon (no emoji) + centred title as one block.
+        const title = 'RANKING'
+        const iconS = headH * 0.52
+        const gap = iconS * 0.35
+        const titleW = ctx.measureText(title).width
+        const blockX = (w - (iconS + gap + titleW)) / 2
+        drawTrophy(ctx, blockX, headH * 0.52, iconS)
+        ctx.textAlign = 'left'
+        ctx.fillText(title, blockX + iconS + gap, headH * 0.52)
 
         const rowsY = headH + 22
         const footerH = 60
@@ -175,6 +186,42 @@ export default class ScoreboardScreen {
         this.material?.dispose?.()
         this.texture?.dispose?.()
     }
+}
+
+/** Small gold trophy drawn with canvas paths (x = left edge, cy = vertical centre). */
+function drawTrophy(ctx, x, cy, s) {
+    const cx = x + s / 2
+    const top = cy - s * 0.48
+    ctx.save()
+    ctx.lineWidth = Math.max(2, s * 0.09)
+    ctx.strokeStyle = '#e8a200'
+    ctx.fillStyle = '#ffd84d'
+
+    // Handles
+    ctx.beginPath()
+    ctx.arc(cx - s * 0.34, top + s * 0.22, s * 0.16, Math.PI * 0.35, Math.PI * 1.45)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx + s * 0.34, top + s * 0.22, s * 0.16, Math.PI * 1.55, Math.PI * 0.65)
+    ctx.stroke()
+
+    // Cup (wide top, rounded narrow bottom)
+    ctx.beginPath()
+    ctx.moveTo(cx - s * 0.3, top)
+    ctx.lineTo(cx + s * 0.3, top)
+    ctx.bezierCurveTo(cx + s * 0.3, top + s * 0.42, cx + s * 0.12, top + s * 0.52, cx, top + s * 0.52)
+    ctx.bezierCurveTo(cx - s * 0.12, top + s * 0.52, cx - s * 0.3, top + s * 0.42, cx - s * 0.3, top)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Stem + base
+    ctx.fillRect(cx - s * 0.05, top + s * 0.52, s * 0.1, s * 0.2)
+    ctx.beginPath()
+    roundRect(ctx, cx - s * 0.22, top + s * 0.72, s * 0.44, s * 0.16, s * 0.05)
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
 }
 
 function roundRect(ctx, x, y, w, h, r) {

@@ -10,31 +10,40 @@ export default class Camera {
         this.canvas = this.experience.canvas
         this.debug = this.experience.debug
 
+        // Two FOVs (hand-tuned on device): the world keeps a tight lens, while
+        // the frisbee minigame goes wide on mobile so the narrow portrait screen
+        // still shows the whole field.
+        this.isMobile = this.checkIfMobile()
+        this.baseFov = this.isMobile ? 30 : 35        // world / follow
+        this.minigameFov = this.isMobile ? 59 : 35    // frisbee aim, flight & cinematics
+
         this.setInstance()
         this.setOrbitControls()
 
         this.mode = 'follow'
         this.frisbeeTarget = null
-        this.baseFov = 35
         this._throwYaw = 0
         // Bumped whenever a cinematic starts; running cinematics bail if their
         // captured token is stale (lets one shot cancel a previous one cleanly).
         this._cineToken = 0
 
-        // frisbeeAim camera tuning
-        const isMobileAim = this.checkIfMobile()
-        this.aimBehindDist = isMobileAim ? 6.2 : 4.6
-        this.aimHeight = 0.2
-        this.aimLookHeight = 0.1
+        // frisbeeAim camera tuning (mobile values hand-tuned on device).
+        this.aimBehindDist = this.isMobile ? 3.9 : 4.6
+        this.aimHeight = this.isMobile ? 0.65 : 0.2
+        this.aimLookHeight = this.isMobile ? 0.4 : 0.1
         this.aimLerp = 0.15
 
         // frisbeeFlight camera tuning — camera stays near character
-        this.flightForwardNudge = isMobileAim ? 3.0 : 2.0
-        this.flightHeight = 1.6
+        this.flightForwardNudge = this.isMobile ? 3.0 : 2.0
+        // The forward nudge eases in after a short delay: on a fast release the
+        // camera must NOT overtake the disc (it forced an ugly look-back flip).
+        this.flightNudgeDelay = 0.25
+        this.flightNudgeRamp = 0.6
+        this.flightHeight = this.isMobile ? 1.15 : 1.6
         this.flightPosLerp = 0.06
         this.flightLookLerp = 0.1
         this.flightFovMin = 22
-        this.flightFovMax = 35
+        this.flightFovMax = this.minigameFov
         this.flightZoomDist = 30
         this.flightExtraZoomTime = 2.0
         this.flightExtraZoomFov = 14
@@ -47,18 +56,17 @@ export default class Camera {
     }
 
     setInstance() {
-        this.instance = new THREE.PerspectiveCamera(35, this.sizes.width / this.sizes.height, 0.1, 100)
+        this.instance = new THREE.PerspectiveCamera(this.baseFov, this.sizes.width / this.sizes.height, 0.1, 100)
         this.instance.position.set(0, 8, 8)
         this.instance.lookAt(0, 0, 0)
         this.scene.add(this.instance)
 
-        const isMobile = this.checkIfMobile()
-        this.cameraOffset = isMobile
+        this.cameraOffset = this.isMobile
             ? new THREE.Vector3(0, 2.5, 9)
             : new THREE.Vector3(0, 2.5, 7)
         this.smoothPosition = this.instance.position.clone()
         this.smoothLookAt = new THREE.Vector3(0, 0, 0)
-        this.lerpFactor = isMobile ? 0.78 : 0.12
+        this.lerpFactor = this.isMobile ? 0.78 : 0.12
     }
 
     setOrbitControls() {
@@ -143,11 +151,17 @@ export default class Camera {
         const dt = this.experience.time.delta * 0.001
         this._flightTimer += dt
 
+        // Delayed, eased forward nudge (see constructor note).
+        const nudgeT = THREE.MathUtils.clamp(
+            (this._flightTimer - this.flightNudgeDelay) / this.flightNudgeRamp, 0, 1
+        )
+        const nudge = this.flightForwardNudge * nudgeT * nudgeT * (3 - 2 * nudgeT)
+
         const yaw = this._throwYaw
         const desiredPos = character.position.clone()
-        desiredPos.x += Math.sin(yaw) * this.flightForwardNudge
+        desiredPos.x += Math.sin(yaw) * nudge
         desiredPos.y += this.flightHeight
-        desiredPos.z += Math.cos(yaw) * this.flightForwardNudge
+        desiredPos.z += Math.cos(yaw) * nudge
 
         this.smoothPosition.lerp(desiredPos, this.flightPosLerp)
 
@@ -211,7 +225,7 @@ export default class Camera {
         this._cineStartPos = startPos
         this._cineStartLook = startLook
         this.setMode('cinematic')
-        this.instance.fov = this.baseFov
+        this.instance.fov = this.minigameFov
         this.instance.updateProjectionMatrix()
         this.instance.position.copy(startPos)
         this.instance.lookAt(startLook)
@@ -237,7 +251,7 @@ export default class Camera {
         this._cineStartLook = null
 
         this.setMode('cinematic')
-        this.instance.fov = this.baseFov
+        this.instance.fov = this.minigameFov
         this.instance.updateProjectionMatrix()
 
         const _p = new THREE.Vector3()
@@ -270,7 +284,7 @@ export default class Camera {
 
         const token = ++this._cineToken
         this.setMode('cinematic')
-        this.instance.fov = this.baseFov
+        this.instance.fov = this.minigameFov
         this.instance.updateProjectionMatrix()
 
         // Face the pitch so "from the front" is well-defined.
@@ -318,7 +332,7 @@ export default class Camera {
 
         const token = ++this._cineToken
         this.setMode('cinematic')
-        this.instance.fov = this.baseFov
+        this.instance.fov = this.minigameFov
         this.instance.updateProjectionMatrix()
 
         const yaw = dog.container.rotation.y
@@ -364,7 +378,7 @@ export default class Camera {
             // throw (next round) frames the character like the first round
             // instead of staying zoomed-in/"glued" to it.
             this._catchSmoothLook = false
-            this.instance.fov = this.baseFov
+            this.instance.fov = this.minigameFov
             this.instance.updateProjectionMatrix()
         }
 

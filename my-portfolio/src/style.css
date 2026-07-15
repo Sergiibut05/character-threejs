@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
 
 *
 {
@@ -11,7 +11,36 @@ html,
 body
 {
     overflow: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    font-family: 'Nunito', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+/* Game UI feel on touch: no grey tap-flash on buttons, no double-tap text/image
+   selection highlight, and no 300ms double-tap-zoom delay on controls.
+   Real text inputs re-enable selection so typing still works normally. */
+html
+{
+    -webkit-tap-highlight-color: transparent;
+}
+
+body
+{
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable]
+{
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+button,
+a
+{
+    touch-action: manipulation;
 }
 
 .webgl

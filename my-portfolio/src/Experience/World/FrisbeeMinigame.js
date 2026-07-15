@@ -51,7 +51,13 @@ export default class FrisbeeMinigame {
         this.aimYawCenter = 0
         this.aimYawHalfRange = THREE.MathUtils.degToRad(70)
         this.fieldMargin = 1.5
+        // Out-of-bounds tolerance beyond the field edge (hand-tuned with the
+        // debug frame). Separate from fieldMargin, which is auto-calibrated
+        // and keeps targets/balloons AWAY from the fence.
+        this.badMargin = 0.5
         this.isBadThrow = false
+        // Flight time (s) at which a bad throw hands the camera to the dog.
+        this._badSwitchTime = Infinity
         this._pitchBBox = null
 
         // Power oscillator
@@ -242,6 +248,7 @@ export default class FrisbeeMinigame {
         this._chargeLocked = false
         this.enterHeld = false
         this.isBadThrow = false
+        this._badSwitchTime = Infinity
         this._throwResult = null
         this._balloonPoppedThisThrow = false
         if (this.powerBarContainer) this.powerBarContainer.style.display = 'none'
@@ -423,9 +430,10 @@ export default class FrisbeeMinigame {
         this._fieldTopY = F.topY
         this._throwOrigin = origin.clone()
 
-        // Max power lands a touch short of the far edge (flat, far throw); min
-        // power lofts to roughly the near third. Each uses its own elevation.
-        const targetMaxDist = Math.max(4, centerDepth - this.fieldMargin * 1.5)
+        // Max power reaches (almost) the far edge — a full-power throw must be
+        // able to hit far-corner targets; min power lofts to roughly the near
+        // third. Each uses its own elevation.
+        const targetMaxDist = Math.max(4, centerDepth - this.fieldMargin * 0.5)
         this.launchSpeedMax = this._solveSpeedForDistance(
             origin, dirX, dirZ, targetMaxDist, this.launchUpAngleFar
         )
@@ -704,6 +712,17 @@ export default class FrisbeeMinigame {
             this._balloonPoppedThisThrow = true
         }
 
+        // Out-of-bounds throw: no catch is possible. At mid-flight, hand the
+        // camera to the dog and show BAD (the disc keeps sailing away in the
+        // background — see _updateBadThrowEnding).
+        if (this.isBadThrow) {
+            if (this.flightController.flightTime >= this._badSwitchTime ||
+                !this.flightController.active) {
+                this._onBadThrowLanded()
+            }
+            return
+        }
+
         // Check catch trigger only after minimum flight time
         const flightTime = this.flightController.flightTime
         if (flightTime > this.catchMinFlightTime &&
@@ -726,10 +745,6 @@ export default class FrisbeeMinigame {
 
         // Frisbee landed without dog catching in the air
         if (!this.flightController.active) {
-            if (this.isBadThrow) {
-                this._onBadThrowLanded()
-                return
-            }
             if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
                 this.dogCatchPosition.copy(this.dog.position)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
@@ -798,19 +813,27 @@ export default class FrisbeeMinigame {
         this.endTimer = 0
         this._badThrowShown = false
         this._throwResult = { zone: '', points: 0, distance: Infinity }
+        // Soft pan from the disc to the dog + cancel the flight auto-zoom (the
+        // dog is close by; staying at the long-range FOV would jump-cut).
+        const camera = this.experience.camera
+        camera._catchSmoothLook = true
+        camera._flightTimer = -10
     }
 
     _updateBadThrowEnding(dt) {
         this.endTimer += dt
+        // Let the disc keep sailing out of the field in the background while the
+        // camera is already on the dog — freezing it mid-air looks broken.
+        if (this.flightController.active) this.flightController.update(dt)
         this.dog.update(dt)
         this.experience.camera.frisbeeTarget = this.dog.position
 
-        if (!this._badThrowShown && this.endTimer >= 0.8) {
+        if (!this._badThrowShown && this.endTimer >= 0.7) {
             this._badThrowShown = true
             this.scoreFeedback.showBadThrow()
         }
 
-        if (this._badThrowShown && this.endTimer > 2.0) {
+        if (this._badThrowShown && this.endTimer > 2.2) {
             this._finishThrow()
         }
     }
@@ -840,7 +863,20 @@ export default class FrisbeeMinigame {
 
     // ─── Aim / Charge ───────────────────────────────────────────────────
 
+    // Reshape the joystick X for aiming: a wider dead zone (easier to hold a
+    // direction) and the remaining range rescaled so there's no jump at the edge.
+    _shapeAimAxis(x) {
+        const dz = 0.22
+        const ax = Math.abs(x)
+        if (ax < dz) return 0
+        return Math.sign(x) * (ax - dz) / (1 - dz)
+    }
+
     updateAim(dt, character) {
+        // Camera still descending into place (round-start cinematic) — the
+        // player shouldn't be able to turn before the shot is framed.
+        if (this.experience.camera.mode === 'cinematic') return
+
         const keys = character.keys
         let aimDelta = 0
 
@@ -849,7 +885,8 @@ export default class FrisbeeMinigame {
 
         if (this.experience.mobileControls?.isActive()) {
             const m = this.experience.mobileControls.getMovement()
-            aimDelta -= m.x * this.aimSensitivity * dt
+            // Slower turn on touch: fine aim adjustments are hard at full speed.
+            aimDelta -= this._shapeAimAxis(m.x) * this.aimSensitivity * 0.6 * dt
         }
 
         if (this.experience.gamepad?.isActive()) {
@@ -961,16 +998,32 @@ export default class FrisbeeMinigame {
             launchPos, direction, speed, this.tiltAngle
         )
 
-        // Check if landing is outside the pitch
+        // Check if landing is outside the pitch. Uses the ORIENTED field frame
+        // (the pitch is rotated in the world; the axis-aligned AABB is bigger
+        // and skewed vs the real field, which made the BAD zone feel wrong).
         this.isBadThrow = false
-        if (this._pitchBBox) {
+        const F = this._field
+        if (F) {
             const lp = prediction.point
-            const m = this.fieldMargin
+            const loc = this._toFieldLocal(F, lp.x, lp.z)
+            const m = this.badMargin
+            if (Math.abs(loc.u) > F.hu + m || Math.abs(loc.v) > F.hv + m) {
+                this.isBadThrow = true
+            }
+        } else if (this._pitchBBox) {
+            // Fallback (dev light mode / no oriented bounds)
+            const lp = prediction.point
+            const m = this.badMargin
             if (lp.x < this._pitchBBox.min.x - m || lp.x > this._pitchBBox.max.x + m ||
                 lp.z < this._pitchBBox.min.z - m || lp.z > this._pitchBBox.max.z + m) {
                 this.isBadThrow = true
             }
         }
+        // Wii-style out-of-bounds: at mid-flight the camera abandons the disc
+        // and cuts to the dog (already stopped halfway) + BAD callout.
+        this._badSwitchTime = this.isBadThrow
+            ? Math.max(prediction.flightTime * 0.5, 0.4)
+            : Infinity
 
         this.flightController.launch(launchPos, direction, speed, this.tiltAngle)
 

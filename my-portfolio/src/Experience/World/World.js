@@ -6,14 +6,17 @@ import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Mailbox from './Mailbox.js'
 import Door from './Door.js'
+import HouseInterior from './HouseInterior.js'
 import StreetLamps from './StreetLamps.js'
 import ScoreboardScreen from './ScoreboardScreen.js'
+import ScoreboardInteractive from './ScoreboardInteractive.js'
 import Ground from './Ground.js'
 import Grass from './Grass.js'
 import Flowers from './Flowers.js'
 import Fireflies from './Fireflies.js'
 import Fire from './Fire.js'
 import MusicNotes from './MusicNotes.js'
+import Footprints from './Footprints.js'
 import PatioScene from './PatioScene.js'
 import { jsonInstancesToObjects } from './scene/SceneUtils.js'
 import Trees from './Trees.js'
@@ -84,6 +87,9 @@ export default class World {
             // Idle musical notes (Animal-Crossing "humming" while standing still)
             this.musicNotes = new MusicNotes()
 
+            // Footprints on dirt/sand (stamped by Character via stampFootprint)
+            this.footprints = new Footprints()
+
             // Grass — placed on grass regions from the ground mesh vertex colors
             this.setupGrass()
 
@@ -128,10 +134,13 @@ export default class World {
             this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
             this.mailbox = new Mailbox() // resolves the mailbox node lazily
             this.door = new Door() // resolves the house `door` node lazily
+            this.houseInterior = new HouseInterior() // far-offset interior + rug exit
             this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
             // Live ranking screen: auto-attaches the canvas texture to a mesh
             // named "scoreboard" when you import your own object (see file).
             this.scoreboardScreen = new ScoreboardScreen()
+            // …and the physical board is interactive: outline + top-10 modal.
+            this.scoreboardInteractive = new ScoreboardInteractive()
 
             this._showDogAtAnchor()
 
@@ -290,6 +299,24 @@ export default class World {
         }
     }
 
+    /**
+     * True when world (x,z) is on dirt/sand: the pitch's sand diamond, its
+     * dirt fringe, pure-dirt floor meshes, or grass-mask dirt patches.
+     */
+    isDirtAt(x, z) {
+        const pitch = this.patioScene?.pieces?.baseballPitch
+        if (pitch?.isOnSand?.(x, z)) return true
+        const floor = this.patioScene?.pieces?.floor
+        return floor?.isDirtAt?.(x, z) ?? false
+    }
+
+    /** Called by Character each stride; only stamps when the spot is dirt. */
+    stampFootprint(x, y, z, yaw) {
+        if (!this.footprints) return
+        if (!this.isDirtAt(x, z)) return
+        this.footprints.stamp(x, y, z, yaw)
+    }
+
     getPitchBBox() {
         return this.patioScene?.pieces?.baseballPitch?.getBoundingBox?.() ?? null
     }
@@ -359,6 +386,10 @@ export default class World {
             this.musicNotes.update()
         }
 
+        if (this.footprints) {
+            this.footprints.update()
+        }
+
         // Frisbee minigame (includes pre-physics forces)
         if (this.frisbeeMinigame) {
             this.frisbeeMinigame.update()
@@ -382,11 +413,17 @@ export default class World {
         if (this.door) {
             this.door.update()
         }
+        if (this.houseInterior) {
+            this.houseInterior.update()
+        }
         if (this.streetLamps) {
             this.streetLamps.update()
         }
         if (this.scoreboardScreen) {
             this.scoreboardScreen.update()
+        }
+        if (this.scoreboardInteractive) {
+            this.scoreboardInteractive.update()
         }
 
         // Update interactive objects (check proximity to character)

@@ -62,7 +62,7 @@ export default class ContactModal {
                 </svg>
             </span>
             <span class="fz-sent-title">¡Mensaje enviado!</span>
-            <span class="fz-sent-text">Gracias por escribir. Te responderé pronto. ✉️</span>
+            <span class="fz-sent-text">Gracias por escribir. Te responderé pronto.</span>
         `
         this.sentView.style.display = 'none'
         this.modal.append(this.sentView)
