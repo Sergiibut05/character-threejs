@@ -56,7 +56,9 @@ export default class Renderer {
         // Three r183+ unified Renderer: shadow maps default to OFF (`shadowMap.enabled === false`).
         // Only flipping `directional.castShadow` is insufficient — the LightsNode cache key skips
         // shadow passes until this is true (see three/src/renderers/common/nodes/NodeManager.js).
-        this.instance.shadowMap.enabled = true
+        // Gated by Quality: on Android the shadow pipeline must never exist
+        // (broken TEXTURE_COMPARE fallback — see Utils/DeviceCaps.js).
+        this.instance.shadowMap.enabled = this.quality.shadowsEnabled
         this.instance.shadowMap.type = THREE.PCFShadowMap
         this.setPostProcessing()
     }

@@ -28,6 +28,12 @@ export default class Character {
         this.walkSpeed = 1.3
         this.runSpeed = 2.8
         this.rotationSpeed = 12.0
+        // Playback speed of the locomotion clips (they read a touch slow at 1).
+        this.walkAnimSpeed = 1.15
+        this.runAnimSpeed = 1.08
+
+        // Reused input vector — no per-frame allocation (GC hitches).
+        this._dir = new THREE.Vector3()
 
         // State machine: idle | walking | running | resting
         this.state = 'idle'
@@ -189,7 +195,9 @@ export default class Character {
 
         const fade = newState === 'resting' ? 0.4 : 0.25
         newAction.reset()
-        newAction.setEffectiveTimeScale(1)
+        const animScale = newState === 'walking' ? this.walkAnimSpeed
+            : newState === 'running' ? this.runAnimSpeed : 1
+        newAction.setEffectiveTimeScale(animScale)
         newAction.setEffectiveWeight(1)
         if (this.activeAction) newAction.crossFadeFrom(this.activeAction, fade, true)
 
@@ -263,6 +271,67 @@ export default class Character {
 
         this.previousPosition = this.position.clone()
         this.container.position.copy(this.position)
+    }
+
+    // ─── Procedural kick (no authored clip — bone offsets over the pose) ──
+
+    /**
+     * Play a short kick with the right leg. Purely procedural: additive
+     * rotations on the thigh/shin bones layered AFTER the mixer writes the
+     * current pose each frame (wind-up → strike → recover, ~0.62s).
+     */
+    playKick() {
+        if (!this._kickBones) {
+            const find = (name) => {
+                let bone = null
+                this.model.traverse((c) => { if (!bone && c.isBone && c.name === name) bone = c })
+                return bone
+            }
+            this._kickBones = {
+                upLeg: find('mixamorigRightUpLeg'),
+                leg: find('mixamorigRightLeg')
+            }
+        }
+        if (!this._kickBones.upLeg) return false
+        this._kickT = 0
+        return true
+    }
+
+    get isKicking() { return this._kickT !== null && this._kickT !== undefined }
+
+    /** Layered after mixer.update — see update(). */
+    _applyKickPose(dt) {
+        if (this._kickT === null || this._kickT === undefined) return
+        const B = this._kickBones
+        if (!B?.upLeg) { this._kickT = null; return }
+
+        this._kickT += dt
+        const p = this._kickT / 0.62
+        if (p >= 1) { this._kickT = null; return }
+
+        let thigh = 0
+        let shin = 0
+        if (p < 0.38) {
+            // Wind-up: leg swings back, shin folds.
+            const k = Math.sin((p / 0.38) * Math.PI * 0.5)
+            thigh = 0.55 * k
+            shin = 1.0 * k
+        } else if (p < 0.6) {
+            // Strike: fast forward swing, shin extends.
+            const k = (p - 0.38) / 0.22
+            const e = 1 - Math.pow(1 - k, 2)
+            thigh = 0.55 - 1.75 * e
+            shin = 1.0 * (1 - e) * 0.65
+        } else {
+            // Recover: ease back to the underlying pose.
+            const k = (p - 0.6) / 0.4
+            const e = k * k * (3 - 2 * k)
+            thigh = -1.2 * (1 - e)
+            shin = 0.25 * (1 - e)
+        }
+
+        B.upLeg.rotation.x += thigh
+        if (B.leg) B.leg.rotation.x += shin
     }
 
     /**
@@ -401,7 +470,9 @@ export default class Character {
     // ─── Main update ────────────────────────────────────────────────────
 
     update() {
-        const dt = this.time.delta * 0.001
+        // Clamp to 50 ms: after a real hitch (GC, shader compile, tab switch)
+        // an unclamped dt would make the capsule leap a big step in one frame.
+        const dt = Math.min(this.time.delta * 0.001, 0.05)
         if (!this.container) return
 
         // Frozen while a modal (tutorial/help) is open mid-throw — hold the pose
@@ -421,11 +492,12 @@ export default class Character {
             this.idleTime = 0
             this._updateBlinking(dt)
             if (this.mixer) this.mixer.update(dt)
+            this._applyKickPose(dt)
             return
         }
 
-        // Gather input direction
-        const dir = new THREE.Vector3()
+        // Gather input direction (reused vector — no per-frame alloc)
+        const dir = this._dir.set(0, 0, 0)
         if (this.keys.w) dir.z -= 1
         if (this.keys.s) dir.z += 1
         if (this.keys.a) dir.x -= 1
@@ -454,8 +526,9 @@ export default class Character {
         // Blinking
         this._updateBlinking(dt)
 
-        // Animation mixer
+        // Animation mixer (+ procedural kick layered on top)
         if (this.mixer) this.mixer.update(dt)
+        this._applyKickPose(dt)
 
         // Speed
         const speed = (this.isSprinting && isMoving) ? this.runSpeed : this.walkSpeed
@@ -539,6 +612,8 @@ export default class Character {
 
         f.add(this, 'walkSpeed', 0.5, 3.0, 0.1).name('Walk Speed')
         f.add(this, 'runSpeed', 1.5, 5.0, 0.1).name('Run Speed')
+        f.add(this, 'walkAnimSpeed', 0.6, 2.0, 0.01).name('Walk Anim Speed')
+        f.add(this, 'runAnimSpeed', 0.6, 2.0, 0.01).name('Run Anim Speed')
         f.add(this, 'rotationSpeed', 2.0, 30.0, 0.5).name('Rotation Smoothing')
         f.add(this, 'restAfterRunThreshold', 0.5, 5.0, 0.1).name('Rest After Run (s)')
         f.add(this, 'blinkDuration', 0.05, 0.5, 0.01).name('Blink Duration')

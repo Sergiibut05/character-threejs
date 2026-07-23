@@ -81,7 +81,7 @@ export default class Modal {
     }
 
     _focusables() {
-        return [...this.panel.querySelectorAll('.fz-card, .fz-btn, .fz-settings-tab')].filter((el) => {
+        return [...this.panel.querySelectorAll('.fz-card, .fz-btn, .fz-settings-tab, a.fz-cert')].filter((el) => {
             const s = getComputedStyle(el)
             return s.visibility !== 'hidden' && s.display !== 'none' && !el.disabled
         })

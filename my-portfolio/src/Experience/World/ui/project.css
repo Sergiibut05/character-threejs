@@ -1,0 +1,359 @@
+/* ─── Project panel (carts): right drawer on desktop, bottom sheet on touch.
+   Uses the shared design tokens from ui.css (:root --fz-*). Soft-clay look:
+   chunky radii, double soft shadows, big readable text, clear sections. */
+
+.fz-proj-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2680;
+    background: rgba(24, 42, 35, 0.38);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.28s ease, visibility 0.28s;
+}
+
+.fz-proj-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.fz-proj {
+    position: fixed;
+    z-index: 2690;
+    box-sizing: border-box;
+    background: linear-gradient(172deg, #ffffff 0%, var(--fz-green-50) 100%);
+    border: 1.5px solid rgba(120, 195, 160, 0.36);
+    box-shadow: var(--fz-shadow);
+    font-family: var(--fz-font-body);
+    color: var(--fz-ink);
+    display: flex;
+    flex-direction: column;
+    visibility: hidden;
+}
+
+.fz-proj.is-open { visibility: visible; }
+
+/* ── Desktop: right drawer ──────────────────────────────────────────── */
+.fz-proj--drawer {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(520px, 94vw);
+    border-radius: var(--fz-radius) 0 0 var(--fz-radius);
+    border-right: none;
+    padding: 24px 28px 20px;
+    transform: translateX(105%);
+    transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.36s;
+}
+
+.fz-proj--drawer.is-open { transform: translateX(0); }
+
+/* ── Touch: bottom sheet with grab handle ───────────────────────────── */
+.fz-proj--sheet {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 86dvh;
+    border-radius: 26px 26px 0 0;
+    border: none;
+    box-shadow: 0 -14px 44px rgba(39, 90, 70, 0.28);
+    padding: 0 20px calc(18px + env(safe-area-inset-bottom));
+    transform: translateY(105%);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.34s;
+}
+
+.fz-proj--sheet.is-open { transform: translateY(0); }
+.fz-proj--sheet.is-dragging { transition: none; }
+
+.fz-proj-handle {
+    flex: 0 0 auto;
+    padding: 12px 0 10px;
+    display: grid;
+    place-items: center;
+    touch-action: none;
+    cursor: grab;
+}
+
+.fz-proj-handle-bar {
+    width: 48px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(60, 95, 78, 0.28);
+}
+
+/* Sheet content breathes: smaller title, stacked full-width buttons */
+.fz-proj--sheet .fz-proj-title { font-size: 24px; }
+.fz-proj--sheet .fz-proj-footer { flex-direction: column; }
+.fz-proj--sheet .fz-proj-link { flex: 1 1 100%; }
+
+/* ── Content ────────────────────────────────────────────────────────── */
+/* Close button sits OVER the hero image → needs a solid chip to read well
+   (the translucent default disappeared against the screenshot). */
+.fz-proj .fz-modal-close {
+    top: 14px;
+    right: 16px;
+    z-index: 5;
+    width: 38px;
+    height: 38px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1.5px solid var(--fz-green-200);
+    color: var(--fz-ink);
+    box-shadow: 0 4px 12px rgba(39, 90, 70, 0.18);
+}
+
+.fz-proj .fz-modal-close:hover {
+    background: #fff;
+    border-color: rgba(255, 107, 107, 0.5);
+    color: var(--fz-red);
+}
+
+.fz-proj-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fz-green-200) transparent;
+    padding-right: 4px;
+}
+
+/* Hero: framed screenshot + overlaid flag. Subtle single shadow — anything
+   heavier gets clipped by the scroll container and reads as a smudge. */
+.fz-proj-hero {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 2px solid var(--fz-green-100);
+    box-shadow: 0 4px 14px rgba(39, 90, 70, 0.1);
+    line-height: 0;
+    margin: 2px 2px 0;
+}
+
+.fz-proj-img {
+    width: 100%;
+    display: block;
+    transition: opacity 0.14s ease;
+}
+
+/* Thumbnail strip: two big half-width thumbs that fill the hero's width —
+   easy to see AND easy to hit (far above the 44px touch minimum). */
+.fz-proj-thumbs {
+    display: flex;
+    gap: 12px;
+    margin: 12px 2px 0;
+}
+
+.fz-proj-thumb {
+    flex: 1 1 0;
+    aspect-ratio: 3 / 2;
+    padding: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2.5px solid var(--fz-green-100);
+    background: none;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fz-proj-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.fz-proj-thumb:hover { opacity: 1; transform: translateY(-1px); }
+
+.fz-proj-thumb.is-active {
+    border-color: var(--fz-green-400);
+    opacity: 1;
+    box-shadow: 0 3px 10px rgba(65, 160, 110, 0.22);
+}
+
+.fz-proj-thumb:focus-visible {
+    outline: 3px solid var(--fz-green-200);
+    outline-offset: 2px;
+}
+
+.fz-proj-flag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 6px 14px;
+    border-radius: var(--fz-radius-pill);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1.5px solid var(--fz-green-200);
+    font-family: var(--fz-font-title);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fz-green-500);
+    line-height: 1;
+    box-shadow: 0 3px 10px rgba(39, 90, 70, 0.14);
+}
+
+.fz-proj-title {
+    font-family: var(--fz-font-title);
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 18px 0 5px;
+    color: var(--fz-ink);
+}
+
+.fz-proj-tagline {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--fz-green-500);
+    margin: 0;
+}
+
+/* Section labels with a soft rule that fills the remaining width */
+.fz-proj-kicker {
+    font-family: var(--fz-font-title);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fz-green-500);
+}
+
+.fz-proj-kicker--section {
+    margin: 22px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fz-proj-kicker--section::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--fz-green-100);
+    border-radius: 2px;
+}
+
+/* Highlights: check-in-a-circle icons anchor each point for fast scanning */
+.fz-proj-point {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.fz-proj-check {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--fz-green-100);
+    color: var(--fz-green-500);
+}
+
+.fz-proj-point-text {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.65;
+    color: var(--fz-ink);
+}
+
+/* Key terms pop without shouting: heavier weight + a touch darker */
+.fz-proj-point-text strong {
+    font-weight: 800;
+    color: #173c2c;
+}
+
+.fz-proj-chips { margin: 0 0 4px; }
+
+/* Fixed footer — CTAs always visible, content scrolls behind. */
+.fz-proj-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: 6px;
+    border-top: 1.5px dashed var(--fz-green-100);
+}
+
+.fz-proj-link {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 50px;
+    padding: 12px 18px;
+    box-sizing: border-box;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    font-size: 17px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1.5px solid var(--fz-green-200);
+    transition: transform 0.15s ease, background 0.15s ease,
+                border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fz-proj-link svg { flex: 0 0 auto; opacity: 0.75; }
+
+.fz-proj-link:hover {
+    background: #fff;
+    border-color: var(--fz-green-400);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(39, 90, 70, 0.14);
+}
+
+.fz-proj-link:active { transform: translateY(1px); box-shadow: none; }
+
+.fz-proj-link:focus-visible {
+    outline: 3px solid var(--fz-green-200);
+    outline-offset: 2px;
+}
+
+.fz-proj-link--primary {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(65, 160, 110, 0.32);
+}
+
+.fz-proj-link--primary svg { opacity: 0.9; }
+
+.fz-proj-link--primary:hover {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    border-color: transparent;
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px rgba(65, 160, 110, 0.4);
+}
+
+@media (max-width: 520px) {
+    .fz-proj-title { font-size: 24px; }
+    .fz-proj-tagline { font-size: 15px; }
+    .fz-proj-point-text { font-size: 15.5px; }
+    .fz-proj-kicker { font-size: 12.5px; }
+    .fz-proj-thumbs { gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-proj,
+    .fz-proj-backdrop,
+    .fz-proj-link { transition: none; }
+}

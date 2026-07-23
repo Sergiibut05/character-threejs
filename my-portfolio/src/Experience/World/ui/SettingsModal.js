@@ -328,9 +328,10 @@ export default class SettingsModal {
     }
 
     open() {
+        if (this.isOpen()) return // duplicated trigger — don't re-capture the lock
         // Freeze the character while the settings are open (restored on close).
         const character = this.experience.world?.character
-        if (character) {
+        if (character && this._prevLocked === undefined) {
             this._prevLocked = character.movementLocked
             character.movementLocked = true
         }

@@ -6,11 +6,19 @@ export default class Time extends EventEmitter
     {
         super()
 
-        this.start = Date.now()
+        // performance.now(): sub-millisecond precision. Date.now() (integer ms)
+        // quantized frame deltas — on a 120 Hz display frames alternated 8/9 ms
+        // (±6% speed noise every frame), reading as constant micro-stutter.
+        this.start = performance.now()
         this.current = this.start
         this.elapsed = 0
         this.delta = 16
-        this.maxDelta = 33.33
+
+        // Spike guard ONLY (tab switches, GC pauses, shader compiles). It must
+        // stay far above real frame times: the old 33.33 ms cap meant any
+        // device below 30 fps ran in slow motion (movement AND animations
+        // advanced less than real time — the "ralentizado" feel on old phones).
+        this.maxDelta = 100
 
         this._history = new Float32Array(30)
         this._historyIndex = 0
@@ -25,7 +33,7 @@ export default class Time extends EventEmitter
 
     tick()
     {
-        const currentTime = Date.now()
+        const currentTime = performance.now()
         const rawDelta = currentTime - this.current
         this.delta = Math.min(rawDelta, this.maxDelta)
         this.current = currentTime

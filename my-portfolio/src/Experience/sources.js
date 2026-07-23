@@ -291,6 +291,56 @@ const allSources = [
         path: '/models/baseball-pitch/sand-mask-cpu.png',
         priority: 'decorative'
     },
+    // ─── Project carts + goal (west play area) ────────────────────────────
+    {
+        name: 'cartModel',
+        type: 'gltfModel',
+        path: '/models/carts/cart-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'cartReferences',
+        type: 'json',
+        path: '/models/carts/cart-references.json',
+        priority: 'decorative'
+    },
+    {
+        name: 'cartPage1',
+        type: 'texture',
+        path: '/models/carts/page1.webp',
+        priority: 'decorative',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.flipY = false // Blender-authored plane UVs (glTF convention)
+        }
+    },
+    {
+        name: 'cartPage2',
+        type: 'texture',
+        path: '/models/carts/page2.webp',
+        priority: 'decorative',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.flipY = false
+        }
+    },
+    {
+        name: 'cartPage3',
+        type: 'texture',
+        path: '/models/carts/page3.webp',
+        priority: 'decorative',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.flipY = false
+        }
+    },
+    {
+        name: 'goalpostModel',
+        type: 'gltfModel',
+        path: '/models/goalpost/goalpost-compressed.glb',
+        priority: 'decorative'
+    },
+
     // ─── House interior (far-offset "island"; entered via the house door) ──
     {
         name: 'interiorModel',

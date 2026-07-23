@@ -18,6 +18,7 @@
  * and re-apply their quality-dependent settings without a page reload.
  */
 import EventEmitter from './EventEmitter.js'
+import { REAL_SHADOWS_SUPPORTED } from './DeviceCaps.js'
 
 const STORAGE_KEY = 'portfolio.quality'
 const MOBILE_REGEX = /Mobi|Android|iPhone|iPad|iPod/i
@@ -86,11 +87,13 @@ export default class Quality extends EventEmitter {
     }
 
     /**
-     * Shadows are ALWAYS on — both quality levels cast real shadows.
-     * We use a fixed 1024x1024 map to bypass Three.js WebGPU texture-resizing bugs.
-     * Quality is instead controlled by PCF kernel (shadowRadius) and draw distance.
+     * Real shadow maps on both quality levels — EXCEPT on Android, where
+     * three's WebGPU backend drops the TEXTURE_COMPARE capability (UA sniff)
+     * and the fallback shadow-sampling path breaks our materials entirely
+     * (missing floor/props/character). There the whole shadow-map pipeline is
+     * disabled and FakeShadow blobs take over. See Utils/DeviceCaps.js.
      */
-    get shadowsEnabled() { return true }
+    get shadowsEnabled() { return REAL_SHADOWS_SUPPORTED }
 
     /** Fixed to 1024. Resizing this dynamically in WebGPU causes crashes. */
     get shadowMapSize()    { return 1024 }
@@ -108,7 +111,15 @@ export default class Quality extends EventEmitter {
 
     /** Grass blade count (per spawn cluster). */
     get grassCount()      { return this.isLow ? 6000 : 10000 }
-    get grassViewRadius() { return this.isLow ? 14 : 20 }
+    /**
+     * The visible-grass disc is shifted `grassViewAhead` metres toward where
+     * the camera looks, so the character sits near its rear (south) edge and
+     * no budget is wasted on grass behind the camera. That forward shift is
+     * why the radius can be trimmed vs. the old character-centred values
+     * (14 / 20) with MORE on-screen coverage, not less.
+     */
+    get grassViewRadius() { return this.isLow ? 12.5 : 18 }
+    get grassViewAhead()  { return this.isLow ? 8 : 12 }
     /** Foliage SDF cubes (Bushes / dense vegetation). */
     get foliagePlanes()   { return this.isLow ? 36 : 80 }
 }

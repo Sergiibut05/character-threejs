@@ -73,10 +73,17 @@ export default class ScoreboardInteractive {
 
     // ─── Interaction: full top-10 modal ──────────────────────────────────
     async _tryInteract() {
+        // Re-entrancy guard: this handler is ASYNC (fetches the ranking before
+        // opening). A duplicated trigger during that gap re-captured
+        // `_prevLocked` AFTER the first call had already locked movement →
+        // closing "restored" locked=true and froze the character.
+        if (this._busy) return
         if (!(this.isNear || this.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
+
+        this._busy = true
 
         // Freeze the character while reading (restored on close).
         const character = this.experience.world?.character
@@ -85,24 +92,29 @@ export default class ScoreboardInteractive {
             character.movementLocked = true
         }
 
-        if (!this.modal) {
-            this.modal = new Modal({
-                variant: 'paper',
-                size: 'lg',
-                title: 'Ranking',
-                subtitle: 'Top 10 · Frisbee con el perro'
-            })
-            this.modal.onClose(() => this._onModalClosed())
-        }
+        try {
+            if (!this.modal) {
+                this.modal = new Modal({
+                    variant: 'paper',
+                    size: 'lg',
+                    title: 'Ranking',
+                    subtitle: 'Top 10 · Frisbee con el perro'
+                })
+                this.modal.onClose(() => this._onModalClosed())
+            }
 
-        // Fresh data every open.
-        const [top10, myBest] = await Promise.all([
-            this.leaderboard.getTop10(),
-            this.leaderboard.getMyBest()
-        ])
-        this.modal.body.innerHTML = ''
-        this.modal.append(buildLeaderboardList(top10, myBest))
-        this.modal.open()
+            // Fresh data every open.
+            const [top10, myBest] = await Promise.all([
+                this.leaderboard.getTop10(),
+                this.leaderboard.getMyBest()
+            ])
+            this.modal.body.innerHTML = ''
+            this.modal.append(buildLeaderboardList(top10, myBest))
+            this.modal.open()
+        } catch (e) {
+            // Fetch failed — never leave the character frozen.
+            this._onModalClosed()
+        }
     }
 
     _onModalClosed() {
@@ -111,6 +123,7 @@ export default class ScoreboardInteractive {
             character.movementLocked = this._prevLocked
             this._prevLocked = undefined
         }
+        this._busy = false
     }
 
     _updateHighlight() {

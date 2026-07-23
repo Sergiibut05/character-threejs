@@ -382,6 +382,9 @@ export default class HouseInterior {
     }
 
     _lockForModal() {
+        // Idempotent: a duplicated trigger must not re-capture the lock state
+        // AFTER we already locked (that would "restore" locked=true on close).
+        if (this._prevModalLock !== undefined) return
         const character = this.experience.world?.character
         if (character) {
             this._prevModalLock = character.movementLocked

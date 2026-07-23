@@ -251,7 +251,7 @@ export default class PatioScene {
 
         if (!this.pieces.socialArea && r.socialAreaModel) {
             this.pieces.socialArea = new StaticPiece('socialArea', r.socialAreaModel, {
-                map: r.sushiAtlas || null
+                map: r.tinyAtlas || null
             })
         }
 

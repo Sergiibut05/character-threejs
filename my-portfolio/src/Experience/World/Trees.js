@@ -97,12 +97,17 @@ export default class Trees {
         this.visual.updateMatrixWorld(true)
         const references = []
 
-        for (const treeRef of this.references) {
+        for (let t = 0; t < this.references.length; t++) {
+            const treeRef = this.references[t]
             treeRef.updateWorldMatrix(true, false)
+            // One stable random per TREE — every foliage cluster of the same
+            // tree shares it, so the tonal variation shifts the WHOLE tree.
+            const treeSeed = (((Math.sin((t + 1) * 12.9898) * 43758.5453) % 1) + 1) % 1
             for (const leaves of this.modelParts.leaves) {
                 const finalMatrix = leaves.matrix.clone().premultiply(treeRef.matrixWorld)
                 const reference = new THREE.Object3D()
                 reference.applyMatrix4(finalMatrix)
+                reference.userData.treeSeed = treeSeed
                 references.push(reference)
             }
         }
@@ -121,6 +126,7 @@ export default class Trees {
             if (o.seeThroughEdgeMin !== undefined) m.seeThroughEdgeMin.value = o.seeThroughEdgeMin
             if (o.seeThroughEdgeMax !== undefined) m.seeThroughEdgeMax.value = o.seeThroughEdgeMax
             if (o.colorAPresence !== undefined) m.colorAPresence.value = o.colorAPresence
+            if (o.toneVariation !== undefined) m.toneVariation.value = o.toneVariation
         }
     }
 
@@ -180,6 +186,7 @@ export default class Trees {
             this.debugFolder.add(mat.seeThroughEdgeMin, 'value', 0, 1, 0.001).name('See Through Min')
             this.debugFolder.add(mat.seeThroughEdgeMax, 'value', 0, 1, 0.001).name('See Through Max')
             this.debugFolder.add(mat.colorAPresence, 'value', 0, 1, 0.001).name('Color A Presence')
+            this.debugFolder.add(mat.toneVariation, 'value', 0, 0.35, 0.005).name('Tone Variation (± tree)')
         }
     }
 }

@@ -70,6 +70,10 @@
        it on narrow phones; the overflow + `safe center` then left-snapped the
        panel and ate the right padding → modal looked shifted right. */
     width: min(400px, 100%);
+    /* Never taller than the screen; the body scrolls (see .fz-modal-body). */
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
     padding: 30px 26px 26px;
     border-radius: var(--fz-radius);
@@ -139,8 +143,8 @@
 .fz-modal-subtitle {
     margin: 0 2px 20px;
     font-size: 16.5px;
-    font-weight: 500;
-    line-height: 1.35;
+    font-weight: 600;
+    line-height: 1.5;
     color: var(--fz-ink-soft);
 }
 
@@ -179,6 +183,20 @@
 
 .fz-modal-body {
     display: block;
+    /* The panel is a column capped at the overlay height (see .fz-modal):
+       when content is taller than the screen (mobile settings), the BODY
+       scrolls while title and hint bar stay pinned. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fz-green-200) transparent;
+    /* The scrollport CLIPS anything past its edge — card shadows, hover lifts
+       and 3px focus rings were visibly cut. Padding creates room inside the
+       scrollport; the matching negative margin cancels it out of the layout. */
+    padding: 10px 12px 16px;
+    margin: -10px -12px -16px;
 }
 
 /* Adaptive hint bar (gamepad/keyboard nav legend; hidden on touch) */
@@ -189,6 +207,12 @@
     margin-top: 18px;
     padding-top: 13px;
     border-top: 1px solid rgba(120, 185, 150, 0.26);
+    flex: 0 0 auto;
+}
+
+.fz-modal-title,
+.fz-modal-subtitle {
+    flex: 0 0 auto;
 }
 
 .fz-modal-hint {
@@ -196,8 +220,8 @@
     align-items: center;
     gap: 7px;
     font-family: var(--fz-font-body);
-    font-size: 13.5px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--fz-ink-soft);
 }
 
@@ -259,23 +283,28 @@
 .fz-card-title {
     font-family: var(--fz-font-title);
     font-size: 20px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .fz-card-desc {
-    font-size: 13.5px;
-    font-weight: 500;
-    line-height: 1.4;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.5;
     color: var(--fz-ink-soft);
 }
 
 /* ─── Buttons (pill) ──────────────────────────────────────────────────── */
 .fz-btn {
     appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    box-sizing: border-box;
     font-family: var(--fz-font-title);
     font-size: 17px;
-    font-weight: 600;
-    padding: 13px 26px;
+    font-weight: 700;
+    padding: 12px 26px;
     border-radius: var(--fz-radius-pill);
     cursor: pointer;
     border: 1.5px solid transparent;
@@ -737,6 +766,60 @@
     50% { transform: translate(-50%, -5px); }
 }
 
+/* ─── Social area pill (focused network + open glyph) ─────────────────── */
+.fz-social-pill {
+    position: fixed;
+    left: 50%;
+    bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
+    transform: translate(-50%, 12px);
+    z-index: 2450;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.88);
+    border: 1.5px solid rgba(232, 178, 46, 0.5);
+    box-shadow: var(--fz-shadow-soft);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-social-pill.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}
+
+.fz-social-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+}
+.fz-social-icon svg { display: block; }
+
+.fz-social-name { line-height: 1; }
+
+/* Popup-blocked fallback: the pill becomes a real link to confirm. */
+.fz-social-open-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--fz-green-700, #2c7a54);
+    text-decoration: none;
+    font-weight: 800;
+}
+.fz-social-open-link:hover .fz-social-name { text-decoration: underline; }
+
 /* ─── Input glyphs (button hints, adaptive per device) ────────────────── */
 .fz-glyph {
     display: inline-flex;
@@ -930,9 +1013,11 @@
 
 .fz-settings-tab {
     appearance: none;
+    min-height: 44px;
+    box-sizing: border-box;
     font-family: var(--fz-font-title);
     font-size: 17px;
-    font-weight: 600;
+    font-weight: 700;
     padding: 10px 22px;
     border-radius: var(--fz-radius-pill);
     border: 1.5px solid rgba(120, 185, 150, 0.4);
@@ -973,13 +1058,24 @@
 .fz-ctrl-list { display: flex; flex-direction: column; }
 
 .fz-ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-family: var(--fz-font-title);
     font-size: 13.5px;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--fz-green-500);
-    margin: 14px 0 6px;
+    margin: 16px 0 6px;
+}
+
+.fz-ctrl-group::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--fz-green-100);
+    border-radius: 2px;
 }
 
 .fz-ctrl-group:first-child { margin-top: 0; }
@@ -994,8 +1090,8 @@
 }
 
 .fz-ctrl-label {
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
     color: var(--fz-ink);
 }
 
@@ -1022,9 +1118,9 @@
 }
 
 .fz-field-label {
-    font-family: var(--fz-font-title);
-    font-size: 13.5px;
-    font-weight: 600;
+    font-family: var(--fz-font-body);
+    font-size: 14.5px;
+    font-weight: 700;
     color: var(--fz-ink-soft);
 }
 
@@ -1032,7 +1128,7 @@
     width: 100%;
     box-sizing: border-box;
     font-family: var(--fz-font-body);
-    font-size: 15px;
+    font-size: 16px;
     color: var(--fz-ink);
     padding: 11px 14px;
     border-radius: 12px;
@@ -1062,7 +1158,8 @@
     overflow: hidden;
     opacity: 0;
     font-family: var(--fz-font-body);
-    font-size: 13.5px;
+    font-size: 14px;
+    font-weight: 600;
     color: #d2553f;
     transition: opacity 0.16s ease, max-height 0.16s ease;
 }
@@ -1249,4 +1346,36 @@
 
 @media (max-width: 340px) {
     .fz-cards { grid-template-columns: 1fr; }
+}
+
+/* ═══ Mobile compaction (settings + shared modal pieces) ═══════════════ */
+@media (max-width: 520px) {
+    .fz-modal {
+        padding: 24px 16px 16px;
+    }
+
+    .fz-modal--lg { width: 100%; }
+
+    .fz-settings-tab {
+        font-size: 14px;
+        padding: 8px 13px;
+    }
+
+    .fz-settings-nav { gap: 6px; margin-bottom: 14px; }
+
+    .fz-card {
+        padding: 14px 10px 12px;
+        gap: 6px;
+    }
+
+    .fz-card-icon svg { width: 38px; height: 38px; }
+    .fz-card-title { font-size: 16px; }
+    .fz-card-desc { font-size: 12px; }
+
+    .fz-sound { margin-top: 14px; padding-top: 14px; gap: 12px; }
+
+    .fz-icon-btn { width: 36px; height: 36px; }
+    .fz-icon-btn svg { width: 19px; height: 19px; }
+
+    .fz-contact { max-width: 100%; }
 }

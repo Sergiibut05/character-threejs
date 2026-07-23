@@ -7,6 +7,10 @@ import Raycaster from './Raycaster.js'
 import Mailbox from './Mailbox.js'
 import Door from './Door.js'
 import HouseInterior from './HouseInterior.js'
+import ProjectCarts from './ProjectCarts.js'
+import GoalPost from './GoalPost.js'
+import Confetti from './Confetti.js'
+import Ball from './Ball.js'
 import StreetLamps from './StreetLamps.js'
 import ScoreboardScreen from './ScoreboardScreen.js'
 import ScoreboardInteractive from './ScoreboardInteractive.js'
@@ -23,6 +27,7 @@ import Trees from './Trees.js'
 import Bushes from './Bushes.js'
 import FakeShadow from './FakeShadow.js'
 import ActivityPrompt from './ActivityPrompt.js'
+import SocialArea from './SocialArea.js'
 import FrisbeeMinigame from './FrisbeeMinigame.js'
 import FrisbeeSession from './FrisbeeSession.js'
 
@@ -122,8 +127,9 @@ export default class World {
             // Bushes (standalone, ready for future reference models)
             this.bushes = new Bushes()
 
-            // Fake shadows on mobile (real shadow maps disabled for Mali compat)
-            if (this.experience.quality.isLow) {
+            // Fake blob shadows: on low quality, and ALSO wherever the real
+            // shadow pipeline is unavailable (Android — see DeviceCaps.js).
+            if (this.experience.quality.isLow || !this.experience.quality.shadowsEnabled) {
                 this.setupFakeShadows()
             }
 
@@ -135,6 +141,13 @@ export default class World {
             this.mailbox = new Mailbox() // resolves the mailbox node lazily
             this.door = new Door() // resolves the house `door` node lazily
             this.houseInterior = new HouseInterior() // far-offset interior + rug exit
+
+            // West play area: project carts + goal + kickable ball + confetti
+            this.projectCarts = new ProjectCarts()
+            this.socialArea = new SocialArea()
+            this.goalPost = new GoalPost()
+            this.confetti = new Confetti()
+            this.ball = new Ball()
             this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
             // Live ranking screen: auto-attaches the canvas texture to a mesh
             // named "scoreboard" when you import your own object (see file).
@@ -193,6 +206,7 @@ export default class World {
                 cullAspectX: isLow ? 1.8 : 1.0,
                 viewRadius: this.experience.quality.grassViewRadius,
                 viewFadeBand: 4.0,
+                viewAhead: this.experience.quality.grassViewAhead,
                 spawnFunction: (count) => this.patioScene.getGrassSpawnPositions(count)
             })
         } else {
@@ -415,6 +429,18 @@ export default class World {
         }
         if (this.houseInterior) {
             this.houseInterior.update()
+        }
+        if (this.projectCarts) {
+            this.projectCarts.update()
+        }
+        if (this.socialArea) {
+            this.socialArea.update()
+        }
+        if (this.ball) {
+            this.ball.update()
+        }
+        if (this.confetti) {
+            this.confetti.update()
         }
         if (this.streetLamps) {
             this.streetLamps.update()

@@ -2,3 +2,6 @@
 # Local tooling artifacts
 kickbacks.vsix
 .codebase-memory/
+
+# Working plan documents (local only)
+*_PLAN.md

@@ -124,9 +124,21 @@ export default class Fireflies {
     }
 
     update() {
-        // Only uniform update needed — all animation is on GPU
-        if (this.experience.world?.character) {
-            this.uCharacterPos.value.copy(this.experience.world.character.position)
+        // Only uniform update needed — all animation is on GPU.
+        // Culling-only uniform → shifted toward the view direction so the
+        // visible disc matches what's on screen (see Grass.uViewCenter).
+        const character = this.experience.world?.character
+        if (character) {
+            const cam = this.experience.camera.instance.position
+            const ahead = this.experience.quality.grassViewAhead
+            let dx = character.position.x - cam.x
+            let dz = character.position.z - cam.z
+            const len = Math.hypot(dx, dz) || 1
+            this.uCharacterPos.value.set(
+                character.position.x + (dx / len) * ahead,
+                character.position.y,
+                character.position.z + (dz / len) * ahead
+            )
         }
     }
 

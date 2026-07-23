@@ -139,9 +139,13 @@ export default class ContactModal {
     }
 
     open() {
+        if (this.modal.isOpen()) return // duplicated trigger — don't re-capture the lock
         this._reset()
         const c = this.experience?.world?.character
-        if (c) { this._prevLocked = c.movementLocked; c.movementLocked = true }
+        if (c && this._prevLocked === undefined) {
+            this._prevLocked = c.movementLocked
+            c.movementLocked = true
+        }
         this.modal.open()
     }
 

@@ -4,12 +4,14 @@ import {
     uniform, uv, texture,
     mix, normalWorld, sin, cos,
     positionLocal, rotateUV, smoothstep,
-    screenUV, screenSize, positionWorld, cameraPosition
+    screenUV, screenSize, positionWorld, cameraPosition,
+    attribute
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { propSunDirection } from './scene/StylizedPropMaterial.js'
 import { dayNightLitTint } from './DayNight.js'
+import { REAL_SHADOWS_SUPPORTED } from '../Utils/DeviceCaps.js'
 
 function createRng(seed) {
     let s = seed | 0
@@ -111,6 +113,11 @@ export default class Foliage {
         this.material.shadowOffset = uniform(1)
         // 0.5 = neutral, > 0.5 = more Color A presence, < 0.5 = more Color B
         this.material.colorAPresence = uniform(0.5)
+        // Per-TREE tonal variation (± fraction of brightness). A tree is made
+        // of several foliage-cluster instances, so the seed comes from an
+        // instanced attribute (aTreeSeed) that all clusters of the same tree
+        // share — the WHOLE tree shifts lighter/darker together.
+        this.material.toneVariation = uniform(0.16)
 
         const foliageTexture = this.resources.items.foliageTexture
 
@@ -170,12 +177,19 @@ export default class Foliage {
             return alpha
         })()
 
-        // Color: mix A/B based on how much the normal faces the sun
+        // Color: mix A/B based on how much the normal faces the sun, then
+        // shift the whole tree's tone by its per-instance random (see above).
         const colorNode = Fn(() => {
             const mixStrength = normalWorld.dot(lightDir).smoothstep(0, 1)
             const bias = float(0.5).sub(this.material.colorAPresence)
             const shiftedMix = mixStrength.add(bias).clamp(0.0, 1.0)
-            return mix(this.colorANode, this.colorBNode, shiftedMix).mul(dayNightLitTint)
+            const base = mix(this.colorANode, this.colorBNode, shiftedMix)
+            const treeTone = mix(
+                float(1.0).sub(this.material.toneVariation),
+                float(1.0).add(this.material.toneVariation),
+                attribute('aTreeSeed', 'float')
+            )
+            return base.mul(treeTone).mul(dayNightLitTint)
         })()
 
         this.material.instance = new THREE.MeshLambertNodeMaterial({
@@ -188,7 +202,7 @@ export default class Foliage {
         this.material.instance.depthWrite = true
         this.material.instance.alphaTest = 0.5
 
-        if (!this.experience.quality?.isLow) {
+        if (!this.experience.quality?.isLow && REAL_SHADOWS_SUPPORTED) {
             this.material.instance.receivedShadowPositionNode = positionLocal.add(lightDir.mul(this.material.shadowOffset))
         }
     }
@@ -223,6 +237,15 @@ export default class Foliage {
 
         const count = this.transformMatrices.length
         if (count === 0) return
+
+        // Per-instance tree seed for the tonal variation. Clusters tagged by
+        // Trees.setLeaves share their tree's seed; untagged users (bushes…)
+        // get their own random per instance.
+        const seeds = new Float32Array(count)
+        for (let i = 0; i < count; i++) {
+            seeds[i] = this.references[i]?.userData?.treeSeed ?? this.rng()
+        }
+        this.geometry.setAttribute('aTreeSeed', new THREE.InstancedBufferAttribute(seeds, 1))
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material.instance, count)
         const isLow = this.experience.quality?.isLow

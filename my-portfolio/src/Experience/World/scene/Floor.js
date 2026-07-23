@@ -19,6 +19,7 @@ import { uniform, vec4 } from 'three/tsl'
 import Experience from '../../Experience.js'
 import { createFloorColorNode } from '../TSL/FloorShader.js'
 import { dayNightLitTint } from '../DayNight.js'
+import { REAL_SHADOWS_SUPPORTED } from '../../Utils/DeviceCaps.js'
 
 const _vA = new THREE.Vector3()
 const _vB = new THREE.Vector3()
@@ -26,6 +27,11 @@ const _vC = new THREE.Vector3()
 
 const GRASS_MESH_NAMES = ['grass-floor-1', 'grass-floor-2']
 const DIRT_MESH_NAMES = ['ground-floor-1', 'ground-floor-2']
+
+// No vegetation at (or below) water level: the river surface sits at world
+// y ≈ -0.5 (agua plane -0.61 + lift), so blades spawned on the lower bank
+// would poke through the water. Anything under this Y is skipped.
+const GRASS_MIN_WORLD_Y = -0.3
 const SLABS_CHANNELS = ['lum', 'r', 'g', 'b', 'a']
 
 /** Same response as shader `smoothstep(uGrassMaskLow, uGrassMaskHigh, lum)` — CPU-side. */
@@ -145,8 +151,9 @@ export default class Floor {
         mesh.material?.dispose?.()
         mesh.material = material
         mesh.castShadow = false
-        // Force receiveShadow to true regardless of quality to ensure shadows are always visible
-        mesh.receiveShadow = true
+        // Quality-independent, but only where the real shadow pipeline exists
+        // (on Android it is disabled entirely — see Utils/DeviceCaps.js).
+        mesh.receiveShadow = REAL_SHADOWS_SUPPORTED
     }
 
     _applyDirtFloorMaterial(mesh) {
@@ -160,8 +167,9 @@ export default class Floor {
         mesh.material?.dispose?.()
         mesh.material = material
         mesh.castShadow = false
-        // Force receiveShadow to true regardless of quality to ensure shadows are always visible
-        mesh.receiveShadow = true
+        // Quality-independent, but only where the real shadow pipeline exists
+        // (on Android it is disabled entirely — see Utils/DeviceCaps.js).
+        mesh.receiveShadow = REAL_SHADOWS_SUPPORTED
     }
 
     /** Re-create the grass-floor material with the current slabs config. */
@@ -332,6 +340,9 @@ export default class Floor {
                     const x = tri.a.x * u + tri.b.x * vv + tri.c.x * ww
                     const y = tri.a.y * u + tri.b.y * vv + tri.c.y * ww
                     const z = tri.a.z * u + tri.b.z * vv + tri.c.z * ww
+
+                    // Never at/below the water surface (see GRASS_MIN_WORLD_Y).
+                    if (y < GRASS_MIN_WORLD_Y) continue
 
                     if (!sampleMask) {
                         positions.push({ x, y, z })

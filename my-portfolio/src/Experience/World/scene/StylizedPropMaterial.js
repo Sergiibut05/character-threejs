@@ -11,6 +11,7 @@ import {
     mix, smoothstep, max
 } from 'three/tsl'
 import { dayNightTint } from '../DayNight.js'
+import { REAL_SHADOWS_SUPPORTED } from '../../Utils/DeviceCaps.js'
 
 /** Unit vector toward the directional sun (same convention as Foliage.js). */
 export const propSunDirection = uniform(new THREE.Vector3(4, 5, -3).normalize())
@@ -55,6 +56,8 @@ export function createStylizedPropNodeMaterial(options = {}) {
 
     const tc = toThreeColor(color)
     const tintRgb = uniform(new THREE.Vector3(tc.r, tc.g, tc.b))
+    // Exposed so consumers (e.g. Coblestone's GUI) can retint live.
+    // (assigned to userData after material creation below)
 
     const material = new THREE.MeshLambertNodeMaterial({
         flatShading,
@@ -62,13 +65,20 @@ export function createStylizedPropNodeMaterial(options = {}) {
         depthWrite: !(mapAlpha && !!map)
     })
     if (map) material.map = map
+    material.userData.uTint = tintRgb
 
     const catchedShadow = float(1).toVar()
 
-    material.receivedShadowNode = Fn(([shadow]) => {
-        catchedShadow.mulAssign(shadow.r)
-        return float(1)
-    })
+    // Custom shadow hook — only where the real shadow pipeline exists. On
+    // Android this hook + three's TEXTURE_COMPARE fallback fails to build and
+    // the prop simply vanishes (see Utils/DeviceCaps.js). Without the hook,
+    // catchedShadow stays 1 → no drop shadows, everything else identical.
+    if (REAL_SHADOWS_SUPPORTED) {
+        material.receivedShadowNode = Fn(([shadow]) => {
+            catchedShadow.mulAssign(shadow.r)
+            return float(1)
+        })
+    }
 
     material.outputNode = Fn(() => {
         const texel = map ? texture(map, uv()) : null

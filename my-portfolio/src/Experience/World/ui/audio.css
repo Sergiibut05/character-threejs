@@ -84,12 +84,26 @@
     gap: 16px;
 }
 
+/* Section label matching the project panel's kicker: green, spaced caps,
+   with a soft rule filling the remaining width. */
 .fz-sound-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-family: var(--fz-font-title);
-    font-size: 0.78rem;
-    letter-spacing: 0.06em;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--fz-ink-soft);
+    color: var(--fz-green-500);
+}
+
+.fz-sound-heading::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--fz-green-100);
+    border-radius: 2px;
 }
 
 /* Now-playing card (preview). Fixed parts (cover + transport buttons) must
@@ -131,8 +145,9 @@
 }
 
 .fz-np-title {
-    font-family: var(--fz-font-title);
-    font-size: 1rem;
+    font-family: var(--fz-font-body);
+    font-size: 16.5px;
+    font-weight: 700;
     color: var(--fz-ink);
     white-space: nowrap;
     overflow: hidden;
@@ -143,7 +158,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.72rem;
+    font-family: var(--fz-font-body);
+    font-size: 13px;
+    font-weight: 600;
     color: var(--fz-ink-soft);
     font-variant-numeric: tabular-nums;
 }
@@ -189,9 +206,11 @@
 .fz-icon-btn.is-on { background: var(--fz-green-400); border-color: var(--fz-green-500); color: #fff; }
 
 .fz-sfx-desc {
-    font-size: 0.82rem;
+    font-family: var(--fz-font-body);
+    font-size: 15px;
+    font-weight: 600;
     color: var(--fz-ink-soft);
-    line-height: 1.4;
+    line-height: 1.55;
     margin-top: -4px;
 }
 
@@ -221,17 +240,18 @@
 }
 
 .fz-conn-label {
-    font-family: var(--fz-font-title);
-    font-size: 15px;
-    font-weight: 600;
+    font-family: var(--fz-font-body);
+    font-size: 16px;
+    font-weight: 700;
     color: var(--fz-ink);
 }
 
 .fz-conn-hint {
     display: block;
-    font-size: 13px;
+    font-family: var(--fz-font-body);
+    font-size: 14.5px;
     font-weight: 600;
-    line-height: 1.5;
+    line-height: 1.55;
     color: var(--fz-ink-soft);
     margin-top: -6px;
 }

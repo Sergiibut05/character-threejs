@@ -83,16 +83,49 @@ export default class GamepadControls {
             window.experience?.input?.set('gamepad')
         }
 
+        // Start/Options toggles the settings menu (like any console game).
+        if (this.actions.start && !this._prevStart) {
+            const settings = window.experience?.settingsUi
+            if (settings?.isOpen()) settings.close()
+            else if (settings && !document.querySelector('.fz-modal-overlay.is-open, .fz-proj.is-open')) {
+                settings.open()
+            }
+        }
+        this._prevStart = this.actions.start
+
         this._navigateModals()
     }
 
     // Drive open modals from the pad (A activate · B close · dpad/stick move).
     _navigateModals() {
         if (this.suspendMenuNav) { this._prevA = this.actions.button2; this._prevB = this.actions.back; return }
+
+        // The project panel (carts) is NOT a .fz-modal-overlay — it closes on
+        // Escape, so B forwards a synthetic Escape (works for drawer AND sheet,
+        // which has no close button).
+        if (document.querySelector('.fz-proj.is-open')) {
+            if (this.actions.back && !this._prevB) {
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+            }
+            this._prevA = this.actions.button2
+            this._prevB = this.actions.back
+            return
+        }
+
         const overlay = document.querySelector('.fz-modal-overlay.is-open')
         if (!overlay) { this._prevA = this.actions.button2; this._prevB = this.actions.back; return }
 
-        const items = [...overlay.querySelectorAll('.fz-card, .fz-btn, .fz-settings-tab')].filter((el) => {
+        // B closes FIRST — before any item checks. The trophy modal has only
+        // links (no cards/buttons), and the old "no items → return" bailed out
+        // before ever reaching the close branch.
+        if (this.actions.back && !this._prevB) {
+            overlay.querySelector('.fz-modal-close')?.click()
+            this._prevA = this.actions.button2
+            this._prevB = this.actions.back
+            return
+        }
+
+        const items = [...overlay.querySelectorAll('.fz-card, .fz-btn, .fz-settings-tab, a.fz-cert')].filter((el) => {
             const s = getComputedStyle(el)
             return s.visibility !== 'hidden' && s.display !== 'none' && !el.disabled
         })
@@ -101,8 +134,6 @@ export default class GamepadControls {
         if (this.actions.button2 && !this._prevA) {
             const cur = items.includes(document.activeElement) ? document.activeElement : items[0]
             cur?.click()
-        } else if (this.actions.back && !this._prevB) {
-            overlay.querySelector('.fz-modal-close')?.click()
         } else if (items.length > 1) {
             const dpadU = this._buttons[12]?.pressed
             const dpadD = this._buttons[13]?.pressed

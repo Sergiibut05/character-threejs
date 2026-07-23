@@ -64,6 +64,14 @@ export default class AudioManager extends EventEmitter {
         super()
         this.experience = experience
 
+        // Backend per device. Desktop: html5 streaming (low memory, instant
+        // start). Mobile/iOS: WEB AUDIO — html5 <audio> on iOS ignores
+        // programmatic volume (hardware-only) so proximity fades/mute break,
+        // and play() calls outside the tap gesture get blocked (which silenced
+        // the music: it starts after an async manifest fetch + delay). Web
+        // Audio unlocks once on the first touch and volume works everywhere.
+        this._useHtml5 = !(experience.quality?.isMobile)
+
         // ── Music tuning ──
         this.musicVolume = 0.5          // slider position (0..1)
         this.musicCeiling = 0.3         // real gain = musicVolume * musicCeiling
@@ -161,7 +169,7 @@ export default class AudioManager extends EventEmitter {
         const gain = this._musicGain()
         this.howl = new Howl({
             src: track.src,
-            html5: true,
+            html5: this._useHtml5,
             volume: fadeIn ? 0 : gain,
             onend: () => this._onTrackEnd(),
             onloaderror: () => { console.warn('AudioManager: load error', track.id); this._advance() },
@@ -279,7 +287,7 @@ export default class AudioManager extends EventEmitter {
         for (const def of SFX_DEFS) {
             const howl = new Howl({
                 src: def.src,
-                html5: true,
+                html5: this._useHtml5,
                 loop: true,
                 volume: 0,
                 onplayerror: function () { this.once('unlock', () => { try { this.play() } catch { /* */ } }) }

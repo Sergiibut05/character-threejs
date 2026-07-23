@@ -16,6 +16,9 @@ export default class Camera {
         this.isMobile = this.checkIfMobile()
         this.baseFov = this.isMobile ? 30 : 35        // world / follow
         this.minigameFov = this.isMobile ? 59 : 35    // frisbee aim, flight & cinematics
+        // Follow-mode FOV offset (e.g. SocialArea's subtle zoom-in sets −4);
+        // lerped toward baseFov + offset every follow frame.
+        this.zoomFovOffset = 0
 
         this.setInstance()
         this.setOrbitControls()
@@ -67,6 +70,22 @@ export default class Camera {
         this.smoothPosition = this.instance.position.clone()
         this.smoothLookAt = new THREE.Vector3(0, 0, 0)
         this.lerpFactor = this.isMobile ? 0.78 : 0.12
+
+        // Per-frame scratch vectors — no allocations inside update() (per-frame
+        // `new Vector3()` churn caused recurring GC hitches).
+        this._scratchPos = new THREE.Vector3()
+        this._scratchLook = new THREE.Vector3()
+    }
+
+    /**
+     * Frame-rate-corrected lerp factor: `f` is the per-frame factor tuned at
+     * 60 fps; this returns the equivalent for the CURRENT frame time, so the
+     * smoothing speed is identical at 30, 60 or 120 fps (fixed per-frame
+     * factors smooth twice as hard at 120 Hz and half at 30 → jitter).
+     */
+    _alpha(f) {
+        const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
+        return 1 - Math.pow(1 - f, dt * 60)
     }
 
     setOrbitControls() {
@@ -114,13 +133,20 @@ export default class Camera {
 
         if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
-            const desiredPosition = new THREE.Vector3()
+            const desiredPosition = this._scratchPos
                 .copy(characterPosition)
                 .add(this.cameraOffset)
-            this.smoothPosition.lerp(desiredPosition, this.lerpFactor)
-            this.smoothLookAt.lerp(characterPosition, this.lerpFactor)
+            const a = this._alpha(this.lerpFactor)
+            this.smoothPosition.lerp(desiredPosition, a)
+            this.smoothLookAt.lerp(characterPosition, a)
             this.instance.position.copy(this.smoothPosition)
             this.instance.lookAt(this.smoothLookAt)
+
+            const targetFov = this.baseFov + this.zoomFovOffset
+            if (Math.abs(this.instance.fov - targetFov) > 0.02) {
+                this.instance.fov += (targetFov - this.instance.fov) * this._alpha(0.08)
+                this.instance.updateProjectionMatrix()
+            }
         }
     }
 
@@ -129,16 +155,17 @@ export default class Camera {
         if (!character) return
 
         const yaw = character.container.rotation.y
-        const pos = character.position.clone()
+        const pos = this._scratchPos.copy(character.position)
         pos.x -= Math.sin(yaw) * this.aimBehindDist
         pos.y += this.aimHeight
         pos.z -= Math.cos(yaw) * this.aimBehindDist
 
-        const lookTarget = character.position.clone()
+        const lookTarget = this._scratchLook.copy(character.position)
         lookTarget.y += this.aimLookHeight
 
-        this.smoothPosition.lerp(pos, this.aimLerp)
-        this.smoothLookAt.lerp(lookTarget, this.aimLerp)
+        const a = this._alpha(this.aimLerp)
+        this.smoothPosition.lerp(pos, a)
+        this.smoothLookAt.lerp(lookTarget, a)
         this.instance.position.copy(this.smoothPosition)
         this.instance.lookAt(this.smoothLookAt)
     }
@@ -158,15 +185,15 @@ export default class Camera {
         const nudge = this.flightForwardNudge * nudgeT * nudgeT * (3 - 2 * nudgeT)
 
         const yaw = this._throwYaw
-        const desiredPos = character.position.clone()
+        const desiredPos = this._scratchPos.copy(character.position)
         desiredPos.x += Math.sin(yaw) * nudge
         desiredPos.y += this.flightHeight
         desiredPos.z += Math.cos(yaw) * nudge
 
-        this.smoothPosition.lerp(desiredPos, this.flightPosLerp)
+        this.smoothPosition.lerp(desiredPos, this._alpha(this.flightPosLerp))
 
         const lookLerp = this._catchSmoothLook ? 0.035 : this.flightLookLerp
-        this.smoothLookAt.lerp(frisbeePos, lookLerp)
+        this.smoothLookAt.lerp(frisbeePos, this._alpha(lookLerp))
 
         this.instance.position.copy(this.smoothPosition)
         this.instance.lookAt(this.smoothLookAt)
@@ -180,7 +207,7 @@ export default class Camera {
             targetFov = Math.min(targetFov, this.flightExtraZoomFov)
         }
 
-        this.instance.fov += (targetFov - this.instance.fov) * 0.08
+        this.instance.fov += (targetFov - this.instance.fov) * this._alpha(0.08)
         this.instance.updateProjectionMatrix()
     }
 

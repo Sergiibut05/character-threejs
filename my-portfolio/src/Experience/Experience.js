@@ -254,9 +254,13 @@ export default class Experience {
         if (!this.rendererReady) return
 
         // Render main scene behind transition while locked.
+        // NOTE the order: world BEFORE camera — the camera must frame the
+        // character's CURRENT position. The old camera-first order made it
+        // chase last frame's position (one frame of lag → visible rubber-band
+        // jitter on the character, worse at variable frame rates).
         if (!this.ready) {
-            this.camera.update()
             this.world.update()
+            this.camera.update()
             this.renderer.update()
             return
         }
@@ -264,9 +268,9 @@ export default class Experience {
         // Full interactive experience
         this.mobileControls.update()
         this.gamepad.update()
-        this.camera.update()
         this.world.update()
         this.audio?.update()
+        this.camera.update()
         this.renderer.update()
     }
 }

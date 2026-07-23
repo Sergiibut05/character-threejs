@@ -50,15 +50,20 @@ export default class Raycaster
             this.onMouseMove(event)
         })
 
-        // Click detection (use press, not release)
+        // Click detection (use press, not release). Skip the SYNTHETIC
+        // mousedown browsers fire after a touch — it would run the same
+        // interaction twice (touchstart already handled it), which corrupted
+        // modal open/close state (frozen character after closing on mobile).
         this.canvas.addEventListener('mousedown', (event) =>
         {
+            if(performance.now() - (this._lastTouchAt || 0) < 700) return
             this.onClick(event)
         })
 
         // Touch support for mobile
         this.canvas.addEventListener('touchstart', (event) =>
         {
+            this._lastTouchAt = performance.now()
             if(event.touches.length === 1)
             {
                 this.onTouchStart(event)
@@ -128,16 +133,17 @@ export default class Raycaster
     {
         if(this.interactiveObjects.length === 0) return
 
-        // While a modal is open the overlay eats mousemove, so the canvas
+        // While a modal/panel is open the overlay eats mousemove, so the canvas
         // keeps the LAST mouse position — the stale hover would stick and the
         // body 'pointer' cursor would show all over the modal. Clear it.
-        if(document.querySelector('.fz-modal-overlay.is-open'))
+        if(document.querySelector('.fz-modal-overlay.is-open, .fz-proj.is-open'))
         {
             if(this.hoveredObject)
             {
                 this.hoveredObject.onUnhover()
                 this.hoveredObject = null
             }
+            document.body.style.cursor = ''
             return
         }
 

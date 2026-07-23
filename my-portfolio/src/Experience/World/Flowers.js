@@ -271,8 +271,20 @@ export default class Flowers {
 
     update() {
         if (this.uTime) this.uTime.value = this.time.elapsed * 0.001
-        if (this.uCharacterPosition && this.experience.world.character) {
-            this.uCharacterPosition.value.copy(this.experience.world.character.position)
+        const character = this.experience.world.character
+        if (this.uCharacterPosition && character) {
+            // This uniform only feeds view culling (no parting), so push it
+            // toward the view direction — same trick as Grass.uViewCenter.
+            const cam = this.experience.camera.instance.position
+            const ahead = this.experience.quality.grassViewAhead
+            let dx = character.position.x - cam.x
+            let dz = character.position.z - cam.z
+            const len = Math.hypot(dx, dz) || 1
+            this.uCharacterPosition.value.set(
+                character.position.x + (dx / len) * ahead,
+                character.position.y,
+                character.position.z + (dz / len) * ahead
+            )
         }
         this.uViewRadius.value = this.viewRadius
         this.uViewFadeBand.value = this.viewFadeBand

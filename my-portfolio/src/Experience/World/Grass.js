@@ -2,9 +2,9 @@ import * as THREE from 'three'
 import {
     Fn, float, vec2, vec3, vec4,
     uniform, attribute, uv, sin, cos,
-    positionLocal, positionWorld, texture,
+    positionLocal, texture,
     smoothstep, clamp, normalize, length, mix, pow, abs, max,
-    If, Discard
+    If, Discard, vertexStage
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { fbm, colorRamp } from './TSL/NoiseNodes.js'
@@ -34,6 +34,11 @@ export default class Grass {
 
         this.viewRadius = options.viewRadius ?? 20
         this.viewFadeBand = options.viewFadeBand ?? 4.0
+        // Shift the culling circle TOWARD where the camera looks: the player
+        // sits near the SOUTH edge of the visible disc instead of its centre,
+        // so the budget covers on-screen ground instead of grass behind the
+        // camera that nobody sees.
+        this.viewAhead = options.viewAhead ?? 0
 
         this.setGeometry()
         this.setMaterial()
@@ -131,7 +136,11 @@ export default class Grass {
         this.uCullOffsetZ = uniform(this.cullOffsetZ)
         this.uCullAspectX = uniform(this.cullAspectX)
 
-        // View distance culling — collapse blades beyond radius for GPU savings
+        // View distance culling — collapse blades beyond radius for GPU savings.
+        // Its centre (uViewCenter) is the character pushed a few metres along
+        // the view direction — SEPARATE from uCharacterPosition, which must
+        // stay exactly on the character for the blade-parting effect.
+        this.uViewCenter = uniform(new THREE.Vector3(0, 0, 0))
         this.uGrassViewRadius = uniform(this.viewRadius)
         this.uGrassViewFadeBand = uniform(this.viewFadeBand)
 
@@ -168,7 +177,7 @@ export default class Grass {
             pos.z.addAssign(wave2.mul(ws.mul(0.6)).mul(hSq))
 
             // View distance — collapse blades beyond radius (degenerate → GPU skips fragments)
-            const viewDist = length(aInstanceWorldPos.xz.sub(this.uCharacterPosition.xz))
+            const viewDist = length(aInstanceWorldPos.xz.sub(this.uViewCenter.xz))
             const viewFade = smoothstep(this.uGrassViewRadius, this.uGrassViewRadius.sub(this.uGrassViewFadeBand), viewDist)
             pos.mulAssign(viewFade)
 
@@ -180,7 +189,11 @@ export default class Grass {
             const uvCoord = uv()
             const uvFlipped = vec2(uvCoord.x, float(1.0).sub(uvCoord.y))
             const aColorVariant = attribute('aColorVariant', 'float')
-            const worldPos = positionWorld
+            // Per-instance world position — constant across a blade, so any
+            // value derived from it can be hoisted to the vertex stage
+            // (vertexStage) instead of being recomputed per fragment. With the
+            // heavy overdraw grass has, that's the main fragment-cost saver.
+            const instWorld = attribute('aInstanceWorldPos', 'vec3')
 
             // Height factor: 0=base, 1=tip
             const h = uvCoord.y
@@ -194,12 +207,16 @@ export default class Grass {
             const alpha = smoothstep(this.uAlphaCutoff, this.uAlphaCutoff.add(this.uAlphaSoftness), rawAlpha)
 
             // ── 1. World-space patch color (large color blotches from fBM noise) ──
-            const noiseVal = fbm(worldPos.mul(this.uNoiseScale).xz)
-            const patchColor = colorRamp(
+            // fBM + ramp hoisted to the vertex stage: the patch pattern varies
+            // over metres while a blade spans ~0.35m, so per-vertex is
+            // indistinguishable and the per-pixel fBM (the most expensive node
+            // here) disappears.
+            const noiseVal = vertexStage(fbm(instWorld.xz.mul(this.uNoiseScale)))
+            const patchColor = vertexStage(colorRamp(
                 noiseVal,
                 this.uColor0, this.uColor1, this.uColor2, this.uColor3,
                 this.uRampStop1, this.uRampStop2
-            )
+            ))
 
             // Slight individual variation (biodiversity)
             const isAlt = smoothstep(0.45, 0.55, aColorVariant.mod(1.0))
@@ -224,17 +241,24 @@ export default class Grass {
             const baseFade = smoothstep(0.0, 0.25, h)
 
             // ── 7. GPU ellipse culling around character (offset center forward) ──
-            const cullCenter = this.uCharacterPosition.xz.add(vec2(0, this.uCullOffsetZ))
-            const cullDiff = worldPos.xz.sub(cullCenter)
+            // Per-instance distances → vertex stage (fade bands are metres
+            // wide, per-blade granularity is invisible).
+            // Centred on the SHIFTED view centre — if this stayed on the
+            // character, its radius-18 ellipse would clip the forward shift
+            // and the visible region would still look character-centred.
+            const cullCenter = this.uViewCenter.xz.add(vec2(0, this.uCullOffsetZ))
+            const cullDiff = instWorld.xz.sub(cullCenter)
             const scaledDiff = vec2(cullDiff.x.mul(this.uCullAspectX), cullDiff.y)
             const distToChar = length(scaledDiff)
             const edgeStart = max(float(0.0), this.uCullRadius.sub(this.uCullEdgeSoftness))
             const cullMask = float(1.0).sub(smoothstep(edgeStart, this.uCullRadius, distToChar))
-            const visibilityMask = mix(float(1.0), cullMask, this.uCharacterCullEnabled)
+            const visibilityMask = vertexStage(mix(float(1.0), cullMask, this.uCharacterCullEnabled))
 
-            // View distance alpha fade for smooth edge
-            const viewDistFrag = length(worldPos.xz.sub(this.uCharacterPosition.xz))
-            const viewAlphaFade = smoothstep(this.uGrassViewRadius, this.uGrassViewRadius.sub(this.uGrassViewFadeBand), viewDistFrag)
+            // View distance alpha fade — MUST use the same shifted centre as
+            // the vertex collapse (uViewCenter), or grass ahead of the player
+            // would be kept by the vertex stage yet faded out here.
+            const viewDistFrag = length(instWorld.xz.sub(this.uViewCenter.xz))
+            const viewAlphaFade = vertexStage(smoothstep(this.uGrassViewRadius, this.uGrassViewRadius.sub(this.uGrassViewFadeBand), viewDistFrag))
 
             const finalAlpha = alpha.mul(baseFade).mul(visibilityMask).mul(viewAlphaFade)
 
@@ -325,8 +349,22 @@ export default class Grass {
         if (this.uTime) {
             this.uTime.value = this.time.elapsed * 0.001
         }
-        if (this.uCharacterPosition && this.experience.world.character) {
-            this.uCharacterPosition.value.copy(this.experience.world.character.position)
+        const character = this.experience.world.character
+        if (this.uCharacterPosition && character) {
+            this.uCharacterPosition.value.copy(character.position)
+
+            // Cull centre = character pushed `viewAhead` metres along the
+            // camera→character direction (the way the player is looking).
+            const cam = this.experience.camera.instance.position
+            let dx = character.position.x - cam.x
+            let dz = character.position.z - cam.z
+            const len = Math.hypot(dx, dz) || 1
+            dx /= len; dz /= len
+            this.uViewCenter.value.set(
+                character.position.x + dx * this.viewAhead,
+                character.position.y,
+                character.position.z + dz * this.viewAhead
+            )
         }
         this.uCharacterCullEnabled.value = this.enableCharacterCulling ? 1 : 0
         this.uCullRadius.value = this.cullRadius
@@ -373,6 +411,7 @@ export default class Grass {
         this.debugFolder.add(this, 'cullAspectX', 1.0, 3.0, 0.1).name('Cull Aspect X')
         this.debugFolder.add(this, 'viewRadius', 5.0, 40.0, 0.5).name('View Radius')
         this.debugFolder.add(this, 'viewFadeBand', 0.5, 10.0, 0.5).name('View Fade Band')
+        this.debugFolder.add(this, 'viewAhead', 0.0, 20.0, 0.5).name('View Ahead')
 
         this.debugFolder.addColor({ value: this.uColorRoot.value }, 'value').name('Root Color')
             .onChange(v => this.uColorRoot.value.copy(v))
