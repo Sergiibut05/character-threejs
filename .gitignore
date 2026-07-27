@@ -5,3 +5,6 @@ kickbacks.vsix
 
 # Working plan documents (local only)
 *_PLAN.md
+
+# Asset backups made before patching a GLB in place
+*.glb.bak

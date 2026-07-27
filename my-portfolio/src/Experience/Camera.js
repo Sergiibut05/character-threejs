@@ -53,6 +53,15 @@ export default class Camera {
         this._flightTimer = 0
         this._catchSmoothLook = false
 
+        // beachSide — fixed side-on framing for the beach minigame. Targets are
+        // pushed in by BeachMinigame each frame; the lerp does the rest, so the
+        // entry/exit transition is free.
+        this.beachFov = this.isMobile ? 52 : 40
+        this.beachLerp = 0.09
+        this._beachPos = new THREE.Vector3()
+        this._beachLook = new THREE.Vector3()
+        this._hasBeachTarget = false
+
         if (this.debug.active) {
             this.setDebug()
         }
@@ -131,6 +140,11 @@ export default class Camera {
             return
         }
 
+        if (this.mode === 'beachSide') {
+            this.updateBeachSide()
+            return
+        }
+
         if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
             const desiredPosition = this._scratchPos
@@ -147,6 +161,27 @@ export default class Camera {
                 this.instance.fov += (targetFov - this.instance.fov) * this._alpha(0.08)
                 this.instance.updateProjectionMatrix()
             }
+        }
+    }
+
+    /** Where the beach camera should sit / look (world space). */
+    setBeachView(pos, look) {
+        this._beachPos.copy(pos)
+        this._beachLook.copy(look)
+        this._hasBeachTarget = true
+    }
+
+    updateBeachSide() {
+        if (!this._hasBeachTarget) return
+        const a = this._alpha(this.beachLerp)
+        this.smoothPosition.lerp(this._beachPos, a)
+        this.smoothLookAt.lerp(this._beachLook, a)
+        this.instance.position.copy(this.smoothPosition)
+        this.instance.lookAt(this.smoothLookAt)
+
+        if (Math.abs(this.instance.fov - this.beachFov) > 0.02) {
+            this.instance.fov += (this.beachFov - this.instance.fov) * this._alpha(0.08)
+            this.instance.updateProjectionMatrix()
         }
     }
 

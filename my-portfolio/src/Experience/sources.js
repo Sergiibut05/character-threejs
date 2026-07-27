@@ -230,6 +230,43 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        // Palm tree — ships its own KTX2 textures inside the GLB (no atlas).
+        name: 'palmTreeModel',
+        type: 'gltfModel',
+        path: '/models/trees/palm-tree/palm-tree_compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'palmTreeInstances',
+        type: 'json',
+        path: '/models/trees/palm-tree/palm-tree-references.json',
+        priority: 'decorative'
+    },
+    {
+        // Beach ball — decorative prop lying on the sand (its Blender placement
+        // is baked into the GLB node). Ships its own KTX2 texture.
+        name: 'beachBallModel',
+        type: 'gltfModel',
+        path: '/models/beach-ball/beach-ball_compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        // Second ball variant for the beach rally. Authored ~131 units across,
+        // so BeachBallVariants rescales it to match the beach ball.
+        name: 'soccerBallModel',
+        type: 'gltfModel',
+        path: '/models/beach-ball/common_soccer_ball_compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        // The park sign used to live inside InfoBoard.glb; that file now holds
+        // the two scoreboards instead, so the sign is preserved separately.
+        name: 'parkInfoBoardModel',
+        type: 'gltfModel',
+        path: '/models/InfoBoard/park-info-board-compressed.glb',
+        priority: 'decorative'
+    },
+    {
         name: 'postModel',
         type: 'gltfModel',
         path: '/models/posts/post-compressed.glb',
@@ -273,15 +310,11 @@ const allSources = [
         path: '/models/baseball-pitch/baseball-pitch-compressed.glb',
         priority: 'decorative'
     },
-    {
-        // Physical leaderboard by the pitch. Contains 'leaderboard' (structure,
-        // Tiny atlas) + a plane named 'scoreboard' that ScoreboardScreen
-        // auto-detects and paints with the live top-10 canvas.
-        name: 'scoreboardModel',
-        type: 'gltfModel',
-        path: '/models/baseball-pitch/scoreboard-compressed.glb',
-        priority: 'decorative'
-    },
+    // NOTE: the old standalone 'scoreboardModel' (baseball-pitch/scoreboard-
+    // compressed.glb) is no longer loaded — InfoBoard.glb now ships BOTH
+    // leaderboards ('leaderboard'/'scoreboard' by the pitch and
+    // 'leaderboard.001'/'scoreboard.001' on the beach). Loading both put two
+    // identical boards in the same spot, z-fighting against each other.
     {
         // 128px CPU-readable sand mask of the pitch texture (white = sand
         // diamond). Generated offline from the embedded webp; used by

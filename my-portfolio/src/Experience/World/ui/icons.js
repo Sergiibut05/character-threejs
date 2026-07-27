@@ -26,6 +26,32 @@ export const iconTarget = `
   <circle cx="24" cy="24" r="2.4" fill="#ff6b4a"/>
 </svg>`
 
+// Beach ball — the beach volley activity mark (world emblem + HUD).
+export const iconBeachBall = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <circle cx="24" cy="24" r="19" fill="#fdfdfb" stroke="#3f7f66" stroke-width="2.6"/>
+  <path d="M24 5a19 19 0 0 1 0 38Z" fill="#ff8a6b"/>
+  <path d="M24 5a19 19 0 0 0-16.2 9.1c6 2.4 11.4 3.6 16.2 3.6s10.2-1.2 16.2-3.6A19 19 0 0 0 24 5Z" fill="#5ec7f0"/>
+  <path d="M24 43a19 19 0 0 0 16.2-9.1c-6-2.4-11.4-3.6-16.2-3.6s-10.2 1.2-16.2 3.6A19 19 0 0 0 24 43Z" fill="#ffd84d"/>
+  <path d="M24 5c-5.5 5.7-8.3 12-8.3 19S18.5 37.3 24 43M24 5c5.5 5.7 8.3 12 8.3 19S29.5 37.3 24 43" stroke="#3f7f66" stroke-width="2.2" fill="none"/>
+  <circle cx="24" cy="24" r="19" stroke="#3f7f66" stroke-width="2.6" fill="none"/>
+</svg>`
+
+// Medal — competitive mode (distinct from the frisbee's trophy).
+export const iconMedal = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M15 5 22 20M33 5 26 20" stroke="#5a8af5" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="24" cy="31" r="12.5" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6"/>
+  <path d="m24 24 2.1 4.4 4.7.7-3.4 3.4.8 4.8-4.2-2.3-4.2 2.3.8-4.8-3.4-3.4 4.7-.7L24 24Z" fill="#fff3bf"/>
+</svg>`
+
+// Infinity — endless free play.
+export const iconInfinity = `
+<svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+  <path d="M24 24c3.5-5.2 6.4-7.8 10.2-7.8a7.8 7.8 0 0 1 0 15.6C30.4 31.8 27.5 29.2 24 24Zm0 0c-3.5 5.2-6.4 7.8-10.2 7.8a7.8 7.8 0 0 1 0-15.6C17.6 16.2 20.5 18.8 24 24Z"
+        fill="#c2ecd6" stroke="#41a06e" stroke-width="2.8" stroke-linejoin="round"/>
+</svg>`
+
 // Frisbee disc — HUD round header.
 export const iconDisc = `
 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">

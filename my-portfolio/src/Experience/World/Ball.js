@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { positionLocal, mix, smoothstep, vec3, float, max } from 'three/tsl'
 import Experience from '../Experience.js'
 import { dayNightLitTint } from './DayNight.js'
+import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
 /**
  * Ball — a kickable football living by the carts/goal play area.
@@ -190,8 +191,71 @@ export default class Ball {
         else this.renderer.removeOutlinedObject(this.mesh)
     }
 
+    /**
+     * Swap the procedural football for the authored model once it streams in.
+     *
+     * Its geometry is QUANTIZED (positions are normalised int16), so it can be
+     * neither transformed nor re-centred in place — writing floats back into
+     * that buffer destroys it. We rebuild a plain float copy instead, recentre
+     * it (the model is authored resting ON the ground, not around its origin)
+     * and normalise it to a unit sphere so the existing RADIUS still rules.
+     */
+    _trySoccerSkin() {
+        if (this._skinned) return
+        const gltf = this.experience.resources?.items?.soccerBallModel
+        if (!gltf?.scene) return
+
+        let src = null
+        gltf.scene.traverse((c) => { if (!src && c.isMesh) src = c })
+        if (!src?.geometry?.attributes?.position) { this._skinned = true; return }
+
+        const pos = src.geometry.attributes.position
+        const nrm = src.geometry.attributes.normal
+        const uvA = src.geometry.attributes.uv
+
+        // getX/getY/getZ denormalise for us — read through them, never the raw array.
+        const n = pos.count
+        const p = new Float32Array(n * 3)
+        for (let i = 0; i < n; i++) {
+            p[i * 3] = pos.getX(i); p[i * 3 + 1] = pos.getY(i); p[i * 3 + 2] = pos.getZ(i)
+        }
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.BufferAttribute(p, 3))
+        if (nrm) {
+            const nn = new Float32Array(n * 3)
+            for (let i = 0; i < n; i++) {
+                nn[i * 3] = nrm.getX(i); nn[i * 3 + 1] = nrm.getY(i); nn[i * 3 + 2] = nrm.getZ(i)
+            }
+            geo.setAttribute('normal', new THREE.BufferAttribute(nn, 3))
+        }
+        if (uvA) {
+            const uu = new Float32Array(n * 2)
+            for (let i = 0; i < n; i++) { uu[i * 2] = uvA.getX(i); uu[i * 2 + 1] = uvA.getY(i) }
+            geo.setAttribute('uv', new THREE.BufferAttribute(uu, 2))
+        }
+        if (src.geometry.index) geo.setIndex(src.geometry.index.clone())
+
+        geo.computeBoundingSphere()
+        const c = geo.boundingSphere.center
+        geo.translate(-c.x, -c.y, -c.z)          // safe: plain floats now
+        geo.computeBoundingSphere()
+        const r = geo.boundingSphere.radius || 1
+        geo.scale(1 / r, 1 / r, 1 / r)           // unit sphere → RADIUS drives the size
+        geo.computeBoundingSphere()
+
+        const map = src.material?.map || null
+        this.mesh.geometry?.dispose()
+        this.mesh.material?.dispose()
+        this.mesh.geometry = geo
+        this.mesh.material = createStylizedPropNodeMaterial({ map, gloss: 0.4, shininess: 24 })
+        this.mesh.scale.setScalar(RADIUS)
+
+        this._skinned = true
+    }
+
     // ─── Per-frame ───────────────────────────────────────────────────────
     update() {
+        this._trySoccerSkin()
         if (!this._spawned) { this._trySpawn(); return }
         const dt = this.experience.time.delta * 0.001
 

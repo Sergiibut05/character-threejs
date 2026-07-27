@@ -941,6 +941,44 @@
         drop-shadow(0 0 5px rgba(95, 197, 148, 0.8));
 }
 
+/* Disc hovers with a gentle bob, as a thrown frisbee would */
+.fz-emblem-disc {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+}
+
+.fz-emblem.is-active .fz-emblem-disc {
+    animation: fz-disc-hover 2.6s ease-in-out infinite;
+}
+
+@keyframes fz-disc-hover {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-8%) rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-emblem.is-active .fz-emblem-disc { animation: none; }
+}
+
+/* Beach ball rolls slowly instead of swaying (it is a ball, after all) */
+.fz-emblem-ball {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+}
+
+.fz-emblem.is-active .fz-emblem-ball {
+    animation: fz-ball-roll 6s linear infinite;
+}
+
+@keyframes fz-ball-roll {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-emblem.is-active .fz-emblem-ball { animation: none; }
+}
+
 /* Leaf sways very gently from the top of its stem when in range */
 .fz-emblem-leaf {
     transform-box: fill-box;

@@ -1,0 +1,148 @@
+/* ─── Beach minigame HUD (phase-1 demo) ──────────────────────────────────
+   Reuses the shared tokens from ui.css (:root --fz-*). */
+
+.fz-beach-hud {
+    position: fixed;
+    top: max(18px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 2500;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 12px 24px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    color: var(--fz-ink);
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.92), rgba(242, 249, 247, 0.86));
+    border: 1.5px solid rgba(120, 195, 160, 0.42);
+    box-shadow: var(--fz-shadow);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    opacity: 0;
+    transform: translate(-50%, -12px);
+    pointer-events: none;
+    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-beach-hud.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.fz-beach-count {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.fz-beach-label {
+    font-family: var(--fz-font-body);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fz-ink-soft);
+}
+
+.fz-beach-best {
+    font-family: var(--fz-font-body);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--fz-green-500);
+    margin-left: 4px;
+}
+
+/* Wind gauge — direction arrow + magnitude, under the counter */
+.fz-beach-wind {
+    position: fixed;
+    top: max(74px, calc(env(safe-area-inset-top) + 66px));
+    left: 50%;
+    z-index: 2500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 18px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    color: var(--fz-ink);
+    background: rgba(255, 255, 255, 0.82);
+    border: 1.5px solid rgba(120, 195, 160, 0.4);
+    box-shadow: var(--fz-shadow-soft);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transform: translate(-50%, -8px);
+    pointer-events: none;
+    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.fz-beach-wind.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.fz-beach-wind-label {
+    font-family: var(--fz-font-body);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fz-ink-soft);
+}
+
+.fz-beach-wind-arrow {
+    display: inline-flex;
+    color: var(--fz-green-500);
+    /* Rotated/scaled from JS — transition makes direction changes glide. */
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), color 0.4s ease;
+}
+
+.fz-beach-wind-value {
+    font-size: 17px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 30px;
+    text-align: right;
+}
+
+.fz-beach-wind.is-calm .fz-beach-wind-arrow { color: var(--fz-green-200); }
+.fz-beach-wind.is-strong .fz-beach-wind-arrow { color: #e8952e; }
+.fz-beach-wind.is-strong { border-color: rgba(232, 149, 46, 0.5); }
+
+/* Centre-screen call-outs ("¡Perfecto!", milestones, rally end) */
+.fz-beach-flash {
+    position: fixed;
+    top: 34%;
+    left: 50%;
+    z-index: 2510;
+    font-family: var(--fz-font-title);
+    font-size: 44px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 3px 0 rgba(35, 75, 58, 0.35), 0 8px 22px rgba(35, 75, 58, 0.4);
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.9);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.28s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
+.fz-beach-flash.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+}
+
+.fz-beach-flash.is-perfect { color: #ffe27a; }
+.fz-beach-flash.is-milestone { color: #8ff0c0; font-size: 54px; }
+.fz-beach-flash.is-miss { color: #ffb4a8; font-size: 38px; }
+
+@media (max-width: 520px) {
+    .fz-beach-count { font-size: 24px; }
+    .fz-beach-flash { font-size: 34px; }
+    .fz-beach-flash.is-milestone { font-size: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-beach-hud,
+    .fz-beach-wind,
+    .fz-beach-wind-arrow,
+    .fz-beach-flash { transition: opacity 0.2s ease; }
+}

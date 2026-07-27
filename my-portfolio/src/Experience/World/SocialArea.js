@@ -45,7 +45,11 @@ export default class SocialArea {
         this.auraWidth = 0.05        // core ring ~invisible: the look is pure glow
         this.auraGlow = 0.75         // soft halo fading outward
         this.auraStrength = 1.0      // overall opacity multiplier
-        this.auraY = 0.2201          // world height of the ring plane
+        // Absolute world height, hand-tuned in the GUI.
+        // NOTE: the Circle's top face measures y ≈ 0.290, so this sits slightly
+        // under it. The ring keeps depth TEST on, so if the aura ever stops
+        // showing, raise this above the platform surface first.
+        this.auraY = 0.23006185411119
         this.fovZoomDelta = -4       // follow-camera FOV offset while ACTIVE
 
         this.state = 'far'           // 'far' | 'near' | 'active'
@@ -83,7 +87,7 @@ export default class SocialArea {
         // Hand-tuned in the GUI: the GLB bbox centre lands slightly off the
         // platform's visual centre, so override with the calibrated position.
         this.center.x = -5.4933
-        this.center.z = 17.9174
+        this.center.z = 17.9674
         if (this.debug.active) {
             console.log(
                 `SocialArea: Circle center (${this.center.x.toFixed(2)}, ${this.center.z.toFixed(2)}) ` +

@@ -18,6 +18,7 @@ import * as THREE from 'three'
 import { uniform, vec4 } from 'three/tsl'
 import Experience from '../../Experience.js'
 import { createFloorColorNode } from '../TSL/FloorShader.js'
+import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 import { dayNightLitTint } from '../DayNight.js'
 import { REAL_SHADOWS_SUPPORTED } from '../../Utils/DeviceCaps.js'
 
@@ -27,6 +28,15 @@ const _vC = new THREE.Vector3()
 
 const GRASS_MESH_NAMES = ['grass-floor-1', 'grass-floor-2']
 const DIRT_MESH_NAMES = ['ground-floor-1', 'ground-floor-2']
+// Decor meshes shipped inside floor.glb that are textured from the Sushi
+// atlas instead of the floor shader (they keep their own UVs).
+const ATLAS_MESH_NAMES = ['Torus', 'black-plane']
+
+// Meshes that floor.glb may ship but that ANOTHER component owns. The water
+// plane lives in river.glb (River.js gives it the stylized shader); a copy
+// exported inside floor.glb gets no material — it renders default grey and,
+// sitting slightly higher, hides the real river underneath.
+const FOREIGN_MESH_NAMES = ['agua']
 
 // No vegetation at (or below) water level: the river surface sits at world
 // y ≈ -0.5 (agua plane -0.61 + lift), so blades spawned on the lower bank
@@ -60,9 +70,11 @@ export default class Floor {
         this.grassFloorMasks = options.grassFloorMasks || {}
         this.maskCpuImages = options.maskCpuImages || {}
         this.slabsTexture = options.slabsTexture || null
+        this.atlasTexture = options.atlasTexture || null
 
         this.grassMeshes = []
         this.dirtMeshes = []
+        this.atlasMeshes = []
 
         this.uniforms = options.sharedUniforms || createDefaultFloorUniforms()
         // User-tuned slabs config (frozen from the runtime GUI session).
@@ -109,19 +121,87 @@ export default class Floor {
             this.grassMeshes.push(mesh)
         }
 
+        // Optional: floor.glb has never shipped these (the terrain is all
+        // grass-floor meshes whose mask paints the dirt). Kept so a future
+        // export CAN add them — absence is normal, so it isn't a warning.
         for (const name of DIRT_MESH_NAMES) {
             const mesh = this.root.getObjectByName(name)
-            if (!mesh) {
-                console.warn(`Floor: ${name} not found`)
-                continue
-            }
+            if (!mesh) continue
             this._applyDirtFloorMaterial(mesh)
             this.dirtMeshes.push(mesh)
+        }
+
+        // Duplicates of meshes owned elsewhere: hide instead of rendering them
+        // untextured on top of the real thing.
+        for (const name of FOREIGN_MESH_NAMES) {
+            const mesh = this.root.getObjectByName(name)
+            if (!mesh) continue
+            mesh.visible = false
+            mesh.material?.dispose?.()
+            console.warn(
+                `Floor: "${name}" also exists in floor.glb — hidden, since another ` +
+                `component owns it (river.glb). Remove it from the floor export.`
+            )
+        }
+
+        // Atlas-textured decor (Torus / black-plane). The atlas is a decorative
+        // asset that may still be in flight — retry on arrival (see setAtlas).
+        for (const name of ATLAS_MESH_NAMES) {
+            const mesh = this.root.getObjectByName(name)
+            if (!mesh) continue
+            this.atlasMeshes.push(mesh)
+            if (this.atlasTexture) this._applyAtlasMaterial(mesh)
+        }
+    }
+
+    _applyAtlasMaterial(mesh) {
+        mesh.material?.dispose?.()
+        mesh.material = createStylizedPropNodeMaterial({ map: this.atlasTexture })
+        mesh.castShadow = false
+        mesh.receiveShadow = REAL_SHADOWS_SUPPORTED
+    }
+
+    /** Called when the Sushi atlas finishes loading after the floor was built. */
+    setAtlas(texture) {
+        if (!texture || this.atlasTexture === texture) return
+        this.atlasTexture = texture
+        for (const mesh of this.atlasMeshes) this._applyAtlasMaterial(mesh)
+    }
+
+    /**
+     * The grass/dirt mask is sampled by UV, so a mesh whose unwrap collapsed
+     * (a re-export that reset the UV map) samples a single texel and renders
+     * as one flat colour over the whole floor. Silent and very confusing —
+     * so check the span explicitly and say what to fix.
+     */
+    _validateMaskUVs(mesh, key) {
+        const uv = mesh.geometry?.attributes?.uv
+        if (!uv) {
+            console.error(`Floor: "${key}" has NO uv attribute — the grass mask cannot be sampled.`)
+            return
+        }
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity
+        for (let i = 0; i < uv.count; i++) {
+            const u = uv.getX(i), v = uv.getY(i)
+            if (u < minU) minU = u
+            if (u > maxU) maxU = u
+            if (v < minV) minV = v
+            if (v > maxV) maxV = v
+        }
+        // A valid unwrap covers most of the 0..1 mask. Anything tiny is broken.
+        if (maxU - minU < 0.5 || maxV - minV < 0.5) {
+            console.error(
+                `Floor: "${key}" UV map looks COLLAPSED — U[${minU.toFixed(3)}..${maxU.toFixed(3)}] ` +
+                `V[${minV.toFixed(3)}..${maxV.toFixed(3)}] instead of ~0..1. The whole mesh will ` +
+                `sample one texel of the grass mask and render as a single flat colour. ` +
+                `Re-export ${key} from Blender with its original UV map active.`
+            )
         }
     }
 
     _applyGrassFloorMaterial(mesh, key) {
         const maskTex = this.grassFloorMasks[key] || null
+        this._validateMaskUVs(mesh, key)
 
         // Pick attribute that actually exists; fall back to whichever is
         // available so the shader never references a missing attribute.

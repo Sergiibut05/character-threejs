@@ -8,6 +8,18 @@ import StartEmblem from './ui/StartEmblem.js'
 // Used as a fallback when the GLB marker node can't be resolved.
 const FREESBY_POINT_THREE = new THREE.Vector3(6.6989, 0.221253, 5.72696)
 
+// Flying disc mark. The prompt used to carry the portfolio leaf — the same
+// shape as the favicon — which said "portfolio", not "frisbee". Each activity
+// now wears its own object so they're told apart from across the map.
+const DISC_SVG = `
+<svg class="fz-emblem-svg fz-emblem-disc" viewBox="0 0 48 48" aria-hidden="true">
+  <ellipse cx="24" cy="30" rx="18" ry="8" fill="#41a06e"/>
+  <ellipse cx="24" cy="26" rx="18" ry="8" fill="#9be4ca" stroke="#2f7c56" stroke-width="2.2"/>
+  <ellipse cx="24" cy="26" rx="11" ry="4.6" fill="#e7faf1" stroke="#2f7c56" stroke-width="1.8"/>
+  <ellipse cx="24" cy="26" rx="4.6" ry="1.9" fill="#5fc594" stroke="#2f7c56" stroke-width="1.4"/>
+  <path d="M8 27.5c0 4.4 7.2 8 16 8s16-3.6 16-8" fill="none" stroke="#2f7c56" stroke-width="2.2" stroke-linecap="round"/>
+</svg>`
+
 export default class ActivityPrompt {
     constructor() {
         this.experience = new Experience()
@@ -46,7 +58,7 @@ export default class ActivityPrompt {
     setDom() {
         // Reusable "Órbita" emblem (the portfolio's start mark). ActivityPrompt
         // projects the 3D anchor and drives its position/proximity/active state.
-        this.emblem = new StartEmblem()
+        this.emblem = new StartEmblem({ svg: DISC_SVG })
         this.emblem.setLabel('Frisbee con el perro')
         this.el = this.emblem.el
 

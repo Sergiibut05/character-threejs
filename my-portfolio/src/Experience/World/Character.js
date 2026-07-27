@@ -72,6 +72,12 @@ export default class Character {
         // Input
         this.keys = { w: false, a: false, s: false, d: false, shift: false }
 
+        // Beach minigame: restrict movement to a single world axis. When set to
+        // { z, minX, maxX, faceYaw, inputSign } the character only walks left /
+        // right along X, keeps Z pinned, and faces the camera instead of its
+        // direction of travel. Null = normal free roaming.
+        this.planarLock = null
+
         // Throw support
         this.movementLocked = false
         this.throwPaused = false
@@ -299,6 +305,69 @@ export default class Character {
 
     get isKicking() { return this._kickT !== null && this._kickT !== undefined }
 
+    /**
+     * Volleyball bump — both arms swing overhead to meet the ball, then settle.
+     * Same layering trick as playKick(): pure bone rotations applied AFTER the
+     * mixer writes the frame, so it blends over the running locomotion clip.
+     *
+     * Anticipation matters more than amplitude here: the arms dip slightly
+     * BEFORE swinging up, which is what makes a 0.4 s pose read as a hit
+     * instead of a twitch.
+     */
+    playBump() {
+        if (!this._bumpBones) {
+            const find = (name) => {
+                let bone = null
+                this.model.traverse((c) => { if (!bone && c.isBone && c.name === name) bone = c })
+                return bone
+            }
+            this._bumpBones = {
+                lArm: find('mixamorigLeftArm'),
+                rArm: find('mixamorigRightArm'),
+                lFore: find('mixamorigLeftForeArm'),
+                rFore: find('mixamorigRightForeArm'),
+                spine: find('mixamorigSpine1') || find('mixamorigSpine')
+            }
+        }
+        if (!this._bumpBones.lArm && !this._bumpBones.rArm) return false
+        this._bumpT = 0
+        return true
+    }
+
+    /** Layered after mixer.update — see update(). */
+    _applyBumpPose(dt) {
+        if (this._bumpT === null || this._bumpT === undefined) return
+        const B = this._bumpBones
+        if (!B) { this._bumpT = null; return }
+
+        this._bumpT += dt
+        const p = this._bumpT / 0.5
+        if (p >= 1) { this._bumpT = null; return }
+
+        // −0.18 dip (anticipation) → 1 (contact) → 0 (settle)
+        let k
+        if (p < 0.16) {
+            k = -0.18 * Math.sin((p / 0.16) * Math.PI)
+        } else if (p < 0.42) {
+            const e = (p - 0.16) / 0.26
+            k = 1 - Math.pow(1 - e, 2)          // fast swing up
+        } else {
+            const e = (p - 0.42) / 0.58
+            k = (1 - (e * e * (3 - 2 * e)))     // smooth settle
+        }
+
+        // 1.05 rad is this rig's SWEET SPOT: swinging further actually lowers
+        // the hands again (measured — the arm passes its highest point and
+        // starts coming back down), so more amplitude would look like less.
+        const swing = 1.05 * k
+        if (B.lArm) { B.lArm.rotation.z += swing; B.lArm.rotation.y -= swing * 0.2 }
+        if (B.rArm) { B.rArm.rotation.z -= swing; B.rArm.rotation.y += swing * 0.2 }
+        if (B.lFore) B.lFore.rotation.z += swing * 0.45
+        if (B.rFore) B.rFore.rotation.z -= swing * 0.45
+        // A touch of back-arch sells the reach.
+        if (B.spine) B.spine.rotation.x -= swing * 0.12
+    }
+
     /** Layered after mixer.update — see update(). */
     _applyKickPose(dt) {
         if (this._kickT === null || this._kickT === undefined) return
@@ -493,6 +562,7 @@ export default class Character {
             this._updateBlinking(dt)
             if (this.mixer) this.mixer.update(dt)
             this._applyKickPose(dt)
+            this._applyBumpPose(dt)
             return
         }
 
@@ -515,6 +585,14 @@ export default class Character {
             dir.z -= g.y * g.force
         }
 
+        // Side-scroller mode: drop the depth axis and align "right" with what
+        // reads as right ON SCREEN (the beach camera looks down −Z, which flips
+        // world X).
+        if (this.planarLock) {
+            dir.z = 0
+            dir.x *= (this.planarLock.inputSign ?? 1)
+        }
+
         const isMoving = dir.lengthSq() > 0.0001
 
         // Idle timer — drives idle-only effects (e.g. MusicNotes).
@@ -526,9 +604,10 @@ export default class Character {
         // Blinking
         this._updateBlinking(dt)
 
-        // Animation mixer (+ procedural kick layered on top)
+        // Animation mixer (+ procedural kick / bump layered on top)
         if (this.mixer) this.mixer.update(dt)
         this._applyKickPose(dt)
+        this._applyBumpPose(dt)
 
         // Speed
         const speed = (this.isSprinting && isMoving) ? this.runSpeed : this.walkSpeed
@@ -554,6 +633,13 @@ export default class Character {
                 x: cur.x + corrected.x,
                 y: cur.y + corrected.y,
                 z: cur.z + corrected.z
+            }
+
+            // Pin to the play line and keep the player inside the court.
+            if (this.planarLock) {
+                const L = this.planarLock
+                next.x = Math.min(Math.max(next.x, L.minX), L.maxX)
+                next.z = L.z
             }
 
             this.rigidBody.setNextKinematicTranslation(next)
@@ -588,8 +674,28 @@ export default class Character {
                 this._strideFresh = true
             }
 
-            // Smooth rotation — exponential decay, shortest path, no overshoot
-            if (isMoving) {
+            // Smooth rotation — exponential decay, shortest path, no overshoot.
+            // On the court: turn to face the way you RUN (there is no strafe
+            // clip, so a forward-walk cycle played sideways slid horribly), and
+            // swing back to face the camera once you stop.
+            if (this.planarLock) {
+                // Hysteresis: hold the last running facing briefly after input
+                // stops. Without it a fast direction change (or a joystick
+                // crossing its dead zone) snapped the character back toward the
+                // camera for a frame or two — a visible animation "clip".
+                if (isMoving) {
+                    this._courtYaw = Math.sign(dir.x) * Math.PI * 0.5
+                    this._courtIdle = 0
+                } else {
+                    this._courtIdle = (this._courtIdle ?? 0) + dt
+                }
+                const target = (this._courtIdle ?? 0) < 0.22 && this._courtYaw !== undefined
+                    ? this._courtYaw
+                    : (this.planarLock.faceYaw ?? 0)
+                const diff = Math.atan2(Math.sin(target - this.container.rotation.y),
+                                        Math.cos(target - this.container.rotation.y))
+                this.container.rotation.y += diff * (1.0 - Math.exp(-this.rotationSpeed * dt))
+            } else if (isMoving) {
                 const target = Math.atan2(dir.x, dir.z)
                 const diff = Math.atan2(Math.sin(target - this.container.rotation.y),
                                         Math.cos(target - this.container.rotation.y))

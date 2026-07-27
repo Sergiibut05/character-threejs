@@ -3,6 +3,7 @@ import Experience from '../Experience.js'
 import Modal from './ui/Modal.js'
 import Leaderboard from '../Utils/Leaderboard.js'
 import { buildLeaderboardList } from './ui/leaderboardView.js'
+import { _findNode } from './ScoreboardScreen.js'
 
 /**
  * ScoreboardInteractive — the physical leaderboard by the pitch becomes an
@@ -11,10 +12,22 @@ import { buildLeaderboardList } from './ui/leaderboardView.js'
  * plus your own best score (reuses the session's leaderboard list view).
  */
 export default class ScoreboardInteractive {
-    constructor() {
+    /**
+     * @param {object} [o]
+     * @param {string} [o.nodeName] Board node inside the scoreboards GLB.
+     * @param {string} [o.screenName] The ranking PLANE that sits on that board.
+     *   It is a SIBLING node, not a child, so without registering it too the
+     *   hover would drop the moment the cursor crossed onto the screen.
+     * @param {'frisbee'|'beach'} [o.board] Which ranking it shows.
+     * @param {string} [o.subtitle] Modal subtitle.
+     */
+    constructor(o = {}) {
         this.experience = new Experience()
         this.renderer = this.experience.renderer
-        this.leaderboard = new Leaderboard()
+        this.nodeName = o.nodeName || 'leaderboard'
+        this.screenName = o.screenName || 'scoreboard'
+        this.subtitle = o.subtitle || 'Top 10 · Frisbee con el perro'
+        this.leaderboard = new Leaderboard(o.board || 'frisbee')
 
         this.position = new THREE.Vector3()
         this.mesh = null
@@ -37,7 +50,10 @@ export default class ScoreboardInteractive {
     }
 
     _resolve() {
-        const root = this.experience.world?.patioScene?.pieces?.scoreboard?.root
+        // Both boards live in the same GLB, so target only OUR node — using the
+        // whole root would light up (and open) both of them at once.
+        const pieceRoot = this.experience.world?.patioScene?.pieces?.scoreboard?.root
+        const root = _findNode(pieceRoot, this.nodeName)
         if (!root) return false
 
         root.updateWorldMatrix(true, false)
@@ -49,6 +65,24 @@ export default class ScoreboardInteractive {
         root.traverse((c) => {
             if (c.isMesh) { this.meshes.push(c); c.userData.interactiveObject = this }
         })
+
+        // The screen plane belongs to the same physical board: claim it as a
+        // hover target so the highlight holds across the whole object. It is
+        // deliberately NOT added to `meshes` — outlining the live ranking
+        // canvas would draw a bright rim right around the text.
+        const screen = _findNode(pieceRoot, this.screenName)
+        if (screen) {
+            screen.userData.interactiveObject = this
+            screen.traverse((c) => { if (c.isMesh) c.userData.interactiveObject = this })
+            this.screenMesh = screen
+            // The raycaster only tests `obj.mesh` (and its children), so the
+            // sibling plane needs its own entry. Both resolve back to THIS
+            // instance through userData, so crossing between them doesn't
+            // register as leaving — no hover flicker.
+            this._screenProxy = { mesh: screen }
+            this.experience.world?.raycaster?.addInteractiveObject(this._screenProxy)
+        }
+
         this.experience.world?.raycaster?.addInteractiveObject(this)
         this.resolved = true
         return true
@@ -82,6 +116,9 @@ export default class ScoreboardInteractive {
         if (document.querySelector('.fz-modal-overlay.is-open')) return
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
+        // Nor while the beach rally is running (the board sits right by it).
+        const bm = this.experience.world?.beachMinigame
+        if (bm && bm.state !== 'idle') return
 
         this._busy = true
 
@@ -98,7 +135,7 @@ export default class ScoreboardInteractive {
                     variant: 'paper',
                     size: 'lg',
                     title: 'Ranking',
-                    subtitle: 'Top 10 · Frisbee con el perro'
+                    subtitle: this.subtitle
                 })
                 this.modal.onClose(() => this._onModalClosed())
             }
@@ -159,6 +196,9 @@ export default class ScoreboardInteractive {
         window.removeEventListener('keydown', this._onKeyDown)
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         this.experience.world?.raycaster?.removeInteractiveObject?.(this)
+        if (this._screenProxy) {
+            this.experience.world?.raycaster?.removeInteractiveObject?.(this._screenProxy)
+        }
         this.modal?.destroy?.()
     }
 }

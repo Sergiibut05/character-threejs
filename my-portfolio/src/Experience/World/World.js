@@ -28,6 +28,8 @@ import Bushes from './Bushes.js'
 import FakeShadow from './FakeShadow.js'
 import ActivityPrompt from './ActivityPrompt.js'
 import SocialArea from './SocialArea.js'
+import BeachMinigame from './BeachMinigame.js'
+import BeachSession from './BeachSession.js'
 import FrisbeeMinigame from './FrisbeeMinigame.js'
 import FrisbeeSession from './FrisbeeSession.js'
 
@@ -145,15 +147,28 @@ export default class World {
             // West play area: project carts + goal + kickable ball + confetti
             this.projectCarts = new ProjectCarts()
             this.socialArea = new SocialArea()
+            this.beachMinigame = new BeachMinigame()
+            this.beachSession = new BeachSession(this.beachMinigame)
             this.goalPost = new GoalPost()
             this.confetti = new Confetti()
             this.ball = new Ball()
             this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
-            // Live ranking screen: auto-attaches the canvas texture to a mesh
-            // named "scoreboard" when you import your own object (see file).
+            // Live ranking screens. Both boards ship in InfoBoard.glb: the
+            // pitch one ('scoreboard') and the beach one ('scoreboard.001'),
+            // each painted with ITS OWN ranking.
             this.scoreboardScreen = new ScoreboardScreen()
-            // …and the physical board is interactive: outline + top-10 modal.
+            this.beachScoreboard = new ScoreboardScreen({
+                targetName: 'scoreboard001', board: 'beach',
+                footer: 'Top 5 · Voleibol de playa'
+            })
+            // …and the physical boards are interactive: outline + top-10 modal.
             this.scoreboardInteractive = new ScoreboardInteractive()
+            this.beachScoreboardInteractive = new ScoreboardInteractive({
+                nodeName: 'leaderboard001',
+                screenName: 'scoreboard001',
+                board: 'beach',
+                subtitle: 'Top 10 · Voleibol de playa'
+            })
 
             this._showDogAtAnchor()
 
@@ -435,6 +450,18 @@ export default class World {
         }
         if (this.socialArea) {
             this.socialArea.update()
+        }
+        if (this.beachMinigame) {
+            this.beachMinigame.update()
+        }
+        if (this.beachSession) {
+            this.beachSession.update()
+        }
+        if (this.beachScoreboard) {
+            this.beachScoreboard.update()
+        }
+        if (this.beachScoreboardInteractive) {
+            this.beachScoreboardInteractive.update()
         }
         if (this.ball) {
             this.ball.update()

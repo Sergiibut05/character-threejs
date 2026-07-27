@@ -121,6 +121,10 @@ export default class PatioScene {
                     'grass-floor-2': r.grassFloor2MaskCpu || null
                 },
                 slabsTexture: r.slabsTexture || null,
+                // Torus / black-plane decor inside floor.glb. The Sushi atlas is
+                // a decorative-priority asset, so it's usually still loading
+                // here — tryBuild() below re-applies it on arrival.
+                atlasTexture: r.sushiAtlas || null,
                 sharedUniforms: this.floorUniforms
             })
         }
@@ -151,6 +155,10 @@ export default class PatioScene {
             if (name === 'tinyAtlas' || name === 'sushiAtlas') {
                 this._setupAtlasTextureFlags()
             }
+            // Floor's Torus / black-plane wait for the Sushi atlas.
+            if (name === 'sushiAtlas' && r.sushiAtlas) {
+                this.pieces.floor?.setAtlas?.(r.sushiAtlas)
+            }
 
             // River (water shader)
             if (name === 'riverModel' && !this.pieces.river && r.riverModel) {
@@ -170,12 +178,14 @@ export default class PatioScene {
                     map: r.tinyAtlas
                 })
             }
-            // Scoreboard (physical leaderboard by the pitch). The 'scoreboard'
-            // plane gets the atlas material first; ScoreboardScreen polls the
-            // scene by name and swaps it for the live ranking canvas itself.
-            if ((name === 'scoreboardModel' || name === 'tinyAtlas') &&
-                !this.pieces.scoreboard && r.scoreboardModel && r.tinyAtlas) {
-                this.pieces.scoreboard = new StaticPiece('scoreboard', r.scoreboardModel, {
+            // Scoreboards. InfoBoard.glb carries BOTH physical boards: the
+            // pitch one ('leaderboard' / 'scoreboard') and the beach one
+            // ('leaderboard.001' / 'scoreboard.001'). The screen planes get the
+            // atlas material first; each ScoreboardScreen then finds its own
+            // plane by name and swaps in the live ranking canvas.
+            if ((name === 'infoBoardModel' || name === 'tinyAtlas') &&
+                !this.pieces.scoreboard && r.infoBoardModel && r.tinyAtlas) {
+                this.pieces.scoreboard = new StaticPiece('scoreboards', r.infoBoardModel, {
                     map: r.tinyAtlas
                 })
             }
@@ -185,9 +195,10 @@ export default class PatioScene {
                     map: r.forestAtlas || null
                 })
             }
-            // InfoBoard
-            if (name === 'infoBoardModel' && !this.pieces.infoBoard && r.infoBoardModel) {
-                this.pieces.infoBoard = new StaticPiece('infoBoard', r.infoBoardModel, {
+            // Park info sign (was inside InfoBoard.glb before it became the
+            // scoreboards file).
+            if (name === 'parkInfoBoardModel' && !this.pieces.infoBoard && r.parkInfoBoardModel) {
+                this.pieces.infoBoard = new StaticPiece('infoBoard', r.parkInfoBoardModel, {
                     map: r.forestAtlas || null
                 })
             }
@@ -196,7 +207,7 @@ export default class PatioScene {
         this.resources.on('sourceLoaded', tryBuild)
 
         // Also check immediately in case assets loaded from cache already
-        for (const name of ['riverModel', 'houseModel', 'tinyAtlas', 'outsideHouseThingsModel', 'bridgeModel', 'infoBoardModel', 'scoreboardModel']) {
+        for (const name of ['riverModel', 'houseModel', 'tinyAtlas', 'sushiAtlas', 'outsideHouseThingsModel', 'bridgeModel', 'infoBoardModel', 'parkInfoBoardModel']) {
             tryBuild(name)
         }
     }
@@ -247,6 +258,37 @@ export default class PatioScene {
 
         if (!this.pieces.trunk && r.trunkModel && r.trunkInstances) {
             this.pieces.trunk = new InstancedProp('trunk', r.trunkModel, r.trunkInstances, r.forestAtlas || null)
+        }
+
+        // Palm tree — 3 parts (trunk / coconuts / fronds) that must stay
+        // assembled, with its own KTX2 textures and QUANTIZED positions, so it
+        // is cloned rather than instanced (see ClonedFromJSON's header).
+        if (!this.pieces.palmTree && r.palmTreeModel && r.palmTreeInstances) {
+            const { default: ClonedFromJSON } = await import('./scene/ClonedFromJSON.js')
+            this.pieces.palmTree = new ClonedFromJSON(
+                'palmTree', r.palmTreeModel, r.palmTreeInstances,
+                { rotationMode: 'conjugate' }
+            )
+        }
+
+        // Beach ball — single mesh already placed by the GLB node, with its own
+        // texture, so StaticPiece (no atlas) drops it in as authored. Its
+        // positions are quantized: never bake a matrix into this geometry.
+        if (!this.pieces.beachBall && r.beachBallModel) {
+            this.pieces.beachBall = new StaticPiece('beachBall', r.beachBallModel, {})
+
+            // Authored a bit oversized. Shrink around the node origin and drop
+            // it back onto the sand: the node's Y is the ball's CENTRE, so a
+            // smaller radius has to be re-seated or the ball floats.
+            const sphere = this.pieces.beachBall.root?.getObjectByName('Sphere')
+            if (sphere) {
+                sphere.geometry.computeBoundingSphere()
+                const radius = sphere.geometry.boundingSphere.radius * sphere.scale.x
+                const sandY = sphere.position.y - radius
+                const factor = 0.68
+                sphere.scale.multiplyScalar(factor)
+                sphere.position.y = sandY + radius * factor
+            }
         }
 
         if (!this.pieces.socialArea && r.socialAreaModel) {

@@ -18,6 +18,8 @@ const _pos = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
 const _scale = new THREE.Vector3()
 const _identityScale = new THREE.Vector3(1, 1, 1)
+const _zero = new THREE.Vector3(0, 0, 0)
+const _matrix = new THREE.Matrix4()
 
 export default class Trees {
     constructor(name, visual, references, colorA, colorB, foliageOpts = {}) {
@@ -59,6 +61,16 @@ export default class Trees {
         })
     }
 
+    /** The trunk node's rotation+scale, with its translation dropped. */
+    _bodyRotScale() {
+        const out = new THREE.Matrix4()
+        const body = this.modelParts.body
+        if (!body) return out
+        body.updateMatrix()
+        body.matrix.decompose(_pos, _quat, _scale)
+        return out.compose(_zero, _quat, _scale)
+    }
+
     _cleanRefMatrix(ref) {
         ref.updateWorldMatrix(true, false)
         ref.matrixWorld.decompose(_pos, _quat, _scale)
@@ -85,8 +97,14 @@ export default class Trees {
         this.bodies.castShadow = !isLow
         this.bodies.receiveShadow = !isLow
 
+        // Honour the trunk node's own rotation/scale (NOT its translation — the
+        // reference is what says where the tree goes). Skipping it rendered the
+        // raw geometry at full size, so an Old-tree authored at 0.682 came out
+        // ~47% too big. Identity node ⇒ unchanged (Abedul / Normal).
+        const bodyRS = this._bodyRotScale()
         for (let i = 0; i < this.references.length; i++) {
-            this.bodies.setMatrixAt(i, this.references[i].matrix)
+            _matrix.copy(this.references[i].matrix).multiply(bodyRS)
+            this.bodies.setMatrixAt(i, _matrix)
         }
         this.bodies.instanceMatrix.needsUpdate = true
 
@@ -97,6 +115,18 @@ export default class Trees {
         this.visual.updateMatrixWorld(true)
         const references = []
 
+        // Foliage is authored ABSOLUTELY inside the GLB, so only the trunk's
+        // TRANSLATION has to go: the reference decides where the tree stands,
+        // while the trunk keeps its own rotation/scale (see setBodies). What
+        // remains is each cluster's authored offset and size relative to it —
+        // so the template can sit anywhere in Blender and still assemble.
+        const body = this.modelParts.body
+        const unshift = new THREE.Matrix4()
+        if (body) {
+            body.updateMatrix()
+            unshift.makeTranslation(-body.position.x, -body.position.y, -body.position.z)
+        }
+
         for (let t = 0; t < this.references.length; t++) {
             const treeRef = this.references[t]
             treeRef.updateWorldMatrix(true, false)
@@ -104,7 +134,9 @@ export default class Trees {
             // tree shares it, so the tonal variation shifts the WHOLE tree.
             const treeSeed = (((Math.sin((t + 1) * 12.9898) * 43758.5453) % 1) + 1) % 1
             for (const leaves of this.modelParts.leaves) {
-                const finalMatrix = leaves.matrix.clone().premultiply(treeRef.matrixWorld)
+                const finalMatrix = leaves.matrix.clone()
+                    .premultiply(unshift)
+                    .premultiply(treeRef.matrixWorld)
                 const reference = new THREE.Object3D()
                 reference.applyMatrix4(finalMatrix)
                 reference.userData.treeSeed = treeSeed

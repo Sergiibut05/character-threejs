@@ -27,12 +27,13 @@ const ROWS = 5
 const REFRESH_MS = 30000
 
 export default class ScoreboardScreen {
-    constructor({ targetName = TARGET_NODE, width = CANVAS_W, height = CANVAS_H, rows = ROWS, refreshMs = REFRESH_MS } = {}) {
+    constructor({ targetName = TARGET_NODE, board = 'frisbee', footer = 'Top 5 · Frisbee con el perro', width = CANVAS_W, height = CANVAS_H, rows = ROWS, refreshMs = REFRESH_MS } = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.leaderboard = new Leaderboard()
+        this.leaderboard = new Leaderboard(board)
 
         this.targetName = targetName
+        this.footer = footer
         this.rows = rows
         this.refreshMs = refreshMs
         this.attached = false
@@ -77,7 +78,7 @@ export default class ScoreboardScreen {
 
     /** Find `name` under `root` and attach to its first mesh. */
     attachToNode(root, name = this.targetName) {
-        const node = root?.getObjectByName?.(name)
+        const node = _findNode(root, name)
         if (!node) return false
         let mesh = node.isMesh ? node : null
         if (!mesh) node.traverse((c) => { if (!mesh && c.isMesh) mesh = c })
@@ -87,20 +88,32 @@ export default class ScoreboardScreen {
     // ─── Live updates ────────────────────────────────────────────────────
     /** Redraw now (called on the timer and after a score is saved). */
     async render() {
-        let top = []
-        try { top = await this.leaderboard.getTop10() } catch { /* ephemeral */ }
-        this._draw(top.slice(0, this.rows))
-        this.texture.needsUpdate = true
+        // Re-entrancy guard + stamp the clock UP FRONT. getTop10() is a network
+        // call that can take seconds (or time out); stamping only on completion
+        // left `_lastAt` stale, so update() fired another render EVERY FRAME
+        // during the wait — hundreds of overlapping requests, and the main
+        // thread ground to a halt.
+        if (this._rendering) return
+        this._rendering = true
         this._lastAt = performance.now()
+        try {
+            let top = []
+            try { top = await this.leaderboard.getTop10() } catch { /* ephemeral */ }
+            this._draw(top.slice(0, this.rows))
+            this.texture.needsUpdate = true
+        } finally {
+            this._rendering = false
+            this._lastAt = performance.now()
+        }
     }
 
     update() {
         // Auto-attach as soon as the named mesh exists in the scene.
         if (!this.attached) {
-            const node = this.scene?.getObjectByName?.(this.targetName)
+            const node = _findNode(this.scene, this.targetName)
             if (node) this.attachToNode(node.parent || node, this.targetName) || this.attachToNode(node)
         }
-        if (performance.now() - this._lastAt >= this.refreshMs) this.render()
+        if (!this._rendering && performance.now() - this._lastAt >= this.refreshMs) this.render()
     }
 
     // ─── Drawing ─────────────────────────────────────────────────────────
@@ -179,7 +192,7 @@ export default class ScoreboardScreen {
         ctx.textAlign = 'center'
         ctx.fillStyle = '#9a8a66'
         ctx.font = `${Math.round(h * 0.045)}px sans-serif`
-        ctx.fillText('Top 5 · Frisbee con el perro', w / 2, h - 26)
+        ctx.fillText(this.footer, w / 2, h - 26)
     }
 
     destroy() {
@@ -233,4 +246,17 @@ function roundRect(ctx, x, y, w, h, r) {
     ctx.arcTo(x, y + h, x, y, rr)
     ctx.arcTo(x, y, x + w, y, rr)
     ctx.closePath()
+}
+
+/**
+ * Find a node by name, tolerating Blender's ".001" duplicate suffix.
+ * GLTFLoader sanitises names (dots are illegal in animation property paths),
+ * so an object authored as "scoreboard.001" arrives as "scoreboard001".
+ */
+export function _findNode(root, name) {
+    if (!root?.getObjectByName) return null
+    return root.getObjectByName(name) ||
+        root.getObjectByName(name.replace(/\./g, '')) ||
+        root.getObjectByName(name.replace(/(\d)$/, '.$1')) ||
+        null
 }

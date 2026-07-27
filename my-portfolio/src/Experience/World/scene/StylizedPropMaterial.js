@@ -7,8 +7,9 @@ import {
     Fn, float, vec3, vec4,
     uniform,
     texture, uv,
-    normalWorld,
-    mix, smoothstep, max
+    normalWorld, positionWorld, cameraPosition,
+    mix, smoothstep, max, pow, normalize,
+    If, Discard
 } from 'three/tsl'
 import { dayNightTint } from '../DayNight.js'
 import { REAL_SHADOWS_SUPPORTED } from '../../Utils/DeviceCaps.js'
@@ -45,14 +46,29 @@ export function syncPropStylizedSunDirection(sunLight) {
  * @param {number|THREE.Color} [options.color]
  * @param {boolean} [options.flatShading]
  * @param {boolean} [options.mapAlpha] Use texture alpha in output (transparent cutout / billboard)
+ * @param {number} [options.alphaCutoff] glTF alphaMode MASK: DISCARD below this
+ *   alpha and stay fully opaque (keeps depth write). Preferred over `mapAlpha`
+ *   for foliage — blending without depth write makes leaves show through each
+ *   other. Takes precedence over `mapAlpha` when > 0.
+ * @param {number} [options.gloss] 0 = matte (default). Above 0 adds a stylized
+ *   specular highlight from the same fake sun the shading uses, which is what
+ *   sells "moulded plastic" (beach ball) versus "cloth/matte" props.
+ * @param {number} [options.shininess] Highlight tightness; higher = smaller dot.
  */
 export function createStylizedPropNodeMaterial(options = {}) {
     const {
         map = null,
         color = 0xffffff,
         flatShading = false,
-        mapAlpha = false
+        mapAlpha = false,
+        alphaCutoff = 0,
+        gloss = 0,
+        shininess = 26
     } = options
+
+    // Cutout (MASK) wins over blending: opaque + depth write + discard.
+    const useCutout = alphaCutoff > 0 && !!map
+    const useBlend = mapAlpha && !!map && !useCutout
 
     const tc = toThreeColor(color)
     const tintRgb = uniform(new THREE.Vector3(tc.r, tc.g, tc.b))
@@ -61,8 +77,8 @@ export function createStylizedPropNodeMaterial(options = {}) {
 
     const material = new THREE.MeshLambertNodeMaterial({
         flatShading,
-        transparent: mapAlpha && !!map,
-        depthWrite: !(mapAlpha && !!map)
+        transparent: useBlend,
+        depthWrite: !useBlend
     })
     if (map) material.map = map
     material.userData.uTint = tintRgb
@@ -84,6 +100,13 @@ export function createStylizedPropNodeMaterial(options = {}) {
         const texel = map ? texture(map, uv()) : null
         const base = map ? texel.rgb.mul(tintRgb) : tintRgb
 
+        // Alpha cutout: kill the fragment outright so the leaf still writes
+        // depth where it IS opaque — that's what makes overlapping fronds
+        // occlude each other correctly.
+        if (useCutout) {
+            If(texel.a.lessThan(float(alphaCutoff)), () => { Discard() })
+        }
+
         const N = normalWorld.normalize()
         const ndl = N.dot(propSunDirection.normalize())
         const coreMix = float(1).sub(smoothstep(propCoreLit0, propCoreLit1, ndl))
@@ -92,8 +115,19 @@ export function createStylizedPropNodeMaterial(options = {}) {
 
         const lit = base.mul(propLitTint)
         const shaded = base.mul(propShadowTint)
-        const rgb = mix(lit, shaded, combined).mul(dayNightTint)
-        const outA = mapAlpha && map ? texel.a : float(1)
+        let rgb = mix(lit, shaded, combined).mul(dayNightTint)
+
+        // Blinn-Phong style highlight, driven by the SAME fake sun direction the
+        // core shading uses so it never contradicts the stylized lighting.
+        if (gloss > 0) {
+            const V = normalize(cameraPosition.sub(positionWorld))
+            const H = normalize(propSunDirection.normalize().add(V))
+            const spec = pow(max(N.dot(H), float(0)), float(shininess)).mul(gloss)
+            // Fades with the core shadow: no gleam on the dark side.
+            rgb = rgb.add(spec.mul(combined.oneMinus()).mul(dayNightTint))
+        }
+
+        const outA = useBlend ? texel.a : float(1)
         return vec4(rgb, outA)
     })()
 

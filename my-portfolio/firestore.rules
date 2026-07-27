@@ -1,14 +1,19 @@
 rules_version = '2';
 
-// Firestore rules for the frisbee leaderboard.
+// Firestore rules for the in-game leaderboards.
 // Paste into: Firebase Console → Firestore Database → Rules (or deploy with
 // `firebase deploy --only firestore:rules`).
+//
+// One collection per board (`scores` = frisbee, `scores_beach` = beach
+// volley). Separate collections rather than a shared one with a `board` field:
+// a `where(board) + orderBy(score)` query would need a composite index, and
+// this way the existing frisbee documents were never touched.
 //
 // Model: anyone can READ scores and CREATE a well-formed score; nobody can
 // update or delete (records are immutable, so nobody can wipe the board).
 // Shape is strictly validated so garbage/cheat payloads get rejected:
 //   name    → 1-3 chars, A-Z only (the arcade initials the game submits)
-//   score   → integer 0..1500 (the maximum a competitive session can yield)
+//   score   → integer, 0..max for that board (its highest reachable total)
 //   t       → client timestamp (ms) used for tie-breaking
 //   created → MUST be the server timestamp (prevents forged/backdated docs)
 //
@@ -18,21 +23,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /scores/{scoreId} {
-      allow read: if true;
 
-      allow create: if
-        request.resource.data.keys().hasOnly(['name', 'score', 't', 'created']) &&
+    function isValidScore(maxScore) {
+      return request.resource.data.keys().hasOnly(['name', 'score', 't', 'created']) &&
         request.resource.data.name is string &&
         request.resource.data.name.size() >= 1 &&
         request.resource.data.name.size() <= 3 &&
         request.resource.data.name.matches('[A-Z?]+') &&
         request.resource.data.score is int &&
         request.resource.data.score >= 0 &&
-        request.resource.data.score <= 1500 &&
+        request.resource.data.score <= maxScore &&
         request.resource.data.t is int &&
         request.resource.data.created == request.time;
+    }
 
+    // Frisbee: 5×100 + 5×(100+100) = 1500 is the session maximum.
+    match /scores/{scoreId} {
+      allow read: if true;
+      allow create: if isValidScore(1500);
+      allow update, delete: if false;
+    }
+
+    // Beach volley: endless rally, so the cap is just a sanity bound on how
+    // many touches a human could plausibly chain.
+    match /scores_beach/{scoreId} {
+      allow read: if true;
+      allow create: if isValidScore(999);
       allow update, delete: if false;
     }
   }

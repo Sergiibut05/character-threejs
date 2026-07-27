@@ -30,7 +30,9 @@ const DRACO_OPTIONS = {
     }
 }
 
-const SKIP_SUFFIXES = ['-compressed.glb', '-draco.glb']
+// Both separators appear in the asset tree (palm-tree_compressed.glb ships
+// pre-compressed from its source, and re-encoding it just errors out).
+const SKIP_SUFFIXES = ['-compressed.glb', '_compressed.glb', '-draco.glb']
 const FORCE = process.argv.includes('--force')
 
 async function* walk(dir) {

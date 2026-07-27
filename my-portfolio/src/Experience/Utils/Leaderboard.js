@@ -23,14 +23,26 @@
  */
 import EventEmitter from './EventEmitter.js'
 
-const STORAGE_KEY = 'frisbee.leaderboard.v1'
-const BEST_KEY = 'frisbee.leaderboard.best'
-const CACHE_KEY = 'frisbee.leaderboard.serverTop10'
-const PENDING_KEY = 'frisbee.leaderboard.pending'
+/**
+ * Boards live in SEPARATE Firestore collections rather than sharing one with a
+ * `board` field. Two reasons: a `where(board) + orderBy(score)` query needs a
+ * composite index, and the existing frisbee documents stay untouched.
+ */
+const BOARDS = {
+    frisbee: { collection: 'scores', prefix: 'frisbee.leaderboard', maxScore: 1500 },
+    beach: { collection: 'scores_beach', prefix: 'beach.leaderboard', maxScore: 999 }
+}
+const DEFAULT_BOARD = 'frisbee'
+
 const MAX_ENTRIES = 50
 const TOP_N = 10
-const MAX_SCORE = 1500          // 5×100 + 5×(100+100) — session maximum
 const NET_TIMEOUT_MS = 8000
+
+function _cfg(board) { return BOARDS[board] || BOARDS[DEFAULT_BOARD] }
+const _keys = (board) => {
+    const p = _cfg(board).prefix
+    return { store: `${p}.v1`, best: `${p}.best`, cache: `${p}.serverTop10`, pending: `${p}.pending` }
+}
 
 // ─── Connection status (observable) ─────────────────────────────────────
 export const leaderboardStatus = new EventEmitter()
@@ -55,7 +67,12 @@ export function getLeaderboardStatus() { return _status }
 
 // Browser connectivity nudges the state + flushes queued submissions.
 if (typeof window !== 'undefined' && CONFIGURED) {
-    window.addEventListener('online', () => { _fetchTop10().catch(() => { /* stays offline */ }) })
+    window.addEventListener('online', () => {
+        // Refresh (and flush queued scores for) EVERY board, not just one.
+        for (const b of Object.keys(BOARDS)) {
+            _fetchTop10(b).catch(() => { /* stays offline */ })
+        }
+    })
     window.addEventListener('offline', () => _setStatus('offline'))
 }
 
@@ -104,24 +121,26 @@ function _sorted(list) {
     return [...list].sort((a, b) => b.score - a.score || (a.t || 0) - (b.t || 0))
 }
 
-function _cleanEntry({ name, score }) {
+function _cleanEntry({ name, score }, board) {
     const clean = String(name || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || '???'
-    const s = Math.max(0, Math.min(MAX_SCORE, Math.round(Number(score) || 0)))
+    const s = Math.max(0, Math.min(_cfg(board).maxScore, Math.round(Number(score) || 0)))
     return { name: clean, score: s, t: Date.now() }
 }
 
-function _localAdd(entry) {
-    const sorted = _sorted([..._lsGet(STORAGE_KEY, []), entry]).slice(0, MAX_ENTRIES)
-    _lsSet(STORAGE_KEY, sorted)
-    const prev = Number(_lsGet(BEST_KEY, 0)) || 0
-    if (entry.score > prev) _lsSet(BEST_KEY, entry.score)
+function _localAdd(entry, board) {
+    const k = _keys(board)
+    const sorted = _sorted([..._lsGet(k.store, []), entry]).slice(0, MAX_ENTRIES)
+    _lsSet(k.store, sorted)
+    const prev = Number(_lsGet(k.best, 0)) || 0
+    if (entry.score > prev) _lsSet(k.best, entry.score)
     return sorted
 }
 
 /** Best top-10 view we can build WITHOUT the network (server cache ∪ local). */
-function _bestKnownTop10() {
-    const cached = _lsGet(CACHE_KEY, null)
-    const local = _lsGet(STORAGE_KEY, [])
+function _bestKnownTop10(board) {
+    const k = _keys(board)
+    const cached = _lsGet(k.cache, null)
+    const local = _lsGet(k.store, [])
     const merged = cached ? [...cached, ...local] : [...local]
     // De-dupe by name+score+t (a queued entry may also be in the cache later).
     const seen = new Set()
@@ -135,36 +154,36 @@ function _bestKnownTop10() {
 }
 
 // ─── Server operations ───────────────────────────────────────────────────
-async function _fetchTop10() {
+async function _fetchTop10(board) {
     const fb = await _ensureFirebase()
     if (!fb?.db) return null
     const { collection, query, orderBy, limit, getDocs } = fb.fns
-    const q = query(collection(fb.db, 'scores'), orderBy('score', 'desc'), limit(TOP_N))
+    const q = query(collection(fb.db, _cfg(board).collection), orderBy('score', 'desc'), limit(TOP_N))
     const snap = await _withTimeout(getDocs(q))
     const list = _sorted(snap.docs.map((d) => {
         const v = d.data()
         return { name: v.name, score: v.score, t: v.t || 0 }
     }))
-    _lsSet(CACHE_KEY, list)
+    _lsSet(_keys(board).cache, list)
     _setStatus('online')
-    _flushPending() // fire & forget
+    _flushPending(board) // fire & forget
     return list
 }
 
-async function _serverRankOf(score) {
+async function _serverRankOf(score, board) {
     const fb = await _ensureFirebase()
     if (!fb?.db) return null
     const { collection, query, where, getCountFromServer } = fb.fns
-    const q = query(collection(fb.db, 'scores'), where('score', '>', score))
+    const q = query(collection(fb.db, _cfg(board).collection), where('score', '>', score))
     const snap = await _withTimeout(getCountFromServer(q))
     return snap.data().count + 1
 }
 
-async function _serverAdd(entry) {
+async function _serverAdd(entry, board) {
     const fb = await _ensureFirebase()
     if (!fb?.db) throw new Error('no backend')
     const { collection, addDoc, serverTimestamp } = fb.fns
-    await _withTimeout(addDoc(collection(fb.db, 'scores'), {
+    await _withTimeout(addDoc(collection(fb.db, _cfg(board).collection), {
         name: entry.name,
         score: entry.score,
         t: entry.t,
@@ -172,55 +191,63 @@ async function _serverAdd(entry) {
     }))
 }
 
-let _flushing = false
-async function _flushPending() {
-    if (_flushing) return
-    const pending = _lsGet(PENDING_KEY, [])
+const _flushing = new Set()
+async function _flushPending(board) {
+    if (_flushing.has(board)) return
+    const key = _keys(board).pending
+    const pending = _lsGet(key, [])
     if (!pending.length) return
-    _flushing = true
+    _flushing.add(board)
     try {
         const remaining = []
         for (const entry of pending) {
-            try { await _serverAdd(entry) }
+            try { await _serverAdd(entry, board) }
             catch { remaining.push(entry) }
         }
-        _lsSet(PENDING_KEY, remaining)
+        _lsSet(key, remaining)
     } finally {
-        _flushing = false
+        _flushing.delete(board)
     }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────
 export default class Leaderboard {
+    /** @param {'frisbee'|'beach'} [board] Which ranking this instance talks to. */
+    constructor(board = DEFAULT_BOARD) {
+        this.board = BOARDS[board] ? board : DEFAULT_BOARD
+    }
+
+    get maxScore() { return _cfg(this.board).maxScore }
+
     /** Top 10 — server first, cache/local when offline. */
     async getTop10() {
         if (CONFIGURED) {
             try {
-                const list = await _fetchTop10()
+                const list = await _fetchTop10(this.board)
                 if (list) return list
             } catch (e) {
                 _setStatus('offline')
             }
         }
-        return _bestKnownTop10()
+        return _bestKnownTop10(this.board)
     }
 
     /** Your device's best score + its live server rank when online. */
     async getMyBest() {
-        const best = Number(_lsGet(BEST_KEY, 0)) || 0
+        const best = Number(_lsGet(_keys(this.board).best, 0)) || 0
         if (!best) return { score: 0, rank: null }
         if (CONFIGURED && _status !== 'offline') {
-            try { return { score: best, rank: await _serverRankOf(best) } }
+            try { return { score: best, rank: await _serverRankOf(best, this.board) } }
             catch { _setStatus('offline') }
         }
-        const idx = _bestKnownTop10().findIndex((e) => best >= e.score)
+        const idx = _bestKnownTop10(this.board).findIndex((e) => best >= e.score)
         return { score: best, rank: idx === -1 ? null : idx + 1 }
     }
 
     /** Sync check against the freshest top-10 we know (server cache ∪ local). */
     qualifiesForTop10(score) {
         if (!(score > 0)) return false
-        const top = _bestKnownTop10()
+        const top = _bestKnownTop10(this.board)
         if (top.length < TOP_N) return true
         return score > top[TOP_N - 1].score
     }
@@ -230,30 +257,32 @@ export default class Leaderboard {
      * queued (and auto-flushed on reconnect) when not.
      */
     async submitScore(payload) {
-        const entry = _cleanEntry(payload)
-        _localAdd(entry)
+        const board = this.board
+        const entry = _cleanEntry(payload, board)
+        _localAdd(entry, board)
 
         if (CONFIGURED) {
             try {
-                await _serverAdd(entry)
+                await _serverAdd(entry, board)
                 const [top10, rank] = await Promise.all([
-                    _fetchTop10(),
-                    _serverRankOf(entry.score)
+                    _fetchTop10(board),
+                    _serverRankOf(entry.score, board)
                 ])
                 return {
                     rank: rank ?? null,
                     total: null, // not tracked server-side (needs no UI today)
-                    top10: top10 ?? _bestKnownTop10(),
+                    top10: top10 ?? _bestKnownTop10(board),
                     entry
                 }
             } catch (e) {
                 _setStatus('offline')
                 // Queue for when the connection comes back.
-                _lsSet(PENDING_KEY, [..._lsGet(PENDING_KEY, []), entry])
+                const pk = _keys(board).pending
+                _lsSet(pk, [..._lsGet(pk, []), entry])
             }
         }
 
-        const top10 = _bestKnownTop10()
+        const top10 = _bestKnownTop10(board)
         const rank = top10.filter((e) => e.score > entry.score).length + 1
         return { rank, total: top10.length, top10, entry }
     }

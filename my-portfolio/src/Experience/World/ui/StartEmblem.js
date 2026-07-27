@@ -20,12 +20,18 @@ const SVG = `
 </svg>`
 
 export default class StartEmblem {
-    constructor() {
+    /**
+     * @param {object} [o]
+     * @param {string} [o.svg] Mark to show instead of the portfolio leaf, so a
+     *   second activity reads as its own thing (e.g. the beach ball) while
+     *   keeping the identical open/approach behaviour.
+     */
+    constructor(o = {}) {
         this.el = document.createElement('div')
         this.el.className = 'fz-emblem'
         this.el.innerHTML = `
             <div class="fz-emblem-pill">
-                <span class="fz-emblem-orbit-wrap">${SVG}</span>
+                <span class="fz-emblem-orbit-wrap">${o.svg || SVG}</span>
                 <span class="fz-emblem-reveal">
                     <span class="fz-emblem-label"></span>
                     <span class="fz-emblem-glyph"></span>
