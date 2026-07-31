@@ -798,6 +798,62 @@
     pointer-events: auto;
 }
 
+/* Touch layouts put the joystick and action buttons in the bottom ~210px, so
+   the default 48px offset dropped this pill right on top of them. Clear that
+   zone entirely — a control you cannot press without hitting another one is
+   worse than no control. */
+@media (max-width: 820px), (pointer: coarse) {
+    .fz-social-pill {
+        bottom: max(232px, calc(env(safe-area-inset-bottom) + 232px));
+        gap: 6px;
+        padding: 8px 12px;
+    }
+}
+
+/* Prev / next + the big open button. Touch targets are ≥44px so choosing a
+   network never depends on hitting a statue that may be off-screen. */
+.fz-social-cycle {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(120, 175, 145, 0.14);
+    color: var(--fz-ink);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.fz-social-cycle:hover { background: rgba(120, 175, 145, 0.28); }
+.fz-social-cycle:active { transform: scale(0.92); }
+.fz-social-cycle:focus-visible {
+    outline: 3px solid var(--fz-green-200);
+    outline-offset: 2px;
+}
+
+.fz-social-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: none;
+    background: none;
+    border-radius: var(--fz-radius-pill);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+.fz-social-main:focus-visible {
+    outline: 3px solid var(--fz-green-200);
+    outline-offset: 2px;
+}
+
 .fz-social-icon {
     display: inline-flex;
     align-items: center;

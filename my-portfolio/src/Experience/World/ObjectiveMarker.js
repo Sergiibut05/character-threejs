@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import { Fn, float, vec2, vec3, uv, smoothstep, mix, length, abs } from 'three/tsl'
 import Experience from '../Experience.js'
 
+// Resting height of the aiming arrow — the low end of its old bob (0.9 − 0.12).
+const ARROW_Y = 0.78
+
 export default class ObjectiveMarker {
     constructor() {
         this.experience = new Experience()
@@ -37,13 +40,19 @@ export default class ObjectiveMarker {
         this.arrowSprite = new THREE.Sprite(mat)
         this.arrowSprite.scale.set(0.5, 0.6, 1)
         this.arrowSprite.visible = false
+        // Draw AFTER the grass. Both are transparent, and the arrow writes no
+        // depth, so whatever renders later wins — blades standing behind the
+        // arrow were painting straight over it. Ordering it last means the
+        // grass has already laid down depth, and the arrow's own depth TEST
+        // then hides it only where a blade is genuinely in front.
+        this.arrowSprite.renderOrder = 12
         this.scene.add(this.arrowSprite)
     }
 
     showArrow(targetCenter) {
         this.targetCenter.copy(targetCenter)
         if (!this.arrowSprite) return
-        this.arrowSprite.position.set(targetCenter.x, 0.9, targetCenter.z)
+        this.arrowSprite.position.set(targetCenter.x, ARROW_Y, targetCenter.z)
         this.arrowSprite.visible = true
     }
 
@@ -238,9 +247,9 @@ export default class ObjectiveMarker {
     update(dt) {
         this._time += dt
 
-        if (this.arrowSprite?.visible) {
-            this.arrowSprite.position.y = 0.9 + Math.sin(this._time * 3) * 0.12
-        }
+        // The arrow used to bob (0.9 ± 0.12). It now rests at the BOTTOM of that
+        // travel: a marker you aim with has to sit still, or the spot it points
+        // at keeps sliding while you line up the throw.
 
         if (this._bullseyeTimer >= 0 && this.bullseyeMesh) {
             this._bullseyeTimer += dt

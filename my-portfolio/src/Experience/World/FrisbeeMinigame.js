@@ -48,9 +48,14 @@ export default class FrisbeeMinigame {
         this.catchTriggerHeight = 1.0
         this.catchTriggerRadius = 2.2
         this.catchMinFlightTime = 1.7
+        // How far AHEAD of the dog's origin the catch is recorded — its snout,
+        // not its paws (see _setCatchPosition).
+        this.catchMarkerForward = 0.5
         this.aimYawCenter = 0
         this.aimYawHalfRange = THREE.MathUtils.degToRad(70)
         this.fieldMargin = 1.5
+        // How strongly target placement favours the middle of the field.
+        this.targetEdgeBias = 0.5
         // Out-of-bounds tolerance beyond the field edge (hand-tuned with the
         // debug frame). Separate from fieldMargin, which is auto-calibrated
         // and keeps targets/balloons AWAY from the fence.
@@ -556,7 +561,14 @@ export default class FrisbeeMinigame {
             // past the far edge. Lateral spread stays inside the aim cone.
             const fwd = depth * 0.45 + Math.random() * (depth * 0.47)
             const maxLat = Math.min(Math.tan(this.aimYawHalfRange * 0.7) * fwd, depth * 0.5)
-            const lat = (Math.random() * 2 - 1) * maxLat
+            // Blend of uniform and triangular. Pure triangular thinned the outer
+            // band so hard (20% → 4%) that wide targets almost vanished; mixing
+            // it back with a uniform roll keeps the edges in play while still
+            // favouring the middle. `targetEdgeBias` 0 = uniform, 1 = triangular.
+            const bias = this.targetEdgeBias
+            const uniform = Math.random() * 2 - 1
+            const triangular = (Math.random() + Math.random()) - 1
+            const lat = (uniform * (1 - bias) + triangular * bias) * maxLat
 
             // Clamp into the ORIENTED rectangle so the target never leaks past a
             // rotated edge (the world AABB is larger than the real field).
@@ -735,7 +747,7 @@ export default class FrisbeeMinigame {
 
             if (frisbeePos.y < this.catchTriggerHeight && hDist < this.catchTriggerRadius) {
                 this.flightController.active = false
-                this.dogCatchPosition.copy(dogPos)
+                this._setCatchPosition(dogPos)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
                 this.state = 'dogCatch'
                 this._onDogCatchStart()
@@ -746,7 +758,7 @@ export default class FrisbeeMinigame {
         // Frisbee landed without dog catching in the air
         if (!this.flightController.active) {
             if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
-                this.dogCatchPosition.copy(this.dog.position)
+                this._setCatchPosition(this.dog.position)
                 this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
                 this.state = 'dogCatch'
                 this._onDogCatchStart()
@@ -767,7 +779,7 @@ export default class FrisbeeMinigame {
             (frisbeePos.z - dogPos.z) ** 2
         )
         if (hDist < this.catchTriggerRadius * 1.5) {
-            this.dogCatchPosition.copy(dogPos)
+            this._setCatchPosition(dogPos)
             this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
             this.state = 'dogCatch'
             this._onDogCatchStart()
@@ -775,11 +787,29 @@ export default class FrisbeeMinigame {
         }
 
         if (this.dog.state === 'arriving' || this.dog.state === 'idle') {
-            this.dogCatchPosition.copy(dogPos)
+            this._setCatchPosition(dogPos)
             this.dog.triggerCatch(this.flightController.mesh, frisbeePos)
             this.state = 'dogCatch'
             this._onDogCatchStart()
         }
+    }
+
+    /**
+     * Record where the catch happened.
+     *
+     * `dog.position` is the dog's ORIGIN — roughly between its paws — but the
+     * frisbee is caught at its snout, a good step further along. Marking the
+     * origin made the tick land visibly behind the moment you just watched, so
+     * the point is pushed forward along the dog's heading (it is running at the
+     * disc, so its facing is the catch direction). The score reads the same
+     * position, keeping the mark and the points in agreement.
+     */
+    _setCatchPosition(dogPos) {
+        this.dogCatchPosition.copy(dogPos)
+        const yaw = this.dog?.container?.rotation.y
+        if (yaw === undefined) return
+        this.dogCatchPosition.x += Math.sin(yaw) * this.catchMarkerForward
+        this.dogCatchPosition.z += Math.cos(yaw) * this.catchMarkerForward
     }
 
     _onDogCatchStart() {

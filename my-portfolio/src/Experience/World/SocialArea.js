@@ -45,12 +45,22 @@ export default class SocialArea {
         this.auraWidth = 0.05        // core ring ~invisible: the look is pure glow
         this.auraGlow = 0.75         // soft halo fading outward
         this.auraStrength = 1.0      // overall opacity multiplier
+
+        // Camera framing while standing on the platform (see _enterCamera).
+        this.viewFov = 46
+        this.viewMargin = 1.0        // world units of room past the outer statue
+        this.viewFitHeight = 2.6     // vertical extent to keep in shot (statues + depth)
+        this.viewHeight = 1.1
+        this.viewLookHeight = 0.9
+        this.viewBackDist = 2.6      // portrait: how far behind the player the shot sits
+        this._viewDir = new THREE.Vector3(0, 0, 1)
+        this._camPos = new THREE.Vector3()
+        this._camLook = new THREE.Vector3()
         // Absolute world height, hand-tuned in the GUI.
         // NOTE: the Circle's top face measures y ≈ 0.290, so this sits slightly
         // under it. The ring keeps depth TEST on, so if the aura ever stops
         // showing, raise this above the platform surface first.
         this.auraY = 0.23006185411119
-        this.fovZoomDelta = -4       // follow-camera FOV offset while ACTIVE
 
         this.state = 'far'           // 'far' | 'near' | 'active'
         this._ready = false
@@ -114,6 +124,7 @@ export default class SocialArea {
         }
         if (this.statues.length === 0) return
 
+        this._buildRing()
         this._buildAura()
         this._ready = true
     }
@@ -215,17 +226,41 @@ export default class SocialArea {
         const def = this.focused.def
         this.pill.innerHTML = ''
 
-        const icon = document.createElement('span')
-        icon.className = 'fz-social-icon'
-        icon.innerHTML = def.icon
-        this.pill.appendChild(icon)
+        // Explicit prev/next. Cycling used to be keyboard/gamepad only, so on a
+        // phone the ONLY way to choose was tapping the statue itself — hopeless
+        // for any that sat off-screen or behind another. These make every
+        // network reachable regardless of what the camera happens to show.
+        this.pill.appendChild(this._cycleButton(-1, 'Anterior'))
 
-        const name = document.createElement('span')
-        name.className = 'fz-social-name'
-        name.textContent = def.name
-        this.pill.appendChild(name)
+        const main = document.createElement('button')
+        main.type = 'button'
+        main.className = 'fz-social-main'
+        main.setAttribute('aria-label', `Abrir ${def.name}`)
+        main.innerHTML =
+            `<span class="fz-social-icon">${def.icon}</span>` +
+            `<span class="fz-social-name">${def.name}</span>`
+        main.addEventListener('click', () => this._open())
+        this.pill.appendChild(main)
 
-        this.pill.appendChild(inputGlyph('interact'))
+        this.pill.appendChild(this._cycleButton(1, 'Siguiente'))
+
+        // The glyph is a HINT for keyboard/pad users; on touch the buttons
+        // themselves are the affordance, so it would just be noise.
+        if (this.experience.input?.device !== 'touch') {
+            this.pill.appendChild(inputGlyph('interact'))
+        }
+    }
+
+    _cycleButton(dir, label) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.className = 'fz-social-cycle'
+        b.setAttribute('aria-label', label)
+        b.innerHTML = dir < 0
+            ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
+            : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>'
+        b.addEventListener('click', (e) => { e.stopPropagation(); this._cycle(dir) })
+        return b
     }
 
     /** Popup-blocked (gamepad open isn't a user gesture) → confirmable link. */
@@ -262,8 +297,8 @@ export default class SocialArea {
         this.state = 'active'
         const renderer = this.experience.renderer
         for (const s of this.statues) renderer.addOutlinedObject(s.node)
-        if (this.experience.camera) this.experience.camera.zoomFovOffset = this.fovZoomDelta
         this._setFocused(this._statueFacingCamera(), true)
+        this._enterCamera()
         this._showPill()
     }
 
@@ -271,10 +306,98 @@ export default class SocialArea {
         this.state = 'near'
         const renderer = this.experience.renderer
         for (const s of this.statues) renderer.removeOutlinedObject(s.node)
-        if (this.experience.camera) this.experience.camera.zoomFovOffset = 0
+        const camera = this.experience.camera
+        if (camera) {
+            camera.zoomFovOffset = 0
+            // Ease back out, mirroring how it eased in.
+            if (camera.mode === 'focus') camera.releaseFocus()
+        }
         this.focused = null
         this._hidePill()
         document.body.style.cursor = ''
+    }
+
+    /**
+     * Frame the WHOLE ring of statues.
+     *
+     * The old behaviour just nudged the follow camera's FOV, which on a phone
+     * (narrow lens, tight portrait aspect) left two of the four statues off the
+     * sides — you could not even see what you were choosing between, let alone
+     * tap it. Now the camera pulls back to a vantage that fits every statue,
+     * with the distance derived from the real FOV and aspect so portrait simply
+     * backs up further instead of cropping.
+     */
+    _enterCamera() {
+        const camera = this.experience.camera
+        if (!camera) return
+
+        // Freeze the approach direction so the shot doesn't swing around while
+        // the player shuffles about on the platform.
+        const cam = camera.instance
+        this._viewDir.set(cam.position.x - this.center.x, 0, cam.position.z - this.center.z)
+        if (this._viewDir.lengthSq() < 1e-4) this._viewDir.set(0, 0, 1)
+        this._viewDir.normalize()
+
+        camera.focusFov = this.viewFov
+        camera.setMode('focus')
+        this._updateCamera()
+    }
+
+    _updateCamera() {
+        const camera = this.experience.camera
+        if (!camera || camera.mode !== 'focus') return
+
+        const aspect = camera.instance.aspect || 1
+        const halfFov = THREE.MathUtils.degToRad(camera.focusFov * 0.5)
+        const tan = Math.max(0.05, Math.tan(halfFov))
+
+        // Portrait: fitting the whole ring would push the camera ~22 units out
+        // and leave each statue about 5% of the screen — technically visible,
+        // useless in practice. Instead the shot TURNS to the selected statue and
+        // stays close, so whatever you have selected is always big and centred;
+        // the pill's arrows are what move you around the ring.
+        if (aspect < 1.35 && this.focused) {
+            const dx = this.focused.worldPos.x - this.center.x
+            const dz = this.focused.worldPos.z - this.center.z
+            const len = Math.hypot(dx, dz) || 1
+            const nx = dx / len
+            const nz = dz / len
+            this._camPos.set(
+                this.center.x - nx * this.viewBackDist,
+                this.center.y + this.viewHeight + 0.5,
+                this.center.z - nz * this.viewBackDist
+            )
+            this._camLook.set(
+                this.focused.worldPos.x,
+                this.center.y + this.viewLookHeight,
+                this.focused.worldPos.z
+            )
+            camera.setFocusView(this._camPos, this._camLook)
+            return
+        }
+
+        // Wide screen: fit every statue, so the whole choice is on show.
+        let reach = 0
+        for (const s of this.statues) {
+            reach = Math.max(reach, Math.hypot(s.worldPos.x - this.center.x, s.worldPos.z - this.center.z))
+        }
+        // Width has to cover the ring; HEIGHT only has to cover the statues plus
+        // the ring's foreshortened depth. Feeding the ring's radius into the
+        // vertical requirement too is what parked the camera ~11 units out with
+        // each statue at 10% of the screen — far more headroom than anything
+        // needed. Separating them brings the shot in to a comfortable framing.
+        const needH = reach + this.viewMargin
+        const dist = THREE.MathUtils.clamp(
+            Math.max(needH / Math.max(0.05, tan * aspect), this.viewFitHeight / tan), 3, 26
+        )
+
+        this._camPos.set(
+            this.center.x + this._viewDir.x * dist,
+            this.center.y + this.viewHeight + dist * 0.28,
+            this.center.z + this._viewDir.z * dist
+        )
+        this._camLook.set(this.center.x, this.center.y + this.viewLookHeight, this.center.z)
+        camera.setFocusView(this._camPos, this._camLook)
     }
 
     _setFocused(entry, force = false) {
@@ -299,22 +422,30 @@ export default class SocialArea {
         return best
     }
 
-    /** Cycle focus left/right as seen on screen (camera-relative order). */
+    /**
+     * Step around the ring in its FIXED layout order.
+     *
+     * This used to sort by the camera's right vector, which broke badly once
+     * the portrait camera started turning to face the selection: every step
+     * re-sorted against a new heading, so the order reshuffled as you pressed
+     * and cycling felt random. The ring never moves, so its order shouldn't
+     * either — sorted once by angle, it always reads LinkedIn → GitHub → X →
+     * itch.io and back.
+     */
     _cycle(dir) {
-        if (!this.statues.length) return
-        const cam = this.experience.camera.instance
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion)
-        right.y = 0
-        if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
-        right.normalize()
-        const sorted = [...this.statues].sort((a, b) => {
-            const ka = (a.worldPos.x - this.center.x) * right.x + (a.worldPos.z - this.center.z) * right.z
-            const kb = (b.worldPos.x - this.center.x) * right.x + (b.worldPos.z - this.center.z) * right.z
-            return ka - kb
-        })
-        const i = sorted.indexOf(this.focused)
-        const ni = i === -1 ? 0 : (i + dir + sorted.length) % sorted.length
-        this._setFocused(sorted[ni])
+        const ring = this._ring
+        if (!ring?.length) return
+        const i = ring.indexOf(this.focused)
+        const ni = i === -1 ? 0 : (i + dir + ring.length) % ring.length
+        this._setFocused(ring[ni])
+    }
+
+    /** Order the statues once, by their angle around the platform. */
+    _buildRing() {
+        this._ring = [...this.statues].sort((a, b) => (
+            Math.atan2(a.worldPos.z - this.center.z, a.worldPos.x - this.center.x) -
+            Math.atan2(b.worldPos.z - this.center.z, b.worldPos.x - this.center.x)
+        ))
     }
 
     _open() {
@@ -409,7 +540,10 @@ export default class SocialArea {
             s.node.scale.set(s.baseScale.x * k, s.baseScale.y * k, s.baseScale.z * k)
         }
 
-        if (this.state === 'active') this._pollGamepad()
+        if (this.state === 'active') {
+            this._updateCamera()   // keeps framing correct across a resize
+            this._pollGamepad()
+        }
     }
 
     _setAuraDebug() {
@@ -431,7 +565,10 @@ export default class SocialArea {
         f.add(this, 'activePadding', 0, 2, 0.05).name('Active Padding')
         f.add(this, 'riseBase', 0, 1, 0.01).name('Rise Base')
         f.add(this, 'riseExtra', 0, 1, 0.01).name('Rise Extra (focus)')
-        f.add(this, 'fovZoomDelta', -12, 0, 0.5).name('FOV Zoom Delta')
+        f.add(this, 'viewFov', 25, 80, 1).name('Cam FOV')
+        f.add(this, 'viewMargin', 0, 5, 0.1).name('Cam margen')
+        f.add(this, 'viewHeight', 0, 5, 0.1).name('Cam altura')
+        f.add(this, 'viewLookHeight', 0, 3, 0.1).name('Cam mirada Y')
         f.add(this, 'auraPulseSpeed', 0.2, 6, 0.1).name('Aura Pulse Speed')
             .onChange((v) => { if (this.uPulseSpeed) this.uPulseSpeed.value = v })
     }

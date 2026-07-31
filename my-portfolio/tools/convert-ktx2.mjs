@@ -67,6 +67,13 @@ const TARGETS = [
         out: 'models/social-entrance/social-tittle-image.ktx2',
         srgb: true,
         genmipmap: true
+    },
+    {
+        // Artwork on the beach signboard.
+        in: 'models/beach/wahu-island.png',
+        out: 'models/beach/wahu-island.ktx2',
+        srgb: true,
+        genmipmap: true
     }
 ]
 

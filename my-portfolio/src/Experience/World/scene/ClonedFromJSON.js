@@ -37,6 +37,9 @@ export default class ClonedFromJSON {
      * @param {object} instances  Parsed references JSON ({ instances:[…] }).
      * @param {object} [options]
      * @param {string} [options.rotationMode]  Blender→Three rotation mode.
+     * @param {number} [options.yOffset]  Lift every clone by this much, on top
+     *   of the JSON placement. For sinking the base into the ground (or out of
+     *   it) without editing authored data that a re-export would overwrite.
      * @param {boolean} [options.castShadow]
      * @param {boolean} [options.receiveShadow]
      */
@@ -54,9 +57,11 @@ export default class ClonedFromJSON {
 
         const {
             rotationMode = undefined,
+            yOffset = 0,
             castShadow = !this.isLow,
             receiveShadow = !this.isLow
         } = options
+        this.yOffset = yOffset
 
         const source = gltf.scene
         source.updateMatrixWorld(true)
@@ -84,32 +89,74 @@ export default class ClonedFromJSON {
             return m
         })
 
-        // Which instance is the model itself already placed at? Compare the
-        // assembled bounding-box centre against each instance position (XZ; Y
-        // differs because the centre sits mid-trunk, not at the origin).
-        const centre = new THREE.Box3().setFromObject(source).getCenter(new THREE.Vector3())
-        let refIndex = 0
-        let bestDist = Infinity
-        const _p = new THREE.Vector3()
-        matrices.forEach((m, i) => {
-            _p.setFromMatrixPosition(m)
-            const d = Math.hypot(_p.x - centre.x, _p.z - centre.z)
-            if (d < bestDist) { bestDist = d; refIndex = i }
-        })
-        const invRef = matrices[refIndex].clone().invert()
+        // Cancel the placement the GLB was exported WITH, then apply the JSON's.
+        //
+        // Position and scale come from whichever instance the model was
+        // exported at: the node scales are entangled with the dequantisation
+        // factors, and the object origin isn't recoverable from the mesh, so
+        // neither can be read back out of the GLB. The ROTATION can be, and is
+        // taken from the model instead — that's the one the JSON is allowed to
+        // disagree about, because editing a rotation there doesn't move the
+        // tree, so the reference lookup below still resolves the same way.
+        const invBaked = this._bakedTransform(source, matrices).invert()
 
         for (let i = 0; i < data.length; i++) {
             const root = source.clone(true)
             root.name = `${name}:${i}`
-            // Relative placement; exact (uniform scales ⇒ no shear, so the
-            // decompose below is lossless).
-            matrices[i].clone().multiply(invRef)
+            // Uniform scales ⇒ no shear, so this decompose is lossless.
+            matrices[i].clone().multiply(invBaked)
                 .decompose(root.position, root.quaternion, root.scale)
+            // Applied after the decompose so it's a plain world lift, never
+            // spun by the instance's own rotation.
+            root.userData.baseY = root.position.y
+            root.position.y += yOffset
             this.roots.push(root)
             this.scene.add(root)
         }
 
-        console.log(`✅ ${name}: ${data.length} clones (ref instance #${refIndex})`)
+        console.log(`✅ ${name}: ${data.length} clones`)
+    }
+
+    /** Lift (or sink) every clone relative to its JSON placement. */
+    setYOffset(y) {
+        this.yOffset = y
+        for (const root of this.roots) root.position.y = root.userData.baseY + y
+    }
+
+    /**
+     * The placement the GLB was exported at: the reference instance's position
+     * and scale, but the model's OWN orientation (see the call site).
+     */
+    _bakedTransform(source, matrices) {
+        source.updateMatrixWorld(true)
+
+        // Which instance was it exported at? Compare the assembled bounding-box
+        // centre against each instance position in XZ only — Y differs because
+        // the centre sits mid-trunk, not at the object origin.
+        const centre = new THREE.Box3().setFromObject(source).getCenter(new THREE.Vector3())
+        let ref = matrices[0]
+        let best = Infinity
+        const p = new THREE.Vector3()
+        for (const m of matrices) {
+            p.setFromMatrixPosition(m)
+            const d = Math.hypot(p.x - centre.x, p.z - centre.z)
+            if (d < best) { best = d; ref = m }
+        }
+
+        const pos = new THREE.Vector3()
+        const scale = new THREE.Vector3()
+        ref.decompose(pos, new THREE.Quaternion(), scale)
+
+        // The parts share one orientation; any mesh reports it.
+        const quat = new THREE.Quaternion()
+        let found = false
+        source.traverse((c) => {
+            if (found || !c.isMesh) return
+            c.getWorldQuaternion(quat)
+            found = true
+        })
+
+        return new THREE.Matrix4().compose(pos, quat, scale)
     }
 
     dispose() {

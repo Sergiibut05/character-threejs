@@ -152,8 +152,17 @@ const dirtPalette = (uniforms) => {
         const vf1 = voronoiF1(sandUV.mul(uniforms.uSandVoronoiScale), float(0.5))
         const vEdge = voronoiDistToEdge(sandUV.mul(uniforms.uSandVoronoiScale))
         const combinedVoronoi = mix(vf1, vEdge, float(0.3))
-        return mix(uniforms.uSandColor1, uniforms.uSandColor2,
-            clamp(combinedVoronoi, 0.0, 1.0))
+        // Beach shift: run the dirt toward sand as the ground goes south.
+        // Both ends of the palette are remapped BEFORE the voronoi mix, rather
+        // than tinting the result. A multiply can only ever darken, so it could
+        // never pull this saturated orange-brown up to pale sand — swapping the
+        // palette itself can, and keeps every bit of the voronoi detail because
+        // the mix ratio is untouched.
+        const beach = smoothstep(uniforms.uBeachStartZ, uniforms.uBeachEndZ, wp.z)
+            .mul(uniforms.uBeachStrength)
+        const c1 = mix(uniforms.uSandColor1, uniforms.uBeachColor1, beach)
+        const c2 = mix(uniforms.uSandColor2, uniforms.uBeachColor2, beach)
+        return mix(c1, c2, clamp(combinedVoronoi, 0.0, 1.0))
     })()
 }
 

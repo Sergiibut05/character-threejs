@@ -20,7 +20,10 @@
  */
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { vec4 } from 'three/tsl'
 import Floor, { createDefaultFloorUniforms } from './scene/Floor.js'
+import { createFloorColorNode } from './TSL/FloorShader.js'
+import { dayNightLitTint } from './DayNight.js'
 import GrassBorders from './scene/GrassBorders.js'
 import River from './scene/River.js'
 import StaticPiece from './scene/StaticPiece.js'
@@ -33,6 +36,11 @@ import { chunkedInBackground } from '../Utils/Scheduler.js'
 
 // Lazy-imported (decorative-only): Coblestone, Fence, BaseballPitch, BlackCave.
 // Pulled out of the main bundle to drop a few KB of parse cost on first visit.
+
+// Palms sit a touch low against the beach once placed exactly where Blender
+// says. Lifted here rather than in the references JSON, which a re-export
+// would overwrite. Tunable live under "Palmeras" in the debug GUI.
+const PALM_Y_OFFSET = 0.12
 
 export default class PatioScene {
     constructor() {
@@ -80,6 +88,9 @@ export default class PatioScene {
     _setupGUI() {
         const folder = this.debug.ui.addFolder('PatioScene · Instances')
         folder.close()
+        // Kept so the lazily-loaded decorative pieces can add their own
+        // controls once they finish loading, well after this runs.
+        this._guiFolder = folder
 
         const state = { rotationMode: getBlenderRotationMode() }
         folder
@@ -91,6 +102,33 @@ export default class PatioScene {
                 this.pieces.fence?.rebuildMatrices?.(mode)
                 console.log(`🔄 Instance rotation mode → ${mode}`)
             })
+    }
+
+    /**
+     * Re-skin a mesh with the floor's dirt/sand shader so it blends into the
+     * ground. Uses the SHARED floor uniforms, so the beach tint (and any GUI
+     * tweak to the palette) applies to it exactly as it does to the sand.
+     */
+    _applySandMaterial(root, meshName) {
+        const mesh = root?.getObjectByName?.(meshName)
+        if (!mesh) return
+        const material = new THREE.MeshLambertNodeMaterial({ side: THREE.FrontSide })
+        material.colorNode = createFloorColorNode(this.floorUniforms, { mode: 'dirt' })
+            .mul(vec4(dayNightLitTint, 1.0))
+        mesh.material?.dispose?.()
+        mesh.material = material
+        mesh.castShadow = false
+        mesh.receiveShadow = !this.isLow
+    }
+
+    _debugPalm() {
+        if (!this.debug?.active || !this._guiFolder) return
+        const piece = this.pieces.palmTree
+        const state = { alturaExtra: piece.yOffset }
+        this._guiFolder
+            .add(state, 'alturaExtra', -1, 1, 0.01)
+            .name('Palmeras · altura extra')
+            .onChange((v) => piece.setYOffset(v))
     }
 
     _setupAtlasTextureFlags() {
@@ -267,7 +305,40 @@ export default class PatioScene {
             const { default: ClonedFromJSON } = await import('./scene/ClonedFromJSON.js')
             this.pieces.palmTree = new ClonedFromJSON(
                 'palmTree', r.palmTreeModel, r.palmTreeInstances,
-                { rotationMode: 'conjugate' }
+                { rotationMode: 'conjugate', yOffset: PALM_Y_OFFSET }
+            )
+            this._debugPalm()
+        }
+
+        // Beach props: signboard + sandcastle on the Tiny atlas, with the sign's
+        // artwork kept as its own texture.
+        if (!this.pieces.beachThings && r.beachThingsModel && r.tinyAtlas) {
+            const art = r.wahuIslandTexture || null
+            this.pieces.beachThings = new StaticPiece('beachThings', r.beachThingsModel, {
+                map: r.tinyAtlas,
+                preserveOwnMaps: true,
+                // The artwork is RGBA with a transparent surround. Without
+                // asking for the alpha channel the material renders it opaque,
+                // which is why the background came out solid black.
+                meshMaps: art
+                    ? { 'cartel-image': { map: art, alphaCutoff: 0.5, castShadow: false } }
+                    : {}
+            })
+            // The sandcastle is made OF the beach: give it the ground's own sand
+            // shader instead of the atlas, so it reads as piled-up sand rather
+            // than a prop sitting on top of it.
+            this._applySandMaterial(this.pieces.beachThings.root, 'castle')
+        }
+
+        // Deckchairs and parasols — instanced from their reference JSONs.
+        if (!this.pieces.beachChair && r.beachChairModel && r.beachChairInstances) {
+            this.pieces.beachChair = new InstancedProp(
+                'beachChair', r.beachChairModel, r.beachChairInstances, r.tinyAtlas || null
+            )
+        }
+        if (!this.pieces.beachUmbrella && r.beachUmbrellaModel && r.beachUmbrellaInstances) {
+            this.pieces.beachUmbrella = new InstancedProp(
+                'beachUmbrella', r.beachUmbrellaModel, r.beachUmbrellaInstances, r.tinyAtlas || null
             )
         }
 

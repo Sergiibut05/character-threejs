@@ -53,14 +53,19 @@ export default class Camera {
         this._flightTimer = 0
         this._catchSmoothLook = false
 
-        // beachSide — fixed side-on framing for the beach minigame. Targets are
+        // focus — fixed side-on framing for the beach minigame. Targets are
         // pushed in by BeachMinigame each frame; the lerp does the rest, so the
         // entry/exit transition is free.
-        this.beachFov = this.isMobile ? 52 : 40
-        this.beachLerp = 0.09
-        this._beachPos = new THREE.Vector3()
-        this._beachLook = new THREE.Vector3()
-        this._hasBeachTarget = false
+        this.focusFov = this.isMobile ? 52 : 40
+        this.focusLerp = 0.09
+        this._focusPos = new THREE.Vector3()
+        this._focusLook = new THREE.Vector3()
+        this._hasFocusTarget = false
+
+        // Smooth hand-back from a focused view (see beginSmoothReturn).
+        this.returnLerp = 0.05
+        this._returnT = 0
+        this._returnDur = 1
 
         if (this.debug.active) {
             this.setDebug()
@@ -140,8 +145,8 @@ export default class Camera {
             return
         }
 
-        if (this.mode === 'beachSide') {
-            this.updateBeachSide()
+        if (this.mode === 'focus') {
+            this.updateFocusView()
             return
         }
 
@@ -150,7 +155,19 @@ export default class Camera {
             const desiredPosition = this._scratchPos
                 .copy(characterPosition)
                 .add(this.cameraOffset)
-            const a = this._alpha(this.lerpFactor)
+
+            // Handing back from a focused view: ease in from a gentle factor to
+            // the normal one. Follow is deliberately snappy (0.78 on mobile) so
+            // it stays glued while you run — dropping straight into that from a
+            // distant framing reads as a cut, however the mode was switched.
+            let follow = this.lerpFactor
+            if (this._returnT > 0) {
+                const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
+                this._returnT = Math.max(0, this._returnT - dt)
+                const k = 1 - this._returnT / this._returnDur
+                follow = THREE.MathUtils.lerp(this.returnLerp, this.lerpFactor, k * k)
+            }
+            const a = this._alpha(follow)
             this.smoothPosition.lerp(desiredPosition, a)
             this.smoothLookAt.lerp(characterPosition, a)
             this.instance.position.copy(this.smoothPosition)
@@ -164,23 +181,30 @@ export default class Camera {
         }
     }
 
-    /** Where the beach camera should sit / look (world space). */
-    setBeachView(pos, look) {
-        this._beachPos.copy(pos)
-        this._beachLook.copy(look)
-        this._hasBeachTarget = true
+    /** Give the camera back to follow mode gradually instead of cutting. */
+    releaseFocus(duration = 0.9) {
+        this._returnDur = Math.max(0.05, duration)
+        this._returnT = this._returnDur
+        this.setMode('follow', { snap: false })
     }
 
-    updateBeachSide() {
-        if (!this._hasBeachTarget) return
-        const a = this._alpha(this.beachLerp)
-        this.smoothPosition.lerp(this._beachPos, a)
-        this.smoothLookAt.lerp(this._beachLook, a)
+    /** Where the beach camera should sit / look (world space). */
+    setFocusView(pos, look) {
+        this._focusPos.copy(pos)
+        this._focusLook.copy(look)
+        this._hasFocusTarget = true
+    }
+
+    updateFocusView() {
+        if (!this._hasFocusTarget) return
+        const a = this._alpha(this.focusLerp)
+        this.smoothPosition.lerp(this._focusPos, a)
+        this.smoothLookAt.lerp(this._focusLook, a)
         this.instance.position.copy(this.smoothPosition)
         this.instance.lookAt(this.smoothLookAt)
 
-        if (Math.abs(this.instance.fov - this.beachFov) > 0.02) {
-            this.instance.fov += (this.beachFov - this.instance.fov) * this._alpha(0.08)
+        if (Math.abs(this.instance.fov - this.focusFov) > 0.02) {
+            this.instance.fov += (this.focusFov - this.instance.fov) * this._alpha(0.08)
             this.instance.updateProjectionMatrix()
         }
     }
@@ -415,9 +439,19 @@ export default class Camera {
         })
     }
 
-    setMode(mode) {
+    /**
+     * @param {string} mode
+     * @param {object} [o]
+     * @param {boolean} [o.snap=true] Jump straight to the new framing. Pass
+     *   false to hand over from wherever the camera currently is, so the mode's
+     *   own lerp eases it back — that's what makes LEAVING a focused view look
+     *   like entering it, instead of cutting.
+     */
+    setMode(mode, { snap = true } = {}) {
         this.mode = mode
         this.controls.enabled = this.mode === 'free'
+
+        if (!snap) return
 
         if (this.mode === 'free') {
             this.controls.target.copy(this.smoothLookAt)

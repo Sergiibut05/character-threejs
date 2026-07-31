@@ -43,6 +43,7 @@ export default class BeachMinigame {
         // Timed ease rather than an exponential lerp: the walls glide over a
         // known, generous span instead of snapping most of the way instantly.
         this.widthChangeDuration = 4.0
+        this.bannerDuration = 2600      // ms the resize banner stays up
 
         this.autoFrame = true           // derive camera distance from court width
         this.cameraMargin = 1.3         // world units of breathing room past the walls
@@ -50,6 +51,11 @@ export default class BeachMinigame {
         this.cameraHeight = 1.6
         this.lookHeight = 1.1
         this.cameraFollow = 0.3         // 0 = locked, 1 = fully tracks the action
+        this.cameraFollowNarrow = 0.82  // portrait: the camera must carry the action
+        // Floor on how small the ~1-unit-tall character may get, as a fraction
+        // of screen height. This is what stops a portrait screen from zooming
+        // out until the game is unreadable.
+        this.minCharFraction = 0.15
 
         // ── Ball ──
         this.ballRadius = 0.175
@@ -235,6 +241,11 @@ export default class BeachMinigame {
         this.exitBtn.innerHTML = `<span class="fz-hud-leave-icon">${iconExit}</span>`
         this.exitBtn.addEventListener('click', () => this.onExitClick?.())
         document.body.appendChild(this.exitBtn)
+
+        // Court-resize banner (see _showCourtBanner).
+        this.bannerEl = document.createElement('div')
+        this.bannerEl.className = 'fz-beach-banner'
+        document.body.appendChild(this.bannerEl)
     }
 
     _renderWind() {
@@ -306,7 +317,7 @@ export default class BeachMinigame {
             inputSign: Math.sign(this.cameraDist) || 1
         }
 
-        this.experience.camera.setMode('beachSide')
+        this.experience.camera.setMode('focus')
         this.windLines.setEnabled(this.windEnabled)
         this._targetHalfWidth = this.courtHalfWidth
         this._widthFrom = this.courtHalfWidth
@@ -330,9 +341,11 @@ export default class BeachMinigame {
         const character = this.experience.world?.character
         if (character) character.planarLock = null
 
-        this.experience.camera.setMode('follow')
+        this.experience.camera.releaseFocus()
         this.windLines.setEnabled(false)
         this.bounds?.setEnabled(false)
+        clearTimeout(this._bannerTimer)
+        this.bannerEl.className = 'fz-beach-banner'
         this.hud.classList.remove('is-visible')
         this.exitBtn.classList.remove('is-visible')
         this.windEl.classList.remove('is-visible')
@@ -606,8 +619,31 @@ export default class BeachMinigame {
         this._widthFrom = this.courtHalfWidth
         this._targetHalfWidth = steps[next]
         this._widthT = 0
-        this._showFlash(wider ? '¡Pista más ancha!' : '¡Pista más estrecha!', 'is-milestone')
+        this._showCourtBanner(wider)
         return true
+    }
+
+    /**
+     * Announce a court resize with its DIRECTION.
+     *
+     * On a wide screen you simply watch the walls glide. In portrait they are
+     * off-shot entirely, so this banner is the only cue the player gets — hence
+     * arrows that show which way it moved and a longer hold than the score
+     * call-outs, which are glanceable and disposable.
+     */
+    _showCourtBanner(wider) {
+        clearTimeout(this._bannerTimer)
+        const arrows = wider
+            ? '<span class="fz-beach-banner-arrow">&#8592;</span><span class="fz-beach-banner-arrow">&#8594;</span>'
+            : '<span class="fz-beach-banner-arrow">&#8594;</span><span class="fz-beach-banner-arrow">&#8592;</span>'
+        this.bannerEl.innerHTML =
+            `<span class="fz-beach-banner-arrows">${arrows}</span>` +
+            `<span class="fz-beach-banner-text">${wider ? 'Pista más ancha' : 'Pista más estrecha'}</span>`
+        this.bannerEl.className =
+            `fz-beach-banner is-visible ${wider ? 'is-wider' : 'is-narrower'}`
+        this._bannerTimer = setTimeout(() => {
+            this.bannerEl.className = 'fz-beach-banner'
+        }, this.bannerDuration)
     }
 
     /** Ease the court toward its target width, moving walls and limits with it. */
@@ -721,11 +757,34 @@ export default class BeachMinigame {
     _frameDistance() {
         if (!this.autoFrame) return this.cameraDist
         const cam = this.experience.camera
-        const halfFov = THREE.MathUtils.degToRad(cam.beachFov * 0.5)
+        const halfFov = THREE.MathUtils.degToRad(cam.focusFov * 0.5)
         const tan = Math.max(0.05, Math.tan(halfFov))
-        const needH = (this.courtHalfWidth + this.cameraMargin) / Math.max(0.05, tan * cam.instance.aspect)
         const needV = (this.serveHeight * 0.8) / tan
+
+        const needH = (this.courtHalfWidth + this.cameraMargin) / Math.max(0.05, tan * cam.instance.aspect)
+
+        // On a narrow (portrait) screen, insisting that BOTH walls fit pushes the
+        // camera so far back the player becomes a speck. So: pull back AS FAR AS
+        // the court asks, but never past the point where the character drops
+        // below `minCharFraction` of the screen height. You get as much of the
+        // walls as the screen can afford while the player stays readable — and
+        // whatever falls outside is covered by the resize banner.
+        if (this._narrowScreen) {
+            const maxByChar = 1 / (2 * tan * Math.max(0.01, this.minCharFraction))
+            return THREE.MathUtils.clamp(Math.min(needH, maxByChar), needV, 22)
+        }
+
         return THREE.MathUtils.clamp(Math.max(needH, needV), 4, 22)
+    }
+
+    /** Portrait / small screens can't fit the whole court without shrinking it. */
+    get _narrowScreen() {
+        return (this.experience.camera.instance.aspect || 1) < 1.35
+    }
+
+    /** Tracking has to be near-total when the walls are off-screen. */
+    get _followAmount() {
+        return this._narrowScreen ? this.cameraFollowNarrow : this.cameraFollow
     }
 
     _updateCamera(dt) {
@@ -736,7 +795,7 @@ export default class BeachMinigame {
             ? THREE.MathUtils.lerp(character.position.x, this._ballPos.x, 0.5)
             : this.courtCenter.x
         const camX = THREE.MathUtils.lerp(
-            this.courtCenter.x, focusX, this.cameraFollow
+            this.courtCenter.x, focusX, this._followAmount
         )
 
         this._camPos.set(
@@ -745,11 +804,11 @@ export default class BeachMinigame {
             this.courtCenter.z + this._frameDistance()
         )
         this._camLook.set(
-            THREE.MathUtils.lerp(this.courtCenter.x, focusX, this.cameraFollow * 0.8),
+            THREE.MathUtils.lerp(this.courtCenter.x, focusX, this._followAmount * 0.8),
             this.courtCenter.y + this.lookHeight,
             this.courtCenter.z
         )
-        this.experience.camera.setBeachView(this._camPos, this._camLook)
+        this.experience.camera.setFocusView(this._camPos, this._camLook)
     }
 
     // ── Debug ──
@@ -771,6 +830,8 @@ export default class BeachMinigame {
         f.add(this, 'bodyRadius', 0, 1, 0.02).name('Radio cuerpo')
         f.add(this, 'autoFrame').name('Encuadre auto')
         f.add(this, 'cameraMargin', 0, 4, 0.1).name('Margen cámara')
+        f.add(this, 'minCharFraction', 0.05, 0.4, 0.01).name('Tamaño mín. personaje')
+        f.add(this, 'cameraFollowNarrow', 0, 1, 0.02).name('Seguimiento vertical')
         f.add(this, 'ballRadius', 0.05, 0.6, 0.005).name('Radio pelota').listen()
         f.add(this, 'gravity', -25, -4, 0.1).name('Gravedad base')
         f.add(this, 'bounceSpeed', 3, 14, 0.1).name('Fuerza golpe')
@@ -787,7 +848,7 @@ export default class BeachMinigame {
         f.add(this, 'cameraHeight', 0.5, 10, 0.1).name('Cam altura')
         f.add(this, 'lookHeight', 0, 5, 0.1).name('Cam mirada Y')
         f.add(this, 'cameraFollow', 0, 1, 0.05).name('Cam seguimiento')
-        f.add(this.experience.camera, 'beachFov', 20, 80, 1).name('Cam FOV')
+        f.add(this.experience.camera, 'focusFov', 20, 80, 1).name('Cam FOV')
 
         f.add(this, 'windEnabled').name('Viento')
             .onChange((v) => this.windEl.classList.toggle('is-visible', v && this.state !== 'idle'))
@@ -801,10 +862,12 @@ export default class BeachMinigame {
 
     destroy() {
         clearTimeout(this._flashTimer)
+        clearTimeout(this._bannerTimer)
         this.hud?.remove()
         this.flash?.remove()
         this.windEl?.remove()
         this.exitBtn?.remove()
+        this.bannerEl?.remove()
         this.windLines?.dispose()
         this.bounds?.dispose()
         this.balls?.dispose()

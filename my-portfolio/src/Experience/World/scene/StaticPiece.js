@@ -73,7 +73,10 @@ export default class StaticPiece {
                 child.material = createStylizedPropNodeMaterial({
                     map: spec.map,
                     flatShading,
-                    mapAlpha: spec.mapAlpha === true
+                    mapAlpha: spec.mapAlpha === true,
+                    // Cutout keeps depth writing, so a transparent-backed image
+                    // on a signboard can't sort itself behind the board.
+                    alphaCutoff: spec.alphaCutoff || 0
                 })
                 child.castShadow = spec.castShadow !== undefined ? spec.castShadow : false
                 child.receiveShadow = receiveShadow

@@ -108,6 +108,75 @@
 .fz-beach-wind.is-strong .fz-beach-wind-arrow { color: #e8952e; }
 .fz-beach-wind.is-strong { border-color: rgba(232, 149, 46, 0.5); }
 
+/* Court-resize banner. Deliberately NOT one of the quick call-outs below: on a
+   portrait screen the walls are off-shot, so this is the only signal that the
+   court changed — it has to be readable and hold long enough to register. */
+.fz-beach-banner {
+    position: fixed;
+    top: 22%;
+    left: 50%;
+    z-index: 2515;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 26px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    background: rgba(255, 255, 255, 0.92);
+    border: 2px solid var(--fz-green-200);
+    box-shadow: var(--fz-shadow);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.94);
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.22, 1.3, 0.36, 1);
+}
+
+.fz-beach-banner.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+}
+
+.fz-beach-banner-arrows {
+    display: flex;
+    gap: 10px;
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+.fz-beach-banner-text {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--fz-ink);
+}
+
+/* Colour carries the meaning too, not just the arrow direction. */
+.fz-beach-banner.is-wider {
+    border-color: rgba(95, 197, 148, 0.75);
+}
+.fz-beach-banner.is-wider .fz-beach-banner-arrows { color: var(--fz-green-500); }
+
+.fz-beach-banner.is-narrower {
+    border-color: rgba(232, 149, 46, 0.75);
+}
+.fz-beach-banner.is-narrower .fz-beach-banner-arrows { color: #e8952e; }
+
+/* The arrows nudge outward / inward so the direction reads instantly. */
+.fz-beach-banner.is-visible.is-wider .fz-beach-banner-arrows { animation: fz-banner-wide 0.6s ease-out; }
+.fz-beach-banner.is-visible.is-narrower .fz-beach-banner-arrows { animation: fz-banner-narrow 0.6s ease-out; }
+
+@keyframes fz-banner-wide {
+    0% { gap: 4px; }
+    100% { gap: 10px; }
+}
+@keyframes fz-banner-narrow {
+    0% { gap: 22px; }
+    100% { gap: 10px; }
+}
+
 /* Centre-screen call-outs ("¡Perfecto!", milestones, rally end) */
 .fz-beach-flash {
     position: fixed;
@@ -140,9 +209,17 @@
     .fz-beach-flash.is-milestone { font-size: 42px; }
 }
 
+@media (max-width: 520px) {
+    .fz-beach-banner { padding: 10px 20px; top: 20%; }
+    .fz-beach-banner-text { font-size: 15px; }
+    .fz-beach-banner-arrows { font-size: 22px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .fz-beach-hud,
     .fz-beach-wind,
     .fz-beach-wind-arrow,
+    .fz-beach-banner,
     .fz-beach-flash { transition: opacity 0.2s ease; }
+    .fz-beach-banner .fz-beach-banner-arrows { animation: none; }
 }

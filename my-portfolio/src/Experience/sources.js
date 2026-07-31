@@ -251,6 +251,52 @@ const allSources = [
         priority: 'decorative'
     },
     {
+        // Beach props: signboard ('Cartel') + sandcastle. Tiny atlas, except the
+        // sign's artwork which carries its own texture (see wahuIslandTexture).
+        name: 'beachThingsModel',
+        type: 'gltfModel',
+        path: '/models/beach/beach-things-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'wahuIslandTexture',
+        type: 'textureKtx',
+        path: '/models/beach/wahu-island.ktx2',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+            texture.minFilter = THREE.LinearMipMapLinearFilter
+            texture.magFilter = THREE.LinearFilter
+            texture.flipY = false
+        },
+        priority: 'decorative'
+    },
+    {
+        name: 'beachChairModel',
+        type: 'gltfModel',
+        path: '/models/beach/chair/chair-beach-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'beachChairInstances',
+        type: 'json',
+        path: '/models/beach/chair/chair-references.json',
+        priority: 'decorative'
+    },
+    {
+        name: 'beachUmbrellaModel',
+        type: 'gltfModel',
+        path: '/models/beach/umbrella/umbrella-beach-compressed.glb',
+        priority: 'decorative'
+    },
+    {
+        name: 'beachUmbrellaInstances',
+        type: 'json',
+        path: '/models/beach/umbrella/umbrella-references.json',
+        priority: 'decorative'
+    },
+    {
         // Second ball variant for the beach rally. Authored ~131 units across,
         // so BeachBallVariants rescales it to match the beach ball.
         name: 'soccerBallModel',

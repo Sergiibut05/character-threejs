@@ -597,6 +597,24 @@ export default class Floor {
 
         const u = this.uniforms
 
+        const beach = folder.addFolder('Playa (tono arena)')
+        beach.close()
+        // Raw channels throughout: these are shader-space colours, so they must
+        // not go through the sRGB conversion lil-gui assumes.
+        const beachColor = (key, label) => {
+            beach.addColor({ [label]: '#' + u[key].value.getHexString() }, label)
+                .name(label)
+                .onChange((v) => {
+                    const c = new THREE.Color(v)
+                    u[key].value.setRGB(c.r, c.g, c.b)
+                })
+        }
+        beachColor('uBeachColor1', 'Arena clara')
+        beachColor('uBeachColor2', 'Arena oscura')
+        beach.add(u.uBeachStrength, 'value', 0, 1, 0.01).name('Intensidad')
+        beach.add(u.uBeachStartZ, 'value', 10, 50, 0.5).name('Empieza en Z')
+        beach.add(u.uBeachEndZ, 'value', 10, 60, 0.5).name('Acaba en Z')
+
         const grassFolder = folder.addFolder('Grass mask (GPU / floor shader)')
         grassFolder
             .add(u.uGrassMaskLow, 'value', 0, 1, 0.01)
@@ -663,6 +681,17 @@ export function createDefaultFloorUniforms() {
         // Dirt / sand palette
         uSandColor1: uniform(new THREE.Color(0.791, 0.352, 0.122)),
         uSandColor2: uniform(new THREE.Color(0.597, 0.266, 0.093)),
+        // Beach tint — the SAME dirt texture, nudged warmer/yellower as the
+        // ground runs south past the palm trees, so the shore reads as sand
+        // without a second material or a visible seam. Multiplicative, so all
+        // the voronoi grain survives; only the hue shifts.
+        // Sand replaces the dirt palette outright in the beach band (light /
+        // shadow pair, mirroring uSandColor1 / uSandColor2 above).
+        uBeachColor1: uniform(new THREE.Color(0.90, 0.78, 0.50)),
+        uBeachColor2: uniform(new THREE.Color(0.72, 0.60, 0.36)),
+        uBeachStartZ: uniform(34.0),
+        uBeachEndZ: uniform(43.0),
+        uBeachStrength: uniform(1.0),
         uSandVoronoiScale: uniform(6.3),
         uSandNoiseScale: uniform(0.8),
         uSandDistortion: uniform(0.136),

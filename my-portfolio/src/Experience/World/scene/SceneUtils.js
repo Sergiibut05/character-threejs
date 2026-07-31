@@ -18,6 +18,10 @@
  *   - 'conjugate':    q_three = Q_a · q_blender · Q_a⁻¹
  *                     Mathematically correct change-of-basis. Only correct
  *                     if the GLB geometry is authored "standing up" along +Y.
+ *                     Reads the Blender Euler in three's 'ZYX' order — see the
+ *                     note in rotationToQuaternion. The empirical modes below
+ *                     keep 'XYZ' because the assets using them were eyeballed
+ *                     against that behaviour.
  *   - 'swapYZ':       Euler [rx, ry, rz] → THREE.Euler(rx, rz, -ry, 'XYZ').
  *                     Treats Blender's heading (Z) as Three's heading (Y).
  *   - 'raw':          Use raw [rx, ry, rz] as Three.js XYZ Euler.
@@ -86,7 +90,15 @@ function rotationToQuaternion(rx, ry, rz, mode, out = _q) {
         return out
     }
     // 'conjugate' (default) and 'preStandX'
-    _euler.set(rx, ry, rz, 'XYZ')
+    //
+    // 'ZYX', not 'XYZ': Blender's "XYZ Euler" composes as Rz·Ry·Rx, and a
+    // three.js order string reads left-to-right as the matrix product, so
+    // Blender XYZ *is* three ZYX. Getting this backwards leaves the yaw right
+    // and swings the tilt axis around by the yaw angle — invisible on the props
+    // that only spin about Z, obvious on anything both tilted and turned.
+    // Verified against palm-tree_compressed.glb's baked rotation: 0.000° error
+    // with 'ZYX', 7.9° with 'XYZ'.
+    _euler.set(rx, ry, rz, 'ZYX')
     out.setFromEuler(_euler)
     if (mode === 'preStandX') out.multiply(Q_PRE_STAND_X_INV)
     out.premultiply(Q_BLENDER_TO_THREE)
