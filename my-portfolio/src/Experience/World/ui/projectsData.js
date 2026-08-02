@@ -8,6 +8,9 @@ export const PROJECTS = [
     {
         id: 'bookmatch',
         title: 'BookMatch',
+        // Started as the end-of-course project (TFG) and was taken all the way
+        // to a deployed product — worth saying, so the overview badges it.
+        finalProject: true,
         tagline: 'Marketplace de libros: compra, venta e intercambio · web + Android',
         image: '/models/carts/page1.webp',
         image2: '/models/carts/page1b.webp',

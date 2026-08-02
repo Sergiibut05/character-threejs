@@ -10,32 +10,9 @@
  * notebook modal. Imported once from ui/Modal.js (Vite injects it).
  */
 
-:root {
-    /* Nunito is actually LOADED (style.css imports it alongside Fredoka) —
-       'Inter' never was, so body text used to fall back to the system font. */
-    --fz-font-title: 'Fredoka', 'Nunito', 'Quicksand', system-ui, sans-serif;
-    --fz-font-body: 'Nunito', 'Quicksand', system-ui, -apple-system, sans-serif;
-
-    /* Pastel palette (from style.css tokens) */
-    --fz-cream: #f8fbfa;
-    --fz-green-50: #f2f9f7;
-    --fz-green-100: #d7f2e4;
-    --fz-green-200: #9be4ca;
-    --fz-green-400: #5fc594;
-    --fz-green-500: #41a06e;
-    --fz-ink: #234b3a;
-    --fz-ink-soft: rgba(42, 90, 76, 0.66);
-    --fz-gold: #ffd426;
-    --fz-blue: #5a8af5;
-    --fz-red: #ff6b6b;
-
-    --fz-radius: 22px;
-    --fz-radius-sm: 15px;
-    --fz-radius-pill: 999px;
-    --fz-shadow: 0 18px 44px rgba(39, 90, 70, 0.18), 0 6px 14px rgba(60, 100, 80, 0.09);
-    --fz-shadow-soft: 0 8px 18px rgba(39, 90, 70, 0.12);
-    --fz-z: 2700;
-}
+/* Palette, type and radii now live in tokens.css so non-modal surfaces can
+   share them without importing this whole file. */
+@import './tokens.css';
 
 /* ─── Overlay ─────────────────────────────────────────────────────────── */
 .fz-modal-overlay {

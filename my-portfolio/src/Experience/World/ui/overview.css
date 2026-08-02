@@ -1,0 +1,1265 @@
+/*
+ * Quick Overview — the "I'm in a hurry" reading of this portfolio.
+ *
+ * Same palette, type and roundness as the in-world UI (tokens.css), but laid
+ * out as a document rather than a game surface. Everything is scoped under
+ * .ov-root so it can never reach the 3D canvas or the modal styles.
+ *
+ * Motion: one shared easing and one shared reveal, driven by IntersectionObserver
+ * adding .is-in. Stagger comes from a --i index set on each child, so there is
+ * no per-element CSS and no animation library.
+ */
+
+@import './tokens.css';
+
+.ov-root {
+    /* --fz-ink-soft is only ~3.3:1 on cream — fine for meta chips, not for
+       body copy. These are measured to clear 4.5:1. */
+    --ov-muted: #4a7263;
+    --ov-faint: #6d9384;
+    --ov-line: rgba(65, 160, 110, 0.16);
+    --ov-card: #ffffff;
+    /* Flat warm paper, not a cold mint gradient. The blue-to-green wash this
+       replaced is the single thing that made the page read as a SaaS template:
+       a big smooth gradient is screen, and the texture below makes this stock. */
+    --ov-bg: #fbfdf5;
+    --ov-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --ov-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+    --ov-max: 1120px;
+    --ov-pad: clamp(20px, 5vw, 56px);
+
+    /* Type scale. This page used to carry 13 different fixed sizes, half of
+       them a half-pixel apart (14.5 / 15 / 15.5) — differences too small to
+       read as hierarchy and too many to hold together. Six steps do the job. */
+    --ov-t-2xs: 12px;   /* uppercase micro-labels */
+    --ov-t-xs: 13px;    /* meta, dates, issuers */
+    --ov-t-sm: 15px;    /* chips, controls, secondary text */
+    --ov-t-base: 17px;  /* body */
+    --ov-t-md: 19px;    /* opening paragraph, timeline entries */
+    --ov-t-lg: 21px;    /* sub-headings */
+    /* Headings above this stay fluid via clamp() — see .ov-h2 / .ov-name. */
+
+    /* 4px grid. Spacing was 23 unrelated values (7, 9, 11, 13…); rhythm comes
+       from reusing a few, not from tuning each gap on its own. */
+    --ov-s1: 4px;
+    --ov-s2: 8px;
+    --ov-s3: 12px;
+    --ov-s4: 16px;
+    --ov-s5: 20px;
+    --ov-s6: 24px;
+    --ov-s7: 28px;
+    --ov-s8: 32px;
+
+    /* Solid-surface system. These cards used to fake depth with a pale gradient
+       wash, which reads as half-hearted glass. Depth here is structural instead:
+       a 1px inner highlight along the top edge (the moulded-plastic lip the
+       in-world UI has), a tight contact shadow that grounds the card, and a wide
+       ambient one. Nothing is translucent. */
+    --ov-lift:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 1px 2px rgba(39, 90, 70, 0.10),
+        0 12px 28px -10px rgba(39, 90, 70, 0.18);
+    --ov-lift-hi:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 2px 4px rgba(39, 90, 70, 0.12),
+        0 22px 44px -12px rgba(39, 90, 70, 0.26);
+
+
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    background: var(--ov-bg);
+    color: var(--fz-ink);
+    font-family: var(--fz-font-body);
+    font-size: var(--ov-t-base);
+    line-height: 1.6;
+    opacity: 0;
+    transition: opacity 0.45s var(--ov-ease-soft);
+
+    /* The game sets `user-select: none` on <body> so dragging in the 3D view
+       never selects text. This is a document — people copy an email address
+       out of it. */
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.ov-root.is-open { opacity: 1; }
+
+/* Paper tooth. The first attempt at this was invisible and it was arithmetic,
+   not taste: coloured noise at 3.5% over a near-white page has nowhere to go.
+   This version desaturates the turbulence to grey and multiplies it, so the
+   speckles actually darken the paper instead of washing into it. */
+.ov-root::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0.22;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+.ov-root *,
+.ov-root *::before,
+.ov-root *::after { box-sizing: border-box; }
+
+/* Any author rule that sets `display` beats the browser's `[hidden]`, so
+   `el.hidden = true` silently does nothing on a flex/grid element. Everything
+   here that hides itself (the CV button, the extra certificates) relies on it. */
+.ov-root [hidden] { display: none !important; }
+
+.ov-root :focus-visible {
+    outline: 3px solid var(--fz-green-500);
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+/* Controls are the exception: selecting a button's label is never wanted. */
+.ov-root button,
+.ov-root .ov-nav,
+.ov-root .ov-lang {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ═══ Skip link ═══════════════════════════════════════════════════════════ */
+.ov-skip {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    transform: translate(-50%, -180%);
+    z-index: 30;
+    padding: 12px 24px;
+    border-radius: var(--fz-radius-pill);
+    background: var(--fz-green-500);
+    color: #fff;
+    font-family: var(--fz-font-title);
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 0.25s var(--ov-ease);
+}
+.ov-skip:focus-visible { transform: translate(-50%, 0); }
+
+/* ═══ Top bar ═════════════════════════════════════════════════════════════ */
+.ov-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px var(--ov-pad);
+    background: rgba(251, 253, 245, 0.86);
+    backdrop-filter: blur(14px) saturate(1.3);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.4s var(--ov-ease-soft), background 0.4s var(--ov-ease-soft);
+}
+.ov-root.is-scrolled .ov-bar {
+    border-bottom-color: var(--ov-line);
+    background: rgba(251, 253, 245, 0.94);
+}
+
+/* Reading progress — a hairline that fills as you go. */
+.ov-progress {
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    height: 2px;
+    width: 100%;
+    transform: scaleX(var(--p, 0));
+    transform-origin: 0 50%;
+    background: linear-gradient(90deg, var(--fz-green-400), var(--fz-green-500));
+    /* Driven per-frame from scroll; a transition here would lag behind. */
+    will-change: transform;
+}
+
+.ov-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 8px 16px 8px 12px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius-pill);
+    background: #fff;
+    color: var(--fz-ink);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s var(--ov-ease), box-shadow 0.2s var(--ov-ease),
+                border-color 0.2s var(--ov-ease);
+}
+.ov-back:hover {
+    transform: translateX(-2px);
+    border-color: var(--fz-green-400);
+    box-shadow: var(--fz-shadow-soft);
+}
+.ov-back svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+.ov-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-inline: auto;
+    padding: 4px;
+    border-radius: var(--fz-radius-pill);
+    background: rgba(215, 242, 228, 0.5);
+}
+.ov-nav-link {
+    position: relative;
+    z-index: 1;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: var(--fz-radius-pill);
+    background: none;
+    color: var(--ov-muted);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.25s var(--ov-ease-soft);
+}
+.ov-nav-link:hover { color: var(--fz-green-500); }
+.ov-nav-link[aria-current='true'] { color: #fff; }
+
+/* One pill slides between items instead of each item animating its own
+   background — that is what makes the movement read as a single object. */
+.ov-nav-pill {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    height: calc(100% - 8px);
+    width: var(--w, 0);
+    border-radius: var(--fz-radius-pill);
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    box-shadow: 0 4px 12px rgba(65, 160, 110, 0.3);
+    transform: translateX(var(--x, 0));
+    opacity: 0;
+    transition: transform 0.42s var(--ov-ease), width 0.42s var(--ov-ease),
+                opacity 0.25s var(--ov-ease-soft);
+    pointer-events: none;
+}
+.ov-nav-pill.is-on { opacity: 1; }
+
+.ov-lang {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 4px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius-pill);
+    background: #fff;
+}
+.ov-lang-btn {
+    min-width: 42px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--fz-radius-pill);
+    background: none;
+    color: var(--ov-muted);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.25s var(--ov-ease-soft), color 0.25s var(--ov-ease-soft);
+}
+.ov-lang-btn[aria-pressed='true'] {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    color: #fff;
+}
+.ov-lang-btn:not([aria-pressed='true']):hover { color: var(--fz-green-500); }
+
+/* Hamburger — hidden until the pill nav stops fitting. */
+.ov-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--fz-ink);
+    cursor: pointer;
+    transition: border-color 0.2s var(--ov-ease-soft), box-shadow 0.2s var(--ov-ease);
+}
+.ov-menu-btn:hover { border-color: var(--fz-green-400); box-shadow: var(--fz-shadow-soft); }
+.ov-menu-btn svg { width: 21px; height: 21px; }
+
+/* ═══ Mobile sheet (Popover API — light dismiss and Escape come free) ═════ */
+.ov-sheet {
+    position: fixed;
+    inset: 0 0 auto 0;
+    width: 100%;
+    max-width: none;
+    max-height: 84dvh;
+    margin: 0;
+    padding: 16px clamp(16px, 4vw, 24px) 24px;
+    border: 0;
+    border-radius: 0 0 26px 26px;
+    background: var(--ov-bg);
+    color: var(--fz-ink);
+    font-family: var(--fz-font-body);
+    box-shadow: 0 24px 60px rgba(28, 70, 54, 0.22);
+    overflow-y: auto;
+
+    opacity: 0;
+    transform: translateY(-12px);
+    transition-property: opacity, transform, display, overlay;
+    transition-duration: 0.34s;
+    transition-timing-function: var(--ov-ease);
+    /* MANDATORY for top-layer elements, and must come after any shorthand. */
+    transition-behavior: allow-discrete;
+}
+.ov-sheet:popover-open {
+    opacity: 1;
+    transform: translateY(0);
+}
+@starting-style {
+    .ov-sheet:popover-open {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+}
+
+.ov-sheet::backdrop {
+    background: rgba(24, 60, 46, 0);
+    backdrop-filter: blur(0px);
+    transition: display 0.34s allow-discrete, overlay 0.34s allow-discrete,
+                background-color 0.34s var(--ov-ease), backdrop-filter 0.34s var(--ov-ease);
+}
+.ov-sheet:popover-open::backdrop {
+    background: rgba(24, 60, 46, 0.42);
+    backdrop-filter: blur(3px);
+}
+@starting-style {
+    .ov-sheet:popover-open::backdrop {
+        background: rgba(24, 60, 46, 0);
+        backdrop-filter: blur(0px);
+    }
+}
+
+.ov-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 16px;
+}
+.ov-sheet-title {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--fz-ink);
+    cursor: pointer;
+}
+.ov-sheet-close svg { width: 18px; height: 18px; }
+
+.ov-sheet-list { display: grid; gap: 8px; }
+.ov-sheet-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 16px 16px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius-sm);
+    background: #fff;
+    color: var(--fz-ink);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-base);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft);
+}
+.ov-sheet-link:hover,
+.ov-sheet-link:active { transform: translateX(3px); border-color: var(--fz-green-400); }
+.ov-sheet-link svg { width: 18px; height: 18px; color: var(--fz-green-400); flex-shrink: 0; }
+
+/* ═══ Hero ════════════════════════════════════════════════════════════════ */
+.ov-hero {
+    position: relative;
+    padding: clamp(40px, 7vh, 72px) var(--ov-pad) clamp(32px, 5vh, 56px);
+    background: none;
+}
+
+.ov-hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    align-items: center;
+    gap: clamp(24px, 5vw, 64px);
+    max-width: var(--ov-max);
+    margin: 0 auto;
+}
+
+/* The name is a graphic element, not a label. Set big enough to break onto two
+   lines with the leading pulled tight, so it reads as one solid mass balancing
+   the character on the other side. Against 17px body that is a ~5.6:1 jump,
+   where it used to be 4.3:1 — the old hierarchy was legible but timid. */
+.ov-name {
+    margin: 0;
+    /* Forces the break into "Sergii / Butrii" — two even lines stacked tight
+       make a block with weight, where one long line just reads as a caption. */
+    max-width: 7ch;
+    font-family: var(--fz-font-title);
+    font-size: clamp(46px, 9vw, 96px);
+    font-weight: 600;
+    line-height: 0.94;
+    letter-spacing: -0.035em;
+    color: #1d4232;
+}
+
+/* Deliberately NOT green. Saturated green is now reserved for the single real
+   action on the page; when the subtitle, the rules, the icons and the button
+   were all the same green, nothing looked more important than anything else. */
+.ov-role {
+    margin: 16px 0 0;
+    font-family: var(--fz-font-title);
+    font-size: clamp(var(--ov-t-base), 2.4vw, var(--ov-t-lg));
+    font-weight: 500;
+    color: var(--ov-muted);
+}
+
+.ov-lede {
+    max-width: 46ch;
+    margin: 20px 0 0;
+    font-size: clamp(var(--ov-t-base), 1.9vw, var(--ov-t-md));
+    line-height: 1.66;
+    color: var(--ov-muted);
+}
+
+.ov-cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+/* ── The window ───────────────────────────────────────────────────────────
+   A framed view into the world, not a decoration: it is the button that
+   enters. Kept flat and in the same card language as everything else — the
+   glossy blob it replaced fought the character for attention. */
+.ov-portal {
+    position: relative;
+    font: inherit;
+    display: block;
+    width: 100%;
+    /* Bigger than it was in the card: without a frame eating the edges he can
+       occupy the column properly. */
+    max-width: 460px;
+    aspect-ratio: 4 / 4.6;
+    margin-inline: auto;
+    padding: 0;
+    /* NO frame. This is a live 3D character, and boxing it made the eye read it
+       as an embedded photo — the one thing on the page with real personality,
+       presented like a passport picture. It now sits directly on the page and
+       is grounded by a cast shadow instead of by a card. */
+    border: 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+    cursor: default;
+    transition: transform 0.45s var(--ov-ease);
+}
+/* No hover at all: he is a character standing there, not a control that
+   lights up. The two explicit "Entrar al mundo" buttons carry that job. */
+.ov-portal.is-armed { cursor: pointer; }
+
+.ov-portal-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.9s var(--ov-ease);
+}
+/* Set by HeroViewport once the character is in and the first frame is drawn. */
+.ov-portal-canvas.is-live { opacity: 1; }
+
+/* The cast shadow now does the whole job the card used to do: it is the only
+   thing telling you he is standing on a surface, so it has to be believable. */
+.ov-portal-glow {
+    position: absolute;
+    left: 50%;
+    /* Both driven by HeroViewport, which projects the feet through the same
+       camera that draws him — a hardcoded percentage desyncs the instant the
+       framing changes. */
+    top: var(--ground-y, 88%);
+    width: var(--ground-w, 40%);
+    height: 5.5%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(38, 92, 70, 0.34), rgba(38, 92, 70, 0) 72%);
+    opacity: 1;
+    pointer-events: none;
+}
+
+
+/* ═══ Buttons ═════════════════════════════════════════════════════════════ */
+.ov-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 16px 28px;
+    border: 1.5px solid transparent;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-base);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.22s var(--ov-ease), box-shadow 0.22s var(--ov-ease),
+                background 0.22s var(--ov-ease-soft), border-color 0.22s var(--ov-ease-soft);
+}
+.ov-btn svg { width: 19px; height: 19px; flex-shrink: 0; }
+.ov-btn:hover { transform: translateY(-2px); }
+.ov-btn:active { transform: translateY(0); }
+.ov-btn:disabled { opacity: 0.55; cursor: progress; transform: none; }
+
+/* The one saturated thing on the page, and the only true action. Two borrowed
+   details give it the "physical toy" feel of Tomodachi Life's buttons: a thick
+   white sticker outline that cuts it out of the background, and a HARD offset
+   shadow with no blur — a diffuse glow reads as a web button, an unblurred
+   ledge reads as something with a side you can press down. */
+.ov-btn--primary {
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    border: 3px solid #fff;
+    color: #fff;
+    box-shadow:
+        0 5px 0 #2f7a52,                      /* the pressable ledge */
+        0 8px 16px -4px rgba(39, 90, 70, 0.3); /* it still has to sit in the room */
+}
+.ov-btn--primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 7px 0 #2f7a52, 0 12px 22px -4px rgba(39, 90, 70, 0.34);
+}
+/* Travels the full height of the ledge, so it bottoms out like a real key. */
+.ov-btn--primary:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 #2f7a52, 0 2px 6px -2px rgba(39, 90, 70, 0.3);
+}
+.ov-btn-arrow { display: inline-flex; transition: transform 0.28s var(--ov-ease); }
+.ov-btn--primary:hover:not(:disabled) .ov-btn-arrow { transform: translateX(4px); }
+
+.ov-btn--ghost {
+    background: #fff;
+    border-color: var(--ov-line);
+    color: var(--fz-ink);
+    box-shadow: var(--fz-shadow-soft);
+}
+.ov-btn--ghost:hover { border-color: var(--fz-green-400); box-shadow: var(--fz-shadow); }
+
+/* ═══ Sections ════════════════════════════════════════════════════════════ */
+.ov-main { position: relative; z-index: 1; }
+
+/* The padding sits INSIDE this box, so the cap has to grow by it for the
+   content column to line up with the hero's (whose padding is on the outside). */
+.ov-section {
+    max-width: calc(var(--ov-max) + 2 * var(--ov-pad));
+    margin: 0 auto;
+    padding: clamp(40px, 6.5vh, 68px) var(--ov-pad);
+    scroll-margin-top: 84px;
+}
+
+.ov-section-head { margin-bottom: 32px; }
+
+.ov-h2 {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+    font-family: var(--fz-font-title);
+    font-size: clamp(27px, 4.2vw, 38px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #1d4232;
+}
+/* Little leaf-green rule that grows in with the heading. */
+.ov-h2::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    max-width: 180px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--fz-green-200), transparent);
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 0.7s var(--ov-ease) 0.15s;
+}
+.ov-section.is-in .ov-h2::after { transform: scaleX(1); }
+
+.ov-blurb {
+    margin: 12px 0 0;
+    max-width: 62ch;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-base);
+}
+
+.ov-h3 {
+    margin: 0 0 20px;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-lg);
+    font-weight: 600;
+    color: var(--fz-green-500);
+}
+
+/* ═══ Reveal ══════════════════════════════════════════════════════════════ */
+.ov-reveal {
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity 0.62s var(--ov-ease), transform 0.62s var(--ov-ease);
+    transition-delay: calc(var(--i, 0) * 70ms);
+}
+.ov-section.is-in .ov-reveal,
+.ov-reveal.is-in {
+    opacity: 1;
+    transform: none;
+}
+
+/* ═══ About ═══════════════════════════════════════════════════════════════ */
+.ov-about {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+}
+.ov-prose p {
+    margin: 0 0 20px;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-base);
+    line-height: 1.74;
+}
+/* The opening line carries the story; give it a little more presence. */
+.ov-prose p:first-child {
+    font-size: var(--ov-t-md);
+    color: var(--fz-ink);
+}
+.ov-prose p:last-child { margin-bottom: 0; }
+
+.ov-langs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin: 24px 0 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--ov-line);
+}
+.ov-langs-label {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-langs-value { color: var(--ov-muted); font-size: var(--ov-t-base); font-weight: 600; }
+
+/* "This site, under the hood" — evidence panel beside the story. */
+/* Solid white, with the rows carrying the structure. The gradient this had was
+   doing the work a divider does better. */
+.ov-made {
+    padding: 24px 24px 8px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius);
+    background: var(--ov-card);
+    box-shadow: var(--ov-lift);
+}
+.ov-made-title {
+    margin: 0 0 16px;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-made-list { list-style: none; margin: 0; padding: 0; }
+.ov-made-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--ov-line);
+}
+.ov-made-item:first-child { border-top: 0; padding-top: 0; }
+.ov-made-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--fz-green-50);
+    color: var(--fz-green-500);
+}
+.ov-made-icon svg { width: 17px; height: 17px; }
+.ov-made-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ov-made-label {
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+/* System mono — no extra font to download, and it does the "these are real
+   tools" job that a rounded sans cannot. */
+.ov-made-tech {
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: var(--ov-t-xs);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--fz-ink);
+}
+
+/* ═══ Projects ════════════════════════════════════════════════════════════ */
+.ov-projects { display: grid; gap: 24px; }
+
+.ov-project {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    overflow: hidden;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius);
+    background: var(--ov-card);
+    box-shadow: var(--fz-shadow-soft);
+    transition: transform 0.34s var(--ov-ease), box-shadow 0.34s var(--ov-ease);
+}
+.ov-project:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--fz-shadow);
+}
+
+.ov-project-media {
+    position: relative;
+    overflow: hidden;
+    min-height: 230px;
+    background: linear-gradient(160deg, var(--fz-green-100), var(--fz-green-50));
+}
+.ov-project-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.7s var(--ov-ease);
+}
+.ov-project:hover .ov-project-media img { transform: scale(1.045); }
+
+.ov-project-body { padding: clamp(24px, 3vw, 32px); }
+
+.ov-project-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+}
+.ov-project-title {
+    margin: 0;
+    font-family: var(--fz-font-title);
+    font-size: clamp(22px, 3vw, 28px);
+    font-weight: 600;
+    color: #1d4232;
+}
+.ov-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: var(--fz-radius-pill);
+    background: var(--fz-green-100);
+    color: #2b6b4d;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+.ov-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.ov-project-tagline {
+    margin: 8px 0 0;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-base);
+}
+
+.ov-highlights { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 12px; }
+.ov-highlight { display: flex; gap: 12px; align-items: flex-start; }
+.ov-highlight-tick {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    border-radius: 50%;
+    background: var(--fz-green-100);
+    color: var(--fz-green-500);
+}
+.ov-highlight-tick svg { width: 12px; height: 12px; }
+.ov-highlight-text { font-size: var(--ov-t-base); line-height: 1.6; color: var(--ov-muted); }
+.ov-highlight-text strong { color: var(--fz-ink); font-weight: 700; }
+
+.ov-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.ov-chip {
+    padding: 4px 12px;
+    border-radius: var(--fz-radius-pill);
+    background: var(--fz-green-50);
+    border: 1px solid var(--ov-line);
+    color: var(--ov-muted);
+    font-size: var(--ov-t-xs);
+    font-weight: 600;
+}
+
+.ov-project-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.ov-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius-pill);
+    background: #fff;
+    color: var(--fz-ink);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
+                box-shadow 0.2s var(--ov-ease), color 0.2s var(--ov-ease-soft);
+}
+.ov-link:hover {
+    transform: translateY(-2px);
+    color: var(--fz-green-500);
+    border-color: var(--fz-green-400);
+    box-shadow: var(--fz-shadow-soft);
+}
+.ov-link svg { width: 15px; height: 15px; }
+
+/* Placeholder project — deliberately quiet, never lorem ipsum on show. */
+.ov-project--upcoming {
+    grid-template-columns: 1fr;
+    border-style: dashed;
+    border-color: rgba(65, 160, 110, 0.26);
+    background: linear-gradient(160deg, #fbfefc, var(--fz-green-50));
+    box-shadow: none;
+}
+.ov-project--upcoming:hover { transform: none; box-shadow: none; }
+.ov-upcoming-inner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 32px clamp(24px, 3vw, 32px);
+}
+.ov-upcoming-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #fff;
+    border: 1.5px solid var(--ov-line);
+    color: var(--fz-green-500);
+}
+.ov-upcoming-icon svg { width: 21px; height: 21px; }
+.ov-upcoming-title {
+    margin: 0;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-md);
+    font-weight: 600;
+    color: var(--fz-ink);
+}
+.ov-upcoming-body { margin: 2px 0 0; color: var(--ov-muted); font-size: var(--ov-t-sm); }
+
+/* ═══ Timeline ════════════════════════════════════════════════════════════ */
+.ov-path {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: clamp(28px, 4vw, 48px);
+    align-items: start;
+}
+
+.ov-timeline { position: relative; list-style: none; margin: 0; padding: 0 0 0 32px; }
+.ov-timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--fz-green-200), rgba(155, 228, 202, 0.2));
+    transform: scaleY(0);
+    transform-origin: 50% 0;
+    transition: transform 0.9s var(--ov-ease) 0.2s;
+}
+.ov-section.is-in .ov-timeline::before { transform: scaleY(1); }
+
+.ov-tl-item { position: relative; padding-bottom: 24px; }
+.ov-tl-item:last-child { padding-bottom: 0; }
+.ov-tl-item::before {
+    content: '';
+    position: absolute;
+    left: -30px;
+    top: 6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--fz-green-400);
+    box-shadow: 0 0 0 4px rgba(215, 242, 228, 0.7);
+}
+.ov-tl-period {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fz-green-500);
+}
+.ov-tl-title {
+    margin: 4px 0 0;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-md);
+    font-weight: 600;
+    color: var(--fz-ink);
+}
+.ov-tl-org { margin: 2px 0 0; color: var(--ov-faint); font-size: var(--ov-t-sm); font-weight: 600; }
+.ov-tl-detail { margin: 8px 0 0; color: var(--ov-muted); font-size: var(--ov-t-sm); line-height: 1.62; }
+
+/* ═══ Certificates — quiet, but unmistakably tappable ═════════════════════ */
+.ov-certs {
+    margin-top: clamp(32px, 5vw, 48px);
+    padding-top: 28px;
+    border-top: 1px solid var(--ov-line);
+}
+.ov-certs-title {
+    margin: 0 0 16px;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+/* Two across on desktop so the block reads as a strip rather than a column
+   trailing off the bottom of Education. */
+.ov-cert-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 12px;
+}
+.ov-cert {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 16px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius-sm);
+    background: var(--ov-card);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
+                box-shadow 0.2s var(--ov-ease);
+}
+.ov-cert:hover,
+.ov-cert:active {
+    transform: translateY(-2px);
+    border-color: var(--fz-green-400);
+    box-shadow: var(--fz-shadow-soft);
+}
+.ov-cert-main { min-width: 0; flex: 1; }
+.ov-cert-title {
+    display: block;
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--fz-ink);
+}
+.ov-cert-meta { display: block; margin-top: 2px; color: var(--ov-faint); font-size: var(--ov-t-xs); }
+.ov-cert-go {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--fz-green-50);
+    color: var(--fz-green-500);
+    transition: background 0.2s var(--ov-ease-soft), transform 0.2s var(--ov-ease);
+}
+.ov-cert-go svg { width: 15px; height: 15px; display: block; }
+.ov-cert:hover .ov-cert-go { background: var(--fz-green-100); transform: translateX(2px); }
+
+.ov-cert-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 8px 16px;
+    border: 1.5px dashed rgba(65, 160, 110, 0.34);
+    border-radius: var(--fz-radius-pill);
+    background: none;
+    color: var(--ov-muted);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s var(--ov-ease-soft), border-color 0.2s var(--ov-ease-soft),
+                background 0.2s var(--ov-ease-soft);
+}
+.ov-cert-toggle:hover {
+    color: var(--fz-green-500);
+    border-color: var(--fz-green-400);
+    background: var(--fz-green-50);
+}
+.ov-cert-toggle svg {
+    width: 15px;
+    height: 15px;
+    transition: transform 0.28s var(--ov-ease);
+}
+.ov-cert-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+.ov-cert-rest { margin-top: 12px; }
+
+/* ═══ Skills — an editorial spec sheet, not a row of boxes ════════════════ */
+.ov-skills { display: grid; gap: 0; }
+.ov-skill-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px clamp(16px, 3vw, 40px);
+    padding: 24px 0;
+    border-top: 1px solid var(--ov-line);
+}
+.ov-skill-row:last-child { border-bottom: 1px solid var(--ov-line); }
+.ov-skill-label {
+    margin: 0;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-skill-row .ov-chips { margin-top: 0; gap: 8px; }
+/* Each tool sits on its own small tile: a hairline ring, a soft lift and a
+   tinted underline so the row reads as a set of objects rather than text. */
+.ov-skill-row .ov-chip {
+    position: relative;
+    padding: 8px 16px 12px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: 13px;
+    background: #fff;
+    font-size: var(--ov-t-sm);
+    color: var(--fz-ink);
+    box-shadow: 0 2px 0 rgba(65, 160, 110, 0.12), var(--fz-shadow-soft);
+    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
+                box-shadow 0.2s var(--ov-ease), color 0.2s var(--ov-ease-soft);
+}
+.ov-skill-row .ov-chip:hover {
+    transform: translateY(-3px);
+    color: var(--fz-green-500);
+    border-color: var(--fz-green-400);
+    box-shadow: 0 4px 0 rgba(65, 160, 110, 0.22), var(--fz-shadow);
+}
+
+/* Soft skills use the same tile as everything else: they are one more row of
+   the same spec sheet, and a second tile style only made the section look like
+   two sections. */
+
+/* ═══ Contact + outro ═════════════════════════════════════════════════════ */
+.ov-card {
+    padding: 24px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: var(--fz-radius);
+    background: var(--ov-card);
+    box-shadow: var(--ov-lift);
+}
+
+.ov-contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 16px;
+    align-items: stretch;
+}
+.ov-contact-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px;
+}
+.ov-fact-label {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-contact-mail {
+    font-family: var(--fz-font-title);
+    font-size: clamp(var(--ov-t-base), 2.4vw, var(--ov-t-lg));
+    font-weight: 600;
+    color: var(--fz-green-500);
+    text-decoration: none;
+    word-break: break-word;
+}
+.ov-contact-mail:hover { text-decoration: underline; }
+
+.ov-socials { display: flex; flex-wrap: wrap; gap: 12px; }
+.ov-social {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border: 1.5px solid var(--ov-line);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ov-muted);
+    transition: transform 0.24s var(--ov-ease), color 0.24s var(--ov-ease-soft),
+                border-color 0.24s var(--ov-ease-soft), box-shadow 0.24s var(--ov-ease);
+}
+.ov-social:hover {
+    transform: translateY(-3px);
+    color: var(--fz-green-500);
+    border-color: var(--fz-green-400);
+    box-shadow: var(--fz-shadow-soft);
+}
+.ov-social svg { width: 20px; height: 20px; }
+
+/* A quiet card, not a gradient banner: the button is the only saturated
+   thing here, which is what makes it read as the action. */
+/* A card laid on the paper, not a coloured banner. The blue sky it had fought
+   the warm page, and the soft ambient shadow made it float like every other
+   web block — a hard unblurred ledge, the same one the button uses, makes it
+   read as a physical piece of card you could pick up. */
+.ov-outro {
+    position: relative;
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    padding: clamp(32px, 5vw, 48px);
+    border: 1.5px solid rgba(65, 160, 110, 0.24);
+    border-radius: var(--fz-radius);
+    background: #e9f2e4;
+    box-shadow: 0 6px 0 rgba(65, 160, 110, 0.16);
+}
+.ov-outro-title {
+    margin: 0;
+    font-family: var(--fz-font-title);
+    font-size: clamp(22px, 3.4vw, 30px);
+    font-weight: 600;
+    color: #1d4232;
+}
+.ov-outro-body {
+    margin: 0 0 16px;
+    max-width: 52ch;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-base);
+    line-height: 1.62;
+}
+.ov-outro .ov-btn--primary { justify-self: start; }
+
+.ov-foot {
+    max-width: calc(var(--ov-max) + 2 * var(--ov-pad));
+    margin: 0 auto;
+    padding: 32px var(--ov-pad) 56px;
+    border-top: 1px solid var(--ov-line);
+    color: var(--ov-faint);
+    font-size: var(--ov-t-sm);
+    text-align: center;
+}
+
+/* ═══ Responsive ══════════════════════════════════════════════════════════ */
+@media (max-width: 980px) {
+    .ov-hero-inner {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+    /* Window first: it is the thing worth seeing before any text. */
+    .ov-portal { order: -1; max-width: 300px; }
+    .ov-about { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+    .ov-project { grid-template-columns: 1fr; }
+    .ov-project-media { min-height: 190px; max-height: 260px; }
+}
+
+/* Below this the pill nav stops fitting: swap it for the sheet rather than
+   letting the bar wrap onto a second line. */
+@media (max-width: 860px) {
+    .ov-nav { display: none; }
+    .ov-menu-btn { display: inline-flex; }
+    .ov-bar { gap: 12px; }
+    .ov-back { margin-right: auto; }
+    .ov-section { scroll-margin-top: 80px; }
+}
+
+@media (max-width: 620px) {
+    .ov-root { font-size: var(--ov-t-base); }
+    .ov-back span { display: none; }
+    .ov-back { padding: 8px 12px; margin-right: auto; }
+    .ov-cta-row .ov-btn { flex: 1 1 100%; }
+    .ov-skill-row { grid-template-columns: 1fr; gap: 12px; }
+}
+
+@media (max-width: 420px) {
+    .ov-upcoming-inner { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+
+/* ═══ Reduced motion ══════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    .ov-root { scroll-behavior: auto; }
+    .ov-root *,
+    .ov-root *::before,
+    .ov-root *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+    }
+    /* Content must still end up visible, not stuck mid-reveal. */
+    .ov-reveal { opacity: 1; transform: none; }
+    .ov-h2::after,
+    .ov-timeline::before { transform: none; }
+    .ov-sheet { transform: none; }
+    .ov-portal-canvas { opacity: 1; }
+}

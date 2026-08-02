@@ -54,7 +54,9 @@ export default class Experience {
         this.progressFill = document.getElementById('progress-fill')
         this.progressBtnText = document.getElementById('progress-btn-text')
         this.loadingEnterBtn = document.getElementById('loading-enter-btn')
+        this.loadingOverviewBtn = document.getElementById('loading-overview-btn')
         this.initialCover = document.getElementById('initial-cover')
+        this._setupOverviewButton()
 
         // State tracking
         this.resourcesReady = false
@@ -100,6 +102,40 @@ export default class Experience {
         // Tick
         this.time.on('tick', () => {
             this.update()
+        })
+    }
+
+    /**
+     * "Quick overview" — the reading of this portfolio for people who do not
+     * want to walk a 3D world. It needs none of the loaded assets, so it is
+     * clickable from the first frame while the world keeps downloading.
+     *
+     * The module and its stylesheet are imported on demand, so visitors who go
+     * straight to the world never pay for any of it.
+     */
+    _setupOverviewButton() {
+        if (!this.loadingOverviewBtn) return
+
+        this.loadingOverviewBtn.addEventListener('click', async () => {
+            this.loadingOverviewBtn.disabled = true
+            try {
+                if (!this.overview) {
+                    const { default: Overview } = await import('./World/ui/Overview.js')
+                    this.overview = new Overview({
+                        worldReady: this.loadingEnterBtn?.classList.contains('ready') === true,
+                        onExplore: () => this.startExperience(),
+                        // Lets the hero upgrade to the live character as soon as
+                        // the model lands, without ever waiting for it.
+                        resources: this.resources
+                    })
+                    await this.overview.init()
+                }
+                this.overview.open()
+            } catch (err) {
+                console.error('Overview failed to open:', err)
+            } finally {
+                this.loadingOverviewBtn.disabled = false
+            }
         })
     }
 
@@ -172,6 +208,8 @@ export default class Experience {
                 this.startExperience()
             }, { once: true })
         }
+        // Someone may already be reading the overview — let its Explore CTAs go live.
+        this.overview?.setWorldReady(true)
     }
 
     /**
@@ -199,6 +237,11 @@ export default class Experience {
         // Remove white UI overlay after iris is active.
         this.cloudTransition?.remove()
         this.cloudTransition = null
+
+        // The overview belongs to the start screen; once we are in the world
+        // there is nothing to go back to.
+        this.overview?.destroy()
+        this.overview = null
 
         // Iris transition: open to a small hole, hold, anticipation in, open fully.
         // Total ~3.2 s — shaders compile naturally in the render loop during this time.

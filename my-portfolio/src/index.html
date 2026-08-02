@@ -44,13 +44,23 @@
         </div>
         <div class="cloud-transition-content">
             <h1 class="cloud-title">Sergii's Portfolio</h1>
-            <button class="cloud-btn" id="loading-enter-btn" disabled>
-                <span class="cloud-btn-fill" id="progress-fill"></span>
-                <span class="cloud-btn-text" id="progress-btn-text">0%</span>
-                <svg class="cloud-btn-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </button>
+            <div class="cloud-actions">
+                <button class="cloud-btn" id="loading-enter-btn" disabled>
+                    <span class="cloud-btn-fill" id="progress-fill"></span>
+                    <span class="cloud-btn-text" id="progress-btn-text">0%</span>
+                    <svg class="cloud-btn-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                <!-- Needs none of the 3D assets, so it is live from the first
+                     frame — the whole point is not waiting for the world. -->
+                <button class="cloud-btn-alt" id="loading-overview-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h10"/>
+                    </svg>
+                    <span>Quick overview</span>
+                </button>
+            </div>
         </div>
     </div>
 

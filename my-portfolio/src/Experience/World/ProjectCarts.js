@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { texture, uv, vec4 } from 'three/tsl'
 import Experience from '../Experience.js'
-import InstancedFromJSON from './scene/InstancedFromJSON.js'
+import { blenderTransformToMatrix } from './scene/SceneUtils.js'
+import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 import ProjectModal from './ui/ProjectModal.js'
 
@@ -49,19 +50,44 @@ export default class ProjectCarts {
         const r = this.resources.items
         if (!r.cartModel || !r.cartReferences || !r.tinyAtlas) return
 
-        // ── Stands: instanced from the JSON (Tiny atlas) ─────────────────
-        this.stands = new InstancedFromJSON('Carts', r.cartModel, r.cartReferences, {
-            singleMesh: true,
-            meshFilter: (m) => m.name.toLowerCase().startsWith('cube'),
-            map: r.tinyAtlas,
-            // This JSON comes from the newer export script (like trees/rocks):
-            // real world rotations → true change-of-basis conversion.
-            rotationMode: 'conjugate'
-        })
-
-        // ── Page planes: textured screens, one per project ───────────────
         const root = r.cartModel.scene
         root.updateMatrixWorld(true)
+
+        // ── Stands: ONE MESH PER CART, deliberately not an InstancedMesh ──
+        // The outline pass takes whole objects, so a single InstancedMesh would
+        // light up all three stands at once. Three meshes is three draw calls
+        // for three objects — nothing — and it is what lets the nearest cart
+        // highlight on its own.
+        let standTpl = null
+        root.traverse((c) => {
+            if (!standTpl && c.isMesh && c.name.toLowerCase().startsWith('cube')) standTpl = c
+        })
+
+        this.stands = []
+        if (standTpl) {
+            const isLow = this.experience.quality?.isLow
+            // Same material the instancer built, so the stands look untouched.
+            const standMat = createStylizedPropNodeMaterial({ map: r.tinyAtlas || null })
+            standTpl.material?.dispose?.()
+
+            for (const inst of (r.cartReferences?.instances || [])) {
+                const mesh = new THREE.Mesh(standTpl.geometry, standMat)
+                // This JSON comes from the newer export script (like trees/rocks):
+                // real world rotations → true change-of-basis conversion.
+                blenderTransformToMatrix(
+                    inst.position, inst.rotation, inst.scale, mesh.matrix, 'conjugate'
+                )
+                mesh.matrixAutoUpdate = false
+                mesh.castShadow = !isLow
+                mesh.receiveShadow = !isLow
+                mesh.name = `CartStand:${this.stands.length}`
+                this.scene.add(mesh)
+                this.stands.push(mesh)
+            }
+            standTpl.parent?.remove(standTpl)
+        }
+
+        // ── Page planes: textured screens, one per project ───────────────
         const self = this
         PLANE_NAMES.forEach((name, index) => {
             const node = root.getObjectByName(name)
@@ -108,7 +134,25 @@ export default class ProjectCarts {
                 },
                 onClick() { self._open(cart.index, true) }
             }
+            // Pair the plane with the stand it sits in, by proximity — the two
+            // come from different sources (baked world transform vs. JSON) so
+            // there is no shared index to trust.
+            let best = null
+            let bestDist = Infinity
+            const _sp = new THREE.Vector3()
+            for (const stand of this.stands) {
+                _sp.setFromMatrixPosition(stand.matrix)
+                const d = Math.hypot(_sp.x - position.x, _sp.z - position.z)
+                if (d < bestDist) { bestDist = d; best = stand }
+            }
+            cart.stand = best
+
+            // Both surfaces open the panel; only the stand takes the outline.
             this.experience.world?.raycaster?.addInteractiveObject({ mesh: plane })
+            if (best && !best.userData.interactiveObject) {
+                best.userData.interactiveObject = plane.userData.interactiveObject
+                this.experience.world?.raycaster?.addInteractiveObject({ mesh: best })
+            }
             this.carts.push(cart)
         })
 
@@ -125,8 +169,11 @@ export default class ProjectCarts {
         const should = cart.isHovered || cart.isNear
         if (should === cart.isHighlighted) return
         cart.isHighlighted = should
-        if (should) this.renderer.addOutlinedObject(cart.plane)
-        else this.renderer.removeOutlinedObject(cart.plane)
+        // The frame around the artwork, not the artwork itself: outlining the
+        // image plane traced the picture instead of the object you walk up to.
+        const target = cart.stand || cart.plane
+        if (should) this.renderer.addOutlinedObject(target)
+        else this.renderer.removeOutlinedObject(target)
     }
 
     _tryInteract() {
@@ -179,7 +226,9 @@ export default class ProjectCarts {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
-        for (const cart of this.carts) this.renderer?.removeOutlinedObject?.(cart.plane)
+        for (const cart of this.carts) {
+            this.renderer?.removeOutlinedObject?.(cart.stand || cart.plane)
+        }
         if (this._onSourceLoaded) this.resources.off('sourceLoaded', this._onSourceLoaded)
         this.modal?.destroy?.()
         this.stands?.dispose?.()

@@ -19,18 +19,22 @@ export const LINKS = {
 }
 
 // ─── Trophy: certificates (newest first, each links to its credential) ───
+// `featured` marks the two the Quick Overview shows up front; the rest sit
+// behind a disclosure there. The trophy in-world still lists all of them.
 export const CERTIFICATES = [
     {
         title: 'JavaScript Moderno: Guía para dominar el lenguaje',
         issuer: 'DevTalles',
         date: 'Septiembre 2025',
-        url: 'https://cursos.devtalles.com/certificates/wmgnjkevgb'
+        url: 'https://cursos.devtalles.com/certificates/wmgnjkevgb',
+        featured: true
     },
     {
         title: 'Cambridge Certificate — Level C1 (CAE)',
         issuer: 'Cambridge English',
         date: 'Julio 2025',
-        url: 'https://drive.google.com/file/d/10qBGizvk6unCi1oGSCg89ivFIFfbLfCh/view?usp=sharing'
+        url: 'https://drive.google.com/file/d/10qBGizvk6unCi1oGSCg89ivFIFfbLfCh/view?usp=sharing',
+        featured: true
     },
     {
         title: 'Curso de Firebase y Angular',
@@ -85,14 +89,14 @@ export const CERTIFICATES = [
 // ─── Computer: about ─────────────────────────────────────────────────────
 export const ABOUT = {
     quickBio:
-        'Estudiante de Desarrollo de Aplicaciones Multiplataforma (DAM) en el Parque ' +
+        'Titulado en Desarrollo de Aplicaciones Multiplataforma (DAM) por el Parque ' +
         'Tecnológico de Málaga. Programo aplicaciones web y móviles, y me apasiona crear ' +
         'experiencias interactivas — como este mundo 3D que estás explorando.',
     fullBio: [
-        'Me estoy formando en las tecnologías clave del desarrollo web y móvil: Java, ' +
+        'Me he formado en las tecnologías clave del desarrollo web y móvil: Java, ' +
         'JavaScript, TypeScript y Kotlin como lenguajes, con Angular, Ionic y Android Studio ' +
         'como entornos de trabajo, y experiencia en bases de datos relacionales (MySQL) y ' +
-        'no relacionales (Firebase). La parte de FP Dual la curso en Aliqindoi, trabajando ' +
+        'no relacionales (Firebase). La parte de FP Dual la hice en Aliqindoi, trabajando ' +
         'en proyectos reales desde el primer día.',
         'Tengo el C1 de inglés certificado por Cambridge (CAE, 190 puntos), hablo ucraniano ' +
         'a nivel nativo y español como lengua materna. Me considero una persona curiosa, ' +
@@ -135,7 +139,7 @@ export const EDUCATION = [
 export const SKILLS = [
     { group: 'Lenguajes', items: ['Java', 'JavaScript', 'TypeScript', 'Kotlin', 'HTML', 'CSS'] },
     { group: 'Frameworks y plataformas', items: ['Angular', 'Ionic', 'Android Studio', 'Git', 'Vite'] },
-    { group: 'Bases de datos', items: ['MySQL', 'Firebase'] },
+    { group: 'Bases de datos', items: ['MySQL', 'PostgreSQL', 'Firebase'] },
     { group: 'Diseño y 3D', items: ['Blender', 'Figma', 'Three.js', 'TSL · WebGPU'] },
     { group: 'Idiomas', items: ['Español (nativo)', 'Ucraniano (nativo)', 'Inglés (C1)'] }
 ]

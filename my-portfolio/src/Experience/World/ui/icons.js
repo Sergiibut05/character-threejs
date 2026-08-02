@@ -150,7 +150,7 @@ export const iconMusic = `
 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
   <path d="M20 30V11l16-3.5V26" stroke="#41a06e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <circle cx="15.5" cy="31.5" r="5" fill="#9be4ca" stroke="#41a06e" stroke-width="2.6"/>
-  <circle cx="31.5" cy="27.5" r="5" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6"/>
+  <circle cx="31.5" cy="27.5" r="5" fill="#9be4ca" stroke="#41a06e" stroke-width="2.6"/>
 </svg>`
 
 // Speaker with sound waves — audio on. currentColor so it follows state.
