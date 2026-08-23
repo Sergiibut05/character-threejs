@@ -65,6 +65,28 @@ async function fileExists(file) {
     } catch { return false }
 }
 
+/** Parse a .glb's JSON chunk, or null if it isn't readable as one. */
+function glbJson(buffer) {
+    if (buffer.length < 20 || buffer.toString('ascii', 0, 4) !== 'glTF') return null
+    const jsonLength = buffer.readUInt32LE(12)
+    if (jsonLength <= 0 || 20 + jsonLength > buffer.length) return null
+    try {
+        return JSON.parse(buffer.toString('utf8', 20, 20 + jsonLength))
+    } catch { return null }
+}
+
+/** True when a .glb already declares KHR_draco_mesh_compression. */
+function isDracoEncoded(buffer) {
+    const json = glbJson(buffer)
+    return !!json && (json.extensionsUsed || []).includes('KHR_draco_mesh_compression')
+}
+
+/** How many meshes a .glb carries (0 for marker-only files). */
+function meshCount(buffer) {
+    const json = glbJson(buffer)
+    return json ? (json.meshes || []).length : -1
+}
+
 async function compressOne(file) {
     const out = compressedSibling(file)
 
@@ -76,6 +98,28 @@ async function compressOne(file) {
     }
 
     const buffer = await fs.readFile(file)
+
+    // Marker-only files (sit-points.glb is empties, no geometry) have nothing
+    // for Draco to work on — compressing them just leaves a second file to keep
+    // in sync with no bytes saved.
+    if (meshCount(buffer) === 0) {
+        return { file, out, status: 'skipped', srcKB: buffer.length / 1024 }
+    }
+
+    // A source exported from Blender with "Compression" ticked is ALREADY
+    // Draco-encoded. Feeding one of those back through the encoder throws a
+    // bare "Draco encoding failed", which reads like a corrupt model rather
+    // than a double-compress — and gltf-pipeline cannot decode it first
+    // (processGlb leaves KHR_draco_mesh_compression in place). So pass it
+    // straight through: it is already compressed, and the only thing another
+    // round trip could add is loss. Untick Compression in the exporter to get
+    // this project's own settings instead.
+    if (isDracoEncoded(buffer)) {
+        await fs.writeFile(out, buffer)
+        const stat = await fs.stat(file)
+        return { file, out, status: 'passthrough', srcKB: stat.size / 1024 }
+    }
+
     const result = await gltfPipeline.processGlb(buffer, DRACO_OPTIONS)
     await fs.writeFile(out, result.glb)
 
@@ -113,6 +157,13 @@ async function main() {
                 completed++
                 if (result.status === 'cached') {
                     console.log(`  [${completed}/${targets.length}] ✓ cached    ${rel}`)
+                } else if (result.status === 'skipped') {
+                    console.log(`  [${completed}/${targets.length}] – sin mallas ${rel}`)
+                } else if (result.status === 'passthrough') {
+                    console.log(
+                        `  [${completed}/${targets.length}] ↪ passthrough ${rel} ` +
+                        `(${result.srcKB.toFixed(0)} KB — ya venía con Draco del exportador)`
+                    )
                 } else {
                     const ratio = (result.ratio * 100).toFixed(1)
                     console.log(

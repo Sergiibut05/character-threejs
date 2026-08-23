@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <!--
+    GENERATED — see scratchpad/gen-pattern.mjs. Do not hand-edit; regenerate.
+
+    Tile for the Quick Overview hero. Tomodachi Life's menus use a tone-on-tone
+    doodle field; these are the same idea drawn from THIS world's vocabulary —
+    leaf, frisbee disc, beach ball, music note, coconut, wave, sparkle — so the
+    page is patterned with its own things rather than generic squiggles.
+
+    Laid out on a 5x5 jittered grid: hand-placing gave clumps in one
+    corner and bald patches in another, which is exactly what makes a repeat
+    read as a repeat. Every shape is clamped inside the tile, so it repeats
+    seamlessly with no wrap maths. Colour is one flat green; the opacity that
+    makes it tone-on-tone lives in overview.css.
+  -->
+  <defs>
+    <g id="leaf" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 11 Q11 -6 22 11 Q11 28 0 11 Z"/>
+      <path d="M2 11 H20"/>
+    </g>
+    <g id="disc" stroke-linecap="round">
+      <ellipse cx="14" cy="7" rx="14" ry="6"/>
+      <ellipse cx="14" cy="7" rx="6" ry="2.4"/>
+    </g>
+    <g id="ball" stroke-linecap="round">
+      <circle cx="10" cy="10" r="10"/>
+      <path d="M2 6 Q10 12 18 6"/>
+      <path d="M2 14 Q10 8 18 14"/>
+    </g>
+    <g id="note" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5" cy="18" r="4.6"/>
+      <path d="M9.6 18 V2"/>
+      <path d="M9.6 2 Q17 4 17 9"/>
+    </g>
+    <g id="coco" stroke-linecap="round">
+      <circle cx="9" cy="9" r="9"/>
+      <circle cx="6" cy="7" r="1.4"/>
+      <circle cx="12" cy="7" r="1.4"/>
+      <circle cx="9" cy="12" r="1.4"/>
+    </g>
+    <g id="wave" stroke-linecap="round">
+      <path d="M0 6 Q7 -2 14 6 T28 6"/>
+    </g>
+    <g id="spark" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 0 Q10.4 7.6 18 9 Q10.4 10.4 9 18 Q7.6 10.4 0 9 Q7.6 7.6 9 0 Z"/>
+    </g>
+  </defs>
+
+  <g fill="none" stroke="#41a06e" stroke-width="2.1" vector-effect="non-scaling-stroke">
+    <use href="#leaf" transform="translate(30.4 13.4) rotate(53 17.1 17.1) scale(1.55)"/>
+    <use href="#wave" transform="translate(81.8 14.2) rotate(46 21.7 9.3) scale(1.55)"/>
+    <use href="#coco" transform="translate(178.9 18.2) rotate(38 14.0 14.0) scale(1.55)"/>
+    <use href="#disc" transform="translate(266.6 44.6) rotate(17 21.7 10.8) scale(1.55)"/>
+    <use href="#spark" transform="translate(332.4 31.7) rotate(-46 14.0 14.0) scale(1.55)"/>
+    <use href="#ball" transform="translate(30.5 93.4) rotate(67 15.5 15.5) scale(1.55)"/>
+    <use href="#note" transform="translate(104.9 105.3) rotate(6 13.2 17.8) scale(1.55)"/>
+    <use href="#wave" transform="translate(183.4 94.6) rotate(-41 21.7 9.3) scale(1.55)"/>
+    <use href="#spark" transform="translate(280.3 116.0) rotate(3 14.0 14.0) scale(1.55)"/>
+    <use href="#leaf" transform="translate(337.4 99.0) rotate(-66 17.1 17.1) scale(1.55)"/>
+    <use href="#note" transform="translate(30.9 186.8) rotate(-37 13.2 17.8) scale(1.55)"/>
+    <use href="#coco" transform="translate(102.0 199.8) rotate(19 14.0 14.0) scale(1.55)"/>
+    <use href="#disc" transform="translate(172.3 191.3) rotate(-60 21.7 10.8) scale(1.55)"/>
+    <use href="#ball" transform="translate(278.7 170.6) rotate(55 15.5 15.5) scale(1.55)"/>
+    <use href="#wave" transform="translate(332.7 199.1) rotate(56 21.7 9.3) scale(1.55)"/>
+    <use href="#spark" transform="translate(19.3 272.6) rotate(-53 14.0 14.0) scale(1.55)"/>
+    <use href="#coco" transform="translate(89.3 271.2) rotate(1 14.0 14.0) scale(1.55)"/>
+    <use href="#note" transform="translate(199.8 256.4) rotate(36 13.2 17.8) scale(1.55)"/>
+    <use href="#ball" transform="translate(251.8 257.3) rotate(-67 15.5 15.5) scale(1.55)"/>
+    <use href="#disc" transform="translate(345.5 269.6) rotate(5 21.7 10.8) scale(1.55)"/>
+    <use href="#leaf" transform="translate(28.7 358.1) rotate(-4 17.1 17.1) scale(1.55)"/>
+    <use href="#wave" transform="translate(97.0 357.1) rotate(-64 21.7 9.3) scale(1.55)"/>
+    <use href="#coco" transform="translate(192.4 356.8) rotate(0 14.0 14.0) scale(1.55)"/>
+    <use href="#note" transform="translate(279.3 344.1) rotate(4 13.2 17.8) scale(1.55)"/>
+    <use href="#ball" transform="translate(341.7 333.6) rotate(36 15.5 15.5) scale(1.55)"/>
+  </g>
+</svg>

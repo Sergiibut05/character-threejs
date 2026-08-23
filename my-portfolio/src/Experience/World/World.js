@@ -5,6 +5,7 @@ import Character from './Character.js'
 import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Mailbox from './Mailbox.js'
+import SitPoints from './SitPoints.js'
 import Door from './Door.js'
 import HouseInterior from './HouseInterior.js'
 import ProjectCarts from './ProjectCarts.js'
@@ -141,6 +142,7 @@ export default class World {
             this.frisbeeMinigame = new FrisbeeMinigame()
             this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
             this.mailbox = new Mailbox() // resolves the mailbox node lazily
+            this.sitPoints = new SitPoints() // resolves sit-points.glb lazily
             this.door = new Door() // resolves the house `door` node lazily
             this.houseInterior = new HouseInterior() // far-offset interior + rug exit
 
@@ -438,6 +440,9 @@ export default class World {
         }
         if (this.mailbox) {
             this.mailbox.update()
+        }
+        if (this.sitPoints) {
+            this.sitPoints.update()
         }
         if (this.door) {
             this.door.update()

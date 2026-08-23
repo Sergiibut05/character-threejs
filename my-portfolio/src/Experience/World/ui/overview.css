@@ -405,8 +405,84 @@
 .ov-sheet-link svg { width: 18px; height: 18px; color: var(--fz-green-400); flex-shrink: 0; }
 
 /* ═══ Hero ════════════════════════════════════════════════════════════════ */
+
+/* A field of the world's own motifs — leaf, disc, ball, note, coconut, wave,
+   sparkle — drifting slowly across the hero, in the spirit of Tomodachi Life's
+   patterned menus. Two deliberate limits:
+     · It stops at the hero. Below this is a document, and a moving pattern
+       behind body text is tiring to read for no gain.
+     · It fades out rather than ending on a line, so the band dissolves into
+       the paper instead of looking cropped. */
+.ov-hero-pattern {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 94%);
+    mask-image: linear-gradient(to bottom, #000 50%, transparent 94%);
+}
+/* TWO layers, not one. A single sheet sliding across reads as exactly that —
+   a flat texture on a conveyor. A second copy at a different scale and speed
+   turns it into parallax: the field gains depth and the repeat stops being
+   readable, because the two cycles never line up. Costs one more composited
+   layer and nothing else. */
+.ov-hero-pattern::before,
+.ov-hero-pattern::after {
+    content: '';
+    position: absolute;
+    /* Just enough slack for the pointer offset below; the drift itself needs
+       none, since it scrolls the background rather than moving the box. */
+    inset: -28px;
+    /* Pointer parallax, layered on top of the drift. The animation owns
+       background-position and this owns transform, so the two never fight.
+       --ov-depth makes the near layer lean further than the far one, which is
+       what turns a shared nudge into depth — and it ties the field to the same
+       cursor that is already turning the character's head. */
+    transform: translate3d(
+        calc(var(--ov-mx, 0px) * var(--ov-depth)),
+        calc(var(--ov-my, 0px) * var(--ov-depth)),
+        0
+    );
+    transition: transform 0.9s var(--ov-ease);
+    background-image: url('./hero-pattern.svg');
+    background-repeat: repeat;
+    /* One variable drives both the tile and the loop distance: the drift is
+       only seamless while they match, so they must not be able to drift apart. */
+    background-size: var(--ov-tile) var(--ov-tile);
+    /* Scrolling the background rather than translating an oversized element.
+       The transform version needs the layer to extend a full tile past every
+       edge, which at this tile size meant two ~20 MB compositor layers for one
+       decorative band. Repainting a tiled blit costs far less than that. */
+    animation: ovPatternDrift var(--ov-speed) linear infinite;
+    will-change: background-position;
+}
+/* Both layers share ONE duration, and that is the whole trick: each travels its
+   own tile per cycle, so the speed ratio equals the size ratio automatically —
+   which is exactly what parallax is. Picking the two durations by hand gave the
+   far layer 2.3 px/s against the near layer's 8.4, and at that opacity it read
+   as frozen rather than distant, like a bug. */
+.ov-hero-pattern::before,
+.ov-hero-pattern::after { --ov-speed: 55s; }
+
+/* Near: bigger, firmer, travels further per cycle. */
+.ov-hero-pattern::before {
+    --ov-tile: 460px;
+    --ov-depth: 1;
+    opacity: 0.10;
+}
+/* Far: smaller and fainter, and therefore slower on its own. */
+.ov-hero-pattern::after {
+    --ov-tile: 340px;
+    --ov-depth: 0.55;
+    opacity: 0.06;
+}
+@keyframes ovPatternDrift {
+    to { background-position: var(--ov-tile) var(--ov-tile); }
+}
+
 .ov-hero {
     position: relative;
+    overflow: hidden;
     padding: clamp(40px, 7vh, 72px) var(--ov-pad) clamp(32px, 5vh, 56px);
     background: none;
 }
@@ -1258,6 +1334,10 @@
     }
     /* Content must still end up visible, not stuck mid-reveal. */
     .ov-reveal { opacity: 1; transform: none; }
+    /* Without this the pointer parallax would survive as an instant snap,
+       which is worse than the easing it replaced. */
+    .ov-hero-pattern::before,
+    .ov-hero-pattern::after { --ov-depth: 0; transform: none; }
     .ov-h2::after,
     .ov-timeline::before { transform: none; }
     .ov-sheet { transform: none; }

@@ -1,8 +1,13 @@
 /**
- * Floor — applies the hybrid grass/dirt + slabs material to the four floor
- * meshes inside `floor.glb`:
- *   - "grass-floor-1" / "grass-floor-2" → full hybrid (grass + dirt + slabs).
+ * Floor — applies the hybrid grass/dirt + slabs material to the floor meshes
+ * inside `floor.glb`:
+ *   - "grass-floor-1" → full hybrid (grass + dirt + slabs).
  *   - "ground-floor-1" / "ground-floor-2" → pure dirt (no masks).
+ *
+ * The terrain used to ship as two grass meshes with one baked mask each. They
+ * were joined into a single mesh in Blender, which also removed the tonal step
+ * where the two masks met, so the lists below stay arrays only because the
+ * dirt meshes are still optional and plural.
  *
  * Grass-floor meshes carry baked masks (KTX2 textures sampled by UV in the
  * shader). For CPU-side grass spawn distribution we additionally accept the
@@ -26,7 +31,7 @@ const _vA = new THREE.Vector3()
 const _vB = new THREE.Vector3()
 const _vC = new THREE.Vector3()
 
-const GRASS_MESH_NAMES = ['grass-floor-1', 'grass-floor-2']
+const GRASS_MESH_NAMES = ['grass-floor-1']
 const DIRT_MESH_NAMES = ['ground-floor-1', 'ground-floor-2']
 // Decor meshes shipped inside floor.glb that are textured from the Sushi
 // atlas instead of the floor shader (they keep their own UVs).

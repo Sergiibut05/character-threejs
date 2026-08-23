@@ -135,6 +135,15 @@ export default class Overview {
         // box: he is standing in the open now, and a gaze that only woke up
         // inside an invisible rectangle read as broken.
         this._onPointerMove = (e) => {
+            // The background field leans toward the cursor whether or not the
+            // character has loaded, so this runs before the viewport check.
+            if (this.heroPattern) {
+                const nx = (e.clientX / window.innerWidth) * 2 - 1
+                const ny = (e.clientY / window.innerHeight) * 2 - 1
+                this.heroPattern.style.setProperty('--ov-mx', `${(-nx * 16).toFixed(1)}px`)
+                this.heroPattern.style.setProperty('--ov-my', `${(-ny * 12).toFixed(1)}px`)
+            }
+
             if (!this.viewport?.ready || !this.portal) return
             const r = this.portal.getBoundingClientRect()
             const cx = r.left + r.width * 0.5
@@ -266,6 +275,15 @@ export default class Overview {
 
     _hero(c) {
         const hero = el('header', 'ov-hero')
+
+        // Tone-on-tone doodle field, drifting corner to corner. Confined to the
+        // hero on purpose: peripheral motion behind long-form text is tiring to
+        // read, and everything below here is prose.
+        const pattern = el('div', 'ov-hero-pattern')
+        pattern.setAttribute('aria-hidden', 'true')
+        hero.appendChild(pattern)
+        this.heroPattern = pattern
+
         const inner = el('div', 'ov-hero-inner')
 
         const text = el('div', 'ov-hero-text')

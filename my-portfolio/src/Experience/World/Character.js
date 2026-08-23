@@ -1,6 +1,32 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 
+// Seated leg pose, in radians, added on top of the idle clip.
+//
+// Measured against the rig rather than guessed, because this character is chibi
+// and the textbook 90°/90° office-chair pose is wrong for it: from the hip the
+// whole leg is only 0.234 long (thigh 0.101, shin 0.082, foot 0.081) against a
+// ~0.99 total height, so on a log whose top sits 0.27 above the ground the feet
+// cannot reach the floor at all. Folding to 90° just sticks both legs straight
+// out in mid-air. What reads right is a gentler fold with the legs DANGLING —
+// which is also what a small child on a log actually looks like.
+//
+// The knee sign is the counter-intuitive one: positive X on the shin lifts the
+// foot toward the thigh (that is the fold playKick() winds up with), so seating
+// needs it negative to drop the shin down.
+const SIT_THIGH = 1.00   // hip flexion — leg swings forward off the seat
+const SIT_SHIN = -0.70   // knee flexion — shin hangs down from the knee
+const SIT_SPLAY = 0.08   // slight outward knee spread; parallel legs look rigid
+const SIT_ANKLE = 0.18   // tips the toes down, the way a dangling foot rests
+
+// Per-radian-of-recline corrections. On a flat seat the legs dangle; on a
+// sloped one — a deckchair, a sofa — you do NOT dangle them, you stretch them
+// out along the seat. So the more the seat tips back, the further the leg
+// extends and the straighter the knee goes. At the deckchair's measured 18°
+// this lands on thigh 1.35 / shin -0.15, i.e. legs lying up the fabric.
+const RECLINE_EXTEND_THIGH = 1.15
+const RECLINE_STRAIGHTEN_SHIN = 1.80
+
 export default class Character {
     constructor() {
         this.experience = new Experience()
@@ -83,6 +109,14 @@ export default class Character {
         this.throwPaused = false
         this.throwPauseTime = null
         this.animationPaused = false // frozen (e.g. tutorial modal open mid-throw)
+
+        // Sitting: a procedural leg pose layered over the idle clip. There is no
+        // sit animation in the rig, so `isSitting` drives `_sitBlend` (0..1) and
+        // _applySitPose() folds the legs by that amount every frame.
+        this.isSitting = false
+        this._sitBlend = 0
+        this._sitBones = null
+        this._sitRecline = 0
 
         this.setModel()
         this.setAnimation()
@@ -403,6 +437,93 @@ export default class Character {
         if (B.leg) B.leg.rotation.x += shin
     }
 
+    // ─── Sitting ─────────────────────────────────────────────────────────
+
+    /**
+     * Sit down / stand up. The rig has no sit clip, so the idle ("happy") clip
+     * keeps running for the torso, head and arms — which is what makes the pose
+     * read as alive rather than frozen — and only the legs are overridden, by
+     * the same additive-bone trick playKick() uses.
+     *
+     * @param {boolean} on true to sit, false to stand
+     * @param {number} [recline] radians the seat itself tips back (a deckchair
+     *   scores ~0.22, a log 0) — leans the whole body to match
+     */
+    setSitting(on, recline = 0) {
+        if (on === this.isSitting) return
+        this.isSitting = on
+        if (on) {
+            this._sitRecline = recline
+            // Whatever was playing (walk/run) has to stop, or the seated legs
+            // would still be striding underneath the override.
+            this._transitionTo('idle')
+            this.movementLocked = true
+        } else {
+            this.movementLocked = false
+        }
+    }
+
+    /**
+     * Layered after mixer.update — see update().
+     *
+     * Angles are additive on top of the idle pose, not absolute, so the small
+     * breathing motion in the clip still comes through at the hips. The blend
+     * ramps over ~0.3 s in both directions; snapping the legs would look like a
+     * glitch rather than an action.
+     */
+    _applySitPose(dt) {
+        const target = this.isSitting ? 1 : 0
+        if (this._sitBlend === target && target === 0) return
+
+        // ~0.3 s to fold or unfold.
+        const step = dt / 0.3
+        this._sitBlend += THREE.MathUtils.clamp(target - this._sitBlend, -step, step)
+        if (Math.abs(target - this._sitBlend) < 0.001) this._sitBlend = target
+        if (this._sitBlend <= 0) return
+
+        if (!this._sitBones) {
+            const find = (name) => {
+                let bone = null
+                this.model.traverse((c) => { if (!bone && c.isBone && c.name === name) bone = c })
+                return bone
+            }
+            this._sitBones = {
+                hips: find('mixamorigHips'),
+                lUpLeg: find('mixamorigLeftUpLeg'),
+                rUpLeg: find('mixamorigRightUpLeg'),
+                lLeg: find('mixamorigLeftLeg'),
+                rLeg: find('mixamorigRightLeg'),
+                lFoot: find('mixamorigLeftFoot'),
+                rFoot: find('mixamorigRightFoot')
+            }
+        }
+        const B = this._sitBones
+        if (!B.lUpLeg && !B.rUpLeg) return
+
+        const k = this._sitBlend
+        const rec = this._sitRecline
+        // Negative X on the thigh swings the leg FORWARD — the same sign
+        // playKick() strikes with.
+        const thigh = -(SIT_THIGH + rec * RECLINE_EXTEND_THIGH) * k
+        const shin = Math.min(0, SIT_SHIN + rec * RECLINE_STRAIGHTEN_SHIN) * k
+        const splay = SIT_SPLAY * k
+        const ankle = SIT_ANKLE * k
+
+        // Hips is the root of the skeleton, so tipping it back carries torso,
+        // head AND legs together — which is exactly how a body settles into a
+        // sloped seat: the back leans and the thighs come up to follow the
+        // fabric. Applied before the legs so their angles stay relative to it.
+        if (B.hips && this._sitRecline) B.hips.rotation.x += this._sitRecline * k
+
+        if (B.lUpLeg) { B.lUpLeg.rotation.x += thigh; B.lUpLeg.rotation.z += splay }
+        if (B.rUpLeg) { B.rUpLeg.rotation.x += thigh; B.rUpLeg.rotation.z -= splay }
+        if (B.lLeg) B.lLeg.rotation.x += shin
+        if (B.rLeg) B.rLeg.rotation.x += shin
+        // Ankles level the soles back toward the ground once the knee is bent.
+        if (B.lFoot) B.lFoot.rotation.x += ankle
+        if (B.rFoot) B.rFoot.rotation.x += ankle
+    }
+
     /**
      * Instant teleport (house enter/exit — hidden behind the iris).
      * @param {number} x world X
@@ -563,6 +684,7 @@ export default class Character {
             if (this.mixer) this.mixer.update(dt)
             this._applyKickPose(dt)
             this._applyBumpPose(dt)
+            this._applySitPose(dt)
             return
         }
 
@@ -608,6 +730,9 @@ export default class Character {
         if (this.mixer) this.mixer.update(dt)
         this._applyKickPose(dt)
         this._applyBumpPose(dt)
+        // Runs while standing too, so the legs unfold smoothly after standing up
+        // instead of snapping straight the frame the lock is released.
+        this._applySitPose(dt)
 
         // Speed
         const speed = (this.isSprinting && isMoving) ? this.runSpeed : this.walkSpeed

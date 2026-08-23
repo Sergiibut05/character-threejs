@@ -14,8 +14,14 @@ import {
     propCoreLit1
 } from './scene/StylizedPropMaterial.js'
 
-const SUN_DISTANCE = 8
 const TWO_PI = Math.PI * 2
+
+/**
+ * Slack, in world units, added on each side of the computed shadow depth so
+ * the near plane never grazes the terrain (which rises ~3 above the shadow
+ * centre and drops ~4 below it) and the far plane never clips the far corner.
+ */
+const SHADOW_DEPTH_MARGIN = 12
 
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
@@ -178,11 +184,56 @@ export default class Environment {
         })
     }
 
+    /**
+     * How far back the sun has to sit for the shadow frustum to actually
+     * contain the ground it claims to cover — and keep near/far in step.
+     *
+     * This used to be a flat `SUN_DISTANCE = 8` against an ortho box of
+     * ±shadowCameraSize (50) and near 0.5, which cannot work: the box is a
+     * 100x100 window onto the ground, but the camera making it sat 8 units
+     * away, so everything more than 7.5 units *behind* the shadow centre along
+     * the sun azimuth fell outside the near plane and was shaded with no
+     * shadow lookup at all. The result was a dead-straight, dead-obvious line
+     * across the grass — the frustum's near plane intersecting the ground —
+     * with correctly shadowed terrain on one side and flat unshadowed terrain
+     * on the other. It read as a seam between two floor meshes; it was not.
+     *
+     * The depth actually needed follows from the geometry. The box's vertical
+     * axis in light space has horizontal component `elev`, so a ground point
+     * `L` along the sun azimuth only reaches the box edge at `L = sc / elev`,
+     * and its depth offset from the centre is `L * horizontal`. Hence
+     * `sc * horizontal / elev` of depth on EACH side of the centre. Measured
+     * over a full cycle that runs 35 units at noon up to 179 at the shallowest
+     * sun, against the flat 8 it had. Ortho shadows have uniform depth
+     * precision, so the only cost of the
+     * bigger range is that `shadow.bias` (an NDC offset) scales with it —
+     * which is why the heavy lifting here is left to `normalBias`, in world
+     * units and therefore unaffected.
+     */
+    _shadowDistanceFor(elevation) {
+        const sc = this.experience.quality.shadowCameraSize
+        const elev = Math.max(0.05, elevation)
+        const horizontal = Math.sqrt(Math.max(0, 1 - elev * elev))
+        const halfDepth = (sc * horizontal) / elev + SHADOW_DEPTH_MARGIN
+
+        const cam = this.sunLight.shadow.camera
+        const far = halfDepth * 2
+        // updateProjectionMatrix is not free and the sun barely moves between
+        // frames, so only rebuild when the range has actually shifted.
+        if (Math.abs(cam.far - far) > 1) {
+            cam.far = far
+            cam.updateProjectionMatrix()
+        }
+        return halfDepth
+    }
+
     _applyShadowQuality() {
         const quality = this.experience.quality
         const sc = quality.shadowCameraSize
         const cam = this.sunLight.shadow.camera
         cam.left = -sc; cam.right = sc; cam.top = sc; cam.bottom = -sc
+        // `far` is owned by _shadowDistanceFor(), which sizes it to the box and
+        // the sun's elevation; this is only a sane value for the first frame.
         cam.far = quality.shadowCameraFar
         cam.updateProjectionMatrix()
 
@@ -370,7 +421,8 @@ export default class Environment {
             shadowDir.normalize()
         }
 
-        this.sunLight.position.copy(shadowDir).multiplyScalar(SUN_DISTANCE)
+        const sunDistance = this._shadowDistanceFor(shadowDir.y)
+        this.sunLight.position.copy(shadowDir).multiplyScalar(sunDistance)
 
         // --- Centre the shadow camera on the character (texel-snapped) ---
         // Without this, the shadow frustum is centred on (0,0,0) and at low
@@ -407,7 +459,7 @@ export default class Environment {
                 .addScaledVector(shadowDir, along)
 
             this.sunLight.target.position.copy(_shadowCenter)
-            this.sunLight.position.copy(_shadowCenter).addScaledVector(shadowDir, SUN_DISTANCE)
+            this.sunLight.position.copy(_shadowCenter).addScaledVector(shadowDir, sunDistance)
             this.sunLight.target.updateMatrixWorld()
         }
 

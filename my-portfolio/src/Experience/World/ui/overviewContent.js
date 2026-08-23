@@ -48,6 +48,22 @@ const isUpcoming = (project) => /^proximamente/.test(project.id)
  * Several placeholders in a row become one card. Two identical "coming soon"
  * tiles stacked read as a rendering bug rather than as intent.
  */
+/**
+ * Order for the overview only.
+ *
+ * PROJECTS is indexed by the 3D world: cart N shows PAGE_SOURCES[N] and opens
+ * PROJECTS[N], so reordering the array would leave a stand showing one
+ * project's screenshot and opening another's panel. The overview has no such
+ * constraint and wants the strongest work first, so `spotlight` reorders here
+ * and here only. Stable, so everything else keeps its authored order.
+ */
+function overviewOrder(list) {
+    return [
+        ...list.filter((p) => p.spotlight === true),
+        ...list.filter((p) => p.spotlight !== true)
+    ]
+}
+
 function collapseUpcoming(list) {
     const out = []
     for (const p of list) {
@@ -115,7 +131,7 @@ export function getContent() {
             blurb: t('projects.blurb'),
             stackLabel: t('projects.stack'),
             finalProjectBadge: t('projects.tfgBadge'),
-            items: collapseUpcoming(PROJECTS).map((p) => {
+            items: overviewOrder(collapseUpcoming(PROJECTS)).map((p) => {
                 if (isUpcoming(p)) {
                     return {
                         id: p.id,
@@ -131,7 +147,9 @@ export function getContent() {
                     title: p.title,
                     finalProject: p.finalProject === true,
                     tagline: opt(`${key}.tagline`) || p.tagline,
-                    image: p.image,
+                    // The card is one wide image, so a project can name a
+                    // better-cropped shot than the one baked onto its 3D stand.
+                    image: p.overviewImage || p.image,
                     highlights: i18n.opt(`overview.${key}.highlights`) || p.highlights,
                     stack: p.stack,
                     links: p.links.map((l, i) => ({

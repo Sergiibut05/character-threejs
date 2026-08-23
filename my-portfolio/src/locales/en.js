@@ -81,6 +81,20 @@ export default {
                         'GA4 analytics and **CI/CD** deployment.'
                     ],
                     links: ['Visit the site', 'Code on GitHub']
+                },
+                volumine: {
+                    tagline: '3D charts you embed anywhere with a link',
+                    highlights: [
+                        'Six chart types in **three.js with hand-built geometry** — bevelled ' +
+                        'edges, real shadows and studio lighting — and no 3D charting ' +
+                        'library anywhere.',
+                        '**The whole config travels inside the URL**, compressed, so a shared ' +
+                        'chart needs no database at all: the free tier and the developer API ' +
+                        'fall out of the same decision.',
+                        'The embed route is **sacred**: zero cookies, zero third-party ' +
+                        'requests, and a 149 KB JS budget that **fails the build** if it slips.'
+                    ],
+                    links: ['Visit the site']
                 }
             }
         },

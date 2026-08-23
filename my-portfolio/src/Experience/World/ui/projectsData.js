@@ -26,16 +26,25 @@ export const PROJECTS = [
         ]
     },
     {
-        id: 'proximamente-2',
-        title: 'Próximamente',
-        tagline: 'Nuevo proyecto en construcción',
+        id: 'volumine',
+        title: 'Volumine',
+        // Leads the overview (see overviewOrder). NOT reordered in the array:
+        // the 3D stands are index-matched to it.
+        spotlight: true,
+        tagline: 'Gráficas 3D que se incrustan en cualquier sitio con un link',
         image: '/models/carts/page2.webp',
+        image2: '/models/carts/page2b.webp',
+        // Wider crop, reads better as the overview's single hero image.
+        overviewImage: '/models/carts/page2b.webp',
         highlights: [
-            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.',
-            'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.'
+            'Seis tipos de gráfica en **three.js con geometría propia** —canto biselado, sombra real y luz de estudio—, sin ninguna librería de gráficas 3D.',
+            '**La configuración entera viaja dentro de la URL** comprimida, así que una gráfica compartida no necesita base de datos: el plan gratuito y la API para desarrolladores salen de la misma decisión.',
+            'La ruta del embed es **sagrada**: cero cookies, cero peticiones a terceros y un presupuesto de 149 KB de JS que **rompe el build** si se pasa.'
         ],
-        stack: ['Lorem', 'Ipsum', 'Dolor'],
-        links: []
+        stack: ['Next.js', 'React', 'TypeScript', 'Three.js', 'Supabase', 'PostgreSQL', 'Stripe', 'Tailwind', 'Playwright'],
+        links: [
+            { label: 'Ver la web', url: 'https://volumine.app' }
+        ]
     },
     {
         id: 'proximamente-3',

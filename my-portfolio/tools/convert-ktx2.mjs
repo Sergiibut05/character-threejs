@@ -57,12 +57,6 @@ const TARGETS = [
         genmipmap: true
     },
     {
-        in: 'models/floor/grass-floor-2.png',
-        out: 'models/floor/grass-floor-2.ktx2',
-        srgb: true,
-        genmipmap: true
-    },
-    {
         in: 'models/social-entrance/social-tittle-image.png',
         out: 'models/social-entrance/social-tittle-image.ktx2',
         srgb: true,

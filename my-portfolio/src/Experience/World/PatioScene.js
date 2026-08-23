@@ -147,16 +147,14 @@ export default class PatioScene {
     _buildCriticalPieces() {
         const r = this.resources.items
 
-        // ── Floor (grass-floor-1, grass-floor-2, ground-floor-1, ground-floor-2)
+        // ── Floor (grass-floor-1, plus the optional ground-floor-* dirt meshes)
         if (r.floorModel) {
             this.pieces.floor = new Floor(r.floorModel, {
                 grassFloorMasks: {
-                    'grass-floor-1': r.grassFloor1Mask || null,
-                    'grass-floor-2': r.grassFloor2Mask || null
+                    'grass-floor-1': r.grassFloor1Mask || null
                 },
                 maskCpuImages: {
-                    'grass-floor-1': r.grassFloor1MaskCpu || null,
-                    'grass-floor-2': r.grassFloor2MaskCpu || null
+                    'grass-floor-1': r.grassFloor1MaskCpu || null
                 },
                 slabsTexture: r.slabsTexture || null,
                 // Torus / black-plane decor inside floor.glb. The Sushi atlas is

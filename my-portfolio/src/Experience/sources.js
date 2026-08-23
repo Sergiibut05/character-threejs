@@ -112,7 +112,7 @@ const allSources = [
     {
         name: 'houseModel',
         type: 'gltfModel',
-        path: '/models/house/house_compressed.glb',
+        path: '/models/house/house-compressed.glb',
         priority: 'decorative'
     },
     {
@@ -139,30 +139,14 @@ const allSources = [
             texture.flipY = false
         }
     },
-    {
-        name: 'grassFloor2Mask',
-        type: 'textureKtx',
-        path: '/models/floor/grass-floor-2.ktx2',
-        modifier: (texture) => {
-            texture.colorSpace = THREE.NoColorSpace
-            texture.wrapS = THREE.ClampToEdgeWrapping
-            texture.wrapT = THREE.ClampToEdgeWrapping
-            texture.flipY = false
-        }
-    },
-    // 256×256 PNG copies of the masks for CPU-side sampling
+    // 256×256 PNG copy of the mask for CPU-side sampling
     // (KTX2 textures can't be drawn on a 2D canvas).
-    // Originals are 1024×1024 (~2.3 MB combined); these are ~150 kB total.
-    // Generate them with `node tools/downsample-cpu-masks.mjs`.
+    // The original is 1024×1024 (~880 kB); this is ~50 kB.
+    // Generate it with `node tools/downsample-cpu-masks.mjs`.
     {
         name: 'grassFloor1MaskCpu',
         type: 'texture',
         path: '/models/floor/grass-floor-1-cpu.png'
-    },
-    {
-        name: 'grassFloor2MaskCpu',
-        type: 'texture',
-        path: '/models/floor/grass-floor-2-cpu.png'
     },
     {
         name: 'slabsTexture',
@@ -468,6 +452,15 @@ const allSources = [
         name: 'collidersModel',
         type: 'gltfModel',
         path: '/models/collaiders/Collaiders-compressed.glb'
+    },
+    {
+        // Blender empties marking where the player can sit. No geometry, so it
+        // is loaded raw (Draco has nothing to compress) and weighs ~1.5 kB.
+        // Each empty's local +Z is the direction the seated character faces.
+        name: 'sitPointsModel',
+        type: 'gltfModel',
+        path: '/models/sit-points/sit-points.glb',
+        priority: 'decorative'
     },
 
     // ─── Activities / characters ──────────────────────────────────
