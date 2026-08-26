@@ -2,6 +2,10 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import Experience from './Experience.js'
 
+// Camera far plane, in world units. There is no scene fog and nothing else
+// clips by distance, so this alone decides how far you can see.
+const DEFAULT_RENDER_DISTANCE = 100
+
 export default class Camera {
     constructor() {
         this.experience = new Experience()
@@ -73,7 +77,9 @@ export default class Camera {
     }
 
     setInstance() {
-        this.instance = new THREE.PerspectiveCamera(this.baseFov, this.sizes.width / this.sizes.height, 0.1, 100)
+        this.instance = new THREE.PerspectiveCamera(
+            this.baseFov, this.sizes.width / this.sizes.height, 0.1, DEFAULT_RENDER_DISTANCE
+        )
         this.instance.position.set(0, 8, 8)
         this.instance.lookAt(0, 0, 0)
         this.scene.add(this.instance)
@@ -359,19 +365,14 @@ export default class Camera {
     }
 
     /**
-     * Entry cinematic (plan §4.E.1): a slow pan in FRONT of the character + dog
-     * (right → left) with a gentle push-in. Leaves the camera held at the end
-     * pose (cinematic mode) for the caller to wait on a "continue" press.
+     * Where the entry pan runs from and to. Shared with primeEntryPan so the
+     * camera can be parked on the first frame of the pan behind a closed iris
+     * — recomputing it in two places is how the two silently drift apart.
      */
-    async playEntryPan(durationMs = 8000) {
+    _entryPanPose() {
         const world = this.experience.world
         const c = world?.character
-        if (!c) return
-
-        const token = ++this._cineToken
-        this.setMode('cinematic')
-        this.instance.fov = this.minigameFov
-        this.instance.updateProjectionMatrix()
+        if (!c) return null
 
         // Face the pitch so "from the front" is well-defined.
         let yaw = c.container.rotation.y
@@ -397,6 +398,39 @@ export default class Camera {
         const endPos = target.clone().addScaledVector(fwd, frontDist).addScaledVector(right, -side)
         endPos.y += height - 0.15
 
+        return { target, fwd, startPos, endPos }
+    }
+
+    /**
+     * Park the camera on the entry pan's opening frame without moving it there
+     * on screen. Called while the iris is shut, so the cut from gameplay to
+     * cinematic happens in the dark instead of as a jump.
+     */
+    primeEntryPan() {
+        const pose = this._entryPanPose()
+        if (!pose) return
+        this.setMode('cinematic')
+        this.instance.fov = this.minigameFov
+        this.instance.updateProjectionMatrix()
+        this.instance.position.copy(pose.startPos)
+        this.instance.lookAt(pose.target)
+    }
+
+    /**
+     * Entry cinematic (plan §4.E.1): a slow pan in FRONT of the character + dog
+     * (right → left) with a gentle push-in. Leaves the camera held at the end
+     * pose (cinematic mode) for the caller to wait on a "continue" press.
+     */
+    async playEntryPan(durationMs = 8000) {
+        const pose = this._entryPanPose()
+        if (!pose) return
+        const { target, fwd, startPos, endPos } = pose
+
+        const token = ++this._cineToken
+        this.setMode('cinematic')
+        this.instance.fov = this.minigameFov
+        this.instance.updateProjectionMatrix()
+
         const _p = new THREE.Vector3()
         await this.experience.animateValue(0, 1, durationMs, (t) => {
             if (this._cineToken !== token || this.mode !== 'cinematic') return
@@ -408,36 +442,6 @@ export default class Camera {
         })
     }
 
-    /**
-     * Move the camera to frame the dog from the front (for its pre-round
-     * gesture). Holds at the end pose (cinematic mode).
-     */
-    async frameDog(durationMs = 1400) {
-        const dog = this.experience.world?.frisbeeMinigame?.dog
-        if (!dog?.container) return
-
-        const token = ++this._cineToken
-        this.setMode('cinematic')
-        this.instance.fov = this.minigameFov
-        this.instance.updateProjectionMatrix()
-
-        const yaw = dog.container.rotation.y
-        const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
-        const target = dog.position.clone()
-        target.y += 0.4
-        const endPos = dog.position.clone().addScaledVector(fwd, 3.0)
-        endPos.y += 1.4
-
-        const startPos = this.instance.position.clone()
-        const _p = new THREE.Vector3()
-        await this.experience.animateValue(0, 1, durationMs, (t) => {
-            if (this._cineToken !== token || this.mode !== 'cinematic') return
-            const e = t * t * (3 - 2 * t)
-            _p.lerpVectors(startPos, endPos, e)
-            this.instance.position.copy(_p)
-            this.instance.lookAt(target)
-        })
-    }
 
     /**
      * @param {string} mode
@@ -484,13 +488,35 @@ export default class Camera {
         }
     }
 
+    /**
+     * How far the camera can see, in world units.
+     *
+     * Every other place that touches the lens changes `fov` and calls
+     * updateProjectionMatrix, which leaves `far` alone — so this survives the
+     * minigame FOV switches, the auto-zoom and resize without needing to be
+     * re-applied.
+     *
+     * @param {number} far world units; clamped to stay in front of `near`.
+     */
+    setRenderDistance(far) {
+        this.instance.far = Math.max(this.instance.near + 1, far)
+        this.instance.updateProjectionMatrix()
+    }
+
     setDebug() {
         const folder = this.debug.ui.addFolder('Camera')
         folder.close()
 
-        const params = { mode: this.mode }
+        const params = { mode: this.mode, renderDistance: this.instance.far }
         folder.add(params, 'mode', ['follow', 'free']).name('Mode').onChange((v) => {
             this.setMode(v)
         })
+
+        // Depth buffer precision is a ratio of near to far, so pushing this a
+        // long way out will eventually bring z-fighting with it. That is the
+        // trade being made on purpose here, not a bug to go chasing.
+        folder.add(params, 'renderDistance', 20, 5000, 10)
+            .name('Render distance')
+            .onChange((v) => this.setRenderDistance(v))
     }
 }

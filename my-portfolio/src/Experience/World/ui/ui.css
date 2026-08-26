@@ -925,6 +925,10 @@
     pointer-events: none;
 }
 
+.fz-emblem.is-out-of-range {
+    pointer-events: none;
+}
+
 .fz-emblem-pill {
     display: inline-flex;
     align-items: center;

@@ -5,6 +5,10 @@ import {
 } from 'three/tsl'
 import Experience from '../Experience.js'
 
+const BALLOON_RADIUS = 0.65
+const KNOT_HEIGHT = 0.12
+const STRING_LENGTH = 1.4
+
 export default class Balloon {
     constructor() {
         this.experience = new Experience()
@@ -27,7 +31,7 @@ export default class Balloon {
     }
 
     setupMesh() {
-        const geo = new THREE.SphereGeometry(0.65, 28, 18)
+        const geo = new THREE.SphereGeometry(BALLOON_RADIUS, 28, 18)
 
         const mat = new THREE.MeshBasicNodeMaterial({
             transparent: true,
@@ -38,33 +42,53 @@ export default class Balloon {
         mat.colorNode = _balloonColor()
         mat.opacityNode = _balloonOpacity()
 
+        // A group holds all three parts, and ONLY the envelope is scaled. The
+        // knot and string used to be children of the envelope, so they
+        // inherited its 1.3 y-stretch (and the squash/stretch on top of it):
+        // their offsets came out ~30% further down than authored and the
+        // string hung detached below the balloon.
+        this.group = new THREE.Group()
+        this.group.visible = false
+        this.scene.add(this.group)
+
         this.mesh = new THREE.Mesh(geo, mat)
         this.mesh.scale.set(1, 1.3, 1)
-        this.mesh.visible = false
         this.mesh.renderOrder = 5
-        this.scene.add(this.mesh)
+        this.group.add(this.mesh)
 
         // Knot at the bottom
         const knotGeo = new THREE.ConeGeometry(0.06, 0.12, 6)
         const knotMat = new THREE.MeshBasicMaterial({ color: 0xcc2233 })
         this.knot = new THREE.Mesh(knotGeo, knotMat)
-        this.knot.position.y = -0.85
         this.knot.rotation.x = Math.PI
-        this.mesh.add(this.knot)
+        this.group.add(this.knot)
 
         // String
-        const stringGeo = new THREE.CylinderGeometry(0.008, 0.008, 1.4, 4)
+        const stringGeo = new THREE.CylinderGeometry(0.008, 0.008, STRING_LENGTH, 4)
         const stringMat = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             transparent: true,
             opacity: 0.5
         })
         this.string = new THREE.Mesh(stringGeo, stringMat)
-        this.string.position.y = -1.7
-        this.mesh.add(this.string)
+        this.group.add(this.string)
+
+        this._layoutTail()
 
         // Pre-create pop fragment pool
         this._setupFragments()
+    }
+
+    /**
+     * Hang the knot and string off wherever the envelope's skin actually ends
+     * this frame. The envelope squashes and stretches, so a fixed offset would
+     * open the same gap the old parenting did, just smaller.
+     */
+    _layoutTail() {
+        const bottom = -BALLOON_RADIUS * this.mesh.scale.y
+        // Pushed a hair up INTO the envelope so no seam shows between them.
+        this.knot.position.y = bottom + KNOT_HEIGHT * 0.2
+        this.string.position.y = bottom - KNOT_HEIGHT * 0.3 - STRING_LENGTH * 0.5
     }
 
     _setupFragments() {
@@ -101,19 +125,22 @@ export default class Balloon {
         this._popping = false
         this._time = 0
         this._baseY = worldPos.y
-        this.mesh.position.set(worldPos.x, worldPos.y, worldPos.z)
+        this.group.position.set(worldPos.x, worldPos.y, worldPos.z)
+        this.mesh.position.set(0, 0, 0)
         this.mesh.scale.set(1, 1.3, 1)
         this.mesh.material.opacity = 1
+        this.group.visible = true
         this.mesh.visible = true
         this.knot.visible = true
         this.string.visible = true
+        this._layoutTail()
 
         for (const f of this._fragments) f.mesh.visible = false
     }
 
     hide() {
         this._active = false
-        this.mesh.visible = false
+        this.group.visible = false
         for (const f of this._fragments) f.mesh.visible = false
     }
 
@@ -129,7 +156,7 @@ export default class Balloon {
         this.knot.visible = false
         this.string.visible = false
 
-        const pos = this.mesh.position
+        const pos = this.group.position
         for (const f of this._fragments) {
             f.mesh.position.set(pos.x, pos.y, pos.z)
             f.mesh.rotation.set(
@@ -144,9 +171,9 @@ export default class Balloon {
 
     checkCollision(frisbeePos, radius = 2.4) {
         if (!this._active || this._popping) return false
-        const dx = frisbeePos.x - this.mesh.position.x
-        const dy = frisbeePos.y - this.mesh.position.y
-        const dz = frisbeePos.z - this.mesh.position.z
+        const dx = frisbeePos.x - this.group.position.x
+        const dy = frisbeePos.y - this.group.position.y
+        const dz = frisbeePos.z - this.group.position.z
         return Math.sqrt(dx * dx + dy * dy + dz * dz) < radius
     }
 
@@ -186,19 +213,22 @@ export default class Balloon {
 
         // Bobbing
         const bobPhase = Math.sin(this._time * this._bobSpeed)
-        this.mesh.position.y = this._baseY + bobPhase * this._bobAmplitude
+        this.group.position.y = this._baseY + bobPhase * this._bobAmplitude
 
         // Squash/stretch — up = stretch, down = squash
         const stretch = 1 + bobPhase * this._squashAmount
         const squash = 1 - bobPhase * this._squashAmount * 0.5
         this.mesh.scale.set(squash, 1.3 * stretch, squash)
+        this._layoutTail()
     }
 
     destroy() {
-        if (this.mesh) {
-            this.scene.remove(this.mesh)
-            this.mesh.geometry.dispose()
-            this.mesh.material.dispose()
+        if (this.group) {
+            this.scene.remove(this.group)
+            for (const m of [this.mesh, this.knot, this.string]) {
+                m?.geometry.dispose()
+                m?.material.dispose()
+            }
         }
         for (const f of this._fragments) {
             this.scene.remove(f.mesh)

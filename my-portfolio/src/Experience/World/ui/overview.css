@@ -1188,17 +1188,28 @@
     box-shadow: var(--ov-lift);
 }
 
-.ov-contact-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-    gap: 16px;
-    align-items: stretch;
-}
+/* One card holding both halves of "how to reach me", split by a hairline
+   rather than by a gap — two cards for four lines of content read as padding
+   looking for something to hold. */
 .ov-contact-card {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 28px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(20px, 3vw, 40px);
+    padding: 24px 28px;
+}
+.ov-contact-field { display: grid; gap: 10px; min-width: 0; }
+.ov-contact-card > * + * {
+    padding-left: clamp(20px, 3vw, 40px);
+    border-left: 1px solid var(--ov-line);
+}
+@media (max-width: 680px) {
+    .ov-contact-card { grid-template-columns: 1fr; gap: 18px; }
+    .ov-contact-card > * + * {
+        padding: 18px 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--ov-line);
+    }
 }
 .ov-fact-label {
     font-family: var(--fz-font-title);
@@ -1249,7 +1260,11 @@
 .ov-outro {
     position: relative;
     display: grid;
-    gap: 12px;
+    /* Invitation left, dog right. He is the reason for the invitation, so he
+       gets real estate rather than a corner. */
+    grid-template-columns: minmax(0, 1fr) clamp(190px, 32%, 320px);
+    gap: clamp(20px, 3vw, 40px);
+    align-items: center;
     margin-top: 20px;
     padding: clamp(32px, 5vw, 48px);
     border: 1.5px solid rgba(65, 160, 110, 0.24);
@@ -1271,7 +1286,8 @@
     font-size: var(--ov-t-base);
     line-height: 1.62;
 }
-.ov-outro .ov-btn--primary { justify-self: start; }
+.ov-outro-text { display: grid; gap: 12px; min-width: 0; }
+.ov-outro-text .ov-btn--primary { justify-self: start; }
 
 .ov-foot {
     max-width: calc(var(--ov-max) + 2 * var(--ov-pad));
@@ -1281,6 +1297,48 @@
     color: var(--ov-faint);
     font-size: var(--ov-t-sm);
     text-align: center;
+}
+
+/* ── The dog ──────────────────────────────────────────────────────────────
+   The hero opens the page with the character; the last section closes it with
+   his dog, sitting in the space the contact column gives up. Presented exactly
+   like the portal — no frame, grounded by a projected cast shadow — so both
+   live 3D moments read as the same world, not as two embedded widgets. */
+.ov-dog {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    /* Bottom-aligned inside the card so he stands on its floor rather than
+       hovering in the middle of it. No negative margin: standing, he fills the
+       full height of his box, and pulling him down cropped his front paws. */
+    align-self: end;
+    margin: 0;
+    pointer-events: none;
+}
+.ov-dog-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.9s var(--ov-ease);
+}
+/* Set by DogPortrait once the first frame is drawn. */
+.ov-dog-canvas.is-live { opacity: 1; }
+
+.ov-dog-glow {
+    position: absolute;
+    left: 50%;
+    /* Both driven by DogPortrait, which projects the ground plane through the
+       same camera that draws him. */
+    top: var(--ground-y, 84%);
+    width: var(--ground-w, 46%);
+    height: 7%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(38, 92, 70, 0.30), rgba(38, 92, 70, 0) 72%);
+    pointer-events: none;
 }
 
 /* ═══ Responsive ══════════════════════════════════════════════════════════ */
@@ -1295,6 +1353,10 @@
 }
 
 @media (max-width: 900px) {
+    /* Stacked, a full-width dog would push the footer a long way down for no
+       gain — a smaller, centred one keeps the beat without the scroll. */
+    .ov-outro { grid-template-columns: 1fr; }
+    .ov-dog { max-width: 200px; margin: 4px auto 0; }
     .ov-project { grid-template-columns: 1fr; }
     .ov-project-media { min-height: 190px; max-height: 260px; }
 }

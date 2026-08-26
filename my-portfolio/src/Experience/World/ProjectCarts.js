@@ -120,6 +120,8 @@ export default class ProjectCarts {
             }
             // Mouse hover/click via the shared raycaster.
             plane.userData.interactiveObject = {
+                position,
+                proximityRadius: self.proximityRadius,
                 onHover() {
                     if (cart.isHovered) return
                     cart.isHovered = true
@@ -189,7 +191,10 @@ export default class ProjectCarts {
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
         if (this.modal?.isOpen()) return
-        // Pointer clicks work from anywhere; key/pad interactions need proximity.
+        const cart = this.carts.find((c) => c.index === index)
+        const character = this.experience.world?.character
+        if (!cart || !character) return
+        if (cart.position.distanceTo(character.position) > this.proximityRadius * 1.15) return
         if (!fromPointer && this.nearestIndex !== index) return
 
         if (!this.modal) this.modal = new ProjectModal()

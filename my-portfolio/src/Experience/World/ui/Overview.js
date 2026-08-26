@@ -82,7 +82,7 @@ export default class Overview {
     async init() {
         await i18n.setLocale(i18n.detect())
         this._build()
-        this._watchCharacter()
+        this._watchResources()
         return this
     }
 
@@ -130,6 +130,10 @@ export default class Overview {
         // to the detached one — the character would simply vanish.
         this.portalCanvas = el('canvas', 'ov-portal-canvas')
         this.portalCanvas.setAttribute('aria-hidden', 'true')
+
+        // Same deal for the dog closing the page — one canvas, re-parented.
+        this.dogCanvas = el('canvas', 'ov-dog-canvas')
+        this.dogCanvas.setAttribute('aria-hidden', 'true')
 
         // Head tracking listens on the whole page, not on the character's own
         // box: he is standing in the open now, and a gaze that only woke up
@@ -213,6 +217,8 @@ export default class Overview {
         this._observeReveals()
         this._syncExploreButtons()
         this._mountPortrait()
+        this._mountDog()
+        this._observeDogStage()
 
         // The nav buttons are new objects with no aria-current, so the cached id
         // has to go too — otherwise the spy short-circuits and the active item
@@ -591,18 +597,21 @@ export default class Overview {
     _contact(c) {
         const s = this._section('ov-contact', c.contact.title, c.contact.blurb)
 
-        const grid = el('div', 'ov-contact-grid ov-reveal')
-        grid.style.setProperty('--i', 1)
+        // One card, not two. They are both "how to reach me", they were short
+        // enough to look padded out as separate cards, and the column has to
+        // give up its right hand side to the dog now.
+        const card = el('div', 'ov-card ov-contact-card ov-reveal')
+        card.style.setProperty('--i', 1)
 
-        const mailCard = el('div', 'ov-card ov-contact-card')
-        mailCard.appendChild(txt('div', 'ov-fact-label', c.contact.emailLabel))
+        const mailField = el('div', 'ov-contact-field')
+        mailField.appendChild(txt('div', 'ov-fact-label', c.contact.emailLabel))
         const mail = el('a', 'ov-contact-mail')
         mail.href = `mailto:${c.links.email}`
         mail.textContent = c.links.email
-        mailCard.appendChild(mail)
+        mailField.appendChild(mail)
 
-        const socialCard = el('div', 'ov-card ov-contact-card')
-        socialCard.appendChild(txt('div', 'ov-fact-label', c.contact.elsewhere))
+        const socialField = el('div', 'ov-contact-field')
+        socialField.appendChild(txt('div', 'ov-fact-label', c.contact.elsewhere))
         const socials = el('div', 'ov-socials')
         for (const so of SOCIALS) {
             const a = el('a', 'ov-social', so.icon)
@@ -613,20 +622,38 @@ export default class Overview {
             a.title = so.name
             socials.appendChild(a)
         }
-        socialCard.appendChild(socials)
+        socialField.appendChild(socials)
 
-        grid.append(mailCard, socialCard)
+        card.append(mailField, socialField)
 
+        // The closing card is a two-column pitch: the invitation on the left,
+        // the dog sitting in the other half. He belongs to what the card is
+        // offering — the world you can walk around — so putting him inside it
+        // rather than beside it is the whole argument in one picture.
+        // Decorative: hidden from assistive tech, and never a control.
         const outro = el('div', 'ov-outro ov-reveal')
         outro.style.setProperty('--i', 2)
-        outro.appendChild(txt('h3', 'ov-outro-title', c.contact.outroTitle))
-        outro.appendChild(txt('p', 'ov-outro-body', c.contact.outroBody))
+
+        const outroText = el('div', 'ov-outro-text')
+        outroText.appendChild(txt('h3', 'ov-outro-title', c.contact.outroTitle))
+        outroText.appendChild(txt('p', 'ov-outro-body', c.contact.outroBody))
         this.outroExplore = el('button', 'ov-btn ov-btn--primary')
         this.outroExplore.type = 'button'
         this.outroExplore.addEventListener('click', () => this._explore())
-        outro.appendChild(this.outroExplore)
+        outroText.appendChild(this.outroExplore)
 
-        s.append(grid, outro)
+        const stage = el('div', 'ov-dog')
+        stage.setAttribute('aria-hidden', 'true')
+        // Shadow BEFORE the canvas: both are absolutely positioned, so DOM
+        // order decides who paints on top. With the canvas last its
+        // transparent background lets the shadow through around him while his
+        // own pixels cover it — which is what standing on a shadow looks like.
+        // The other way round the ellipse washed straight over his legs.
+        stage.append(el('span', 'ov-dog-glow'), this.dogCanvas)
+        this.dogStage = stage
+
+        outro.append(outroText, stage)
+        s.append(card, outro)
         return s
     }
 
@@ -642,16 +669,22 @@ export default class Overview {
      * on its way down. Upgrade the frame the moment it lands — and never block
      * on it.
      */
-    _watchCharacter() {
+    _watchResources() {
         if (!this.resources) return
         const items = this.resources.items
-        if (items?.humanModel) { this._mountPortrait(); return }
+        if (items?.humanModel) this._mountPortrait()
+        if (items?.dogModel) this._mountDog()
+        if (items?.humanModel && items?.dogModel) return
 
         this._onSourceLoaded = (name) => {
-            if (name !== 'humanModel') return
-            this.resources.off('sourceLoaded', this._onSourceLoaded)
-            this._onSourceLoaded = null
-            this._mountPortrait()
+            if (name === 'humanModel') this._mountPortrait()
+            else if (name === 'dogModel') this._mountDog()
+            else return
+            const now = this.resources.items
+            if (now.humanModel && now.dogModel) {
+                this.resources.off('sourceLoaded', this._onSourceLoaded)
+                this._onSourceLoaded = null
+            }
         }
         this.resources.on('sourceLoaded', this._onSourceLoaded)
     }
@@ -679,6 +712,54 @@ export default class Overview {
         } finally {
             this._portraitPending = false
         }
+    }
+
+    /**
+     * The dog is a `decorative` resource, so it lands well after the character.
+     * Same contract as the portrait: mount when it arrives, never wait for it.
+     */
+    async _mountDog() {
+        const gltf = this.resources?.items?.dogModel
+        if (!gltf || !this.dogCanvas || this._dogPending) return
+        this._dogPending = true
+
+        try {
+            if (!this.dogPortrait) {
+                const { default: DogPortrait } = await import('./DogPortrait.js')
+                this.dogPortrait = new DogPortrait(this.dogCanvas)
+            }
+            if (!this.dogPortrait.ready) await this.dogPortrait.setModel(gltf)
+            this.dogPortrait.resize()
+            this._observeDogStage()
+            this._syncDog()
+        } catch (err) {
+            console.error('Overview: dog unavailable', err)
+        } finally {
+            this._dogPending = false
+        }
+    }
+
+    /**
+     * It sits at the very bottom of a long page, so it is off screen almost all
+     * the time — an observer keeps its loop off until the reader gets there.
+     */
+    _observeDogStage() {
+        if (!this.dogStage) return
+        if (!this._dogIo) {
+            this._dogIo = new IntersectionObserver((entries) => {
+                this._dogVisible = entries.some((e) => e.isIntersecting)
+                this._syncDog()
+            }, { root: this.el, rootMargin: '120px' })
+        } else {
+            this._dogIo.disconnect()
+        }
+        this._dogIo.observe(this.dogStage)
+    }
+
+    _syncDog() {
+        if (!this.dogPortrait?.ready) return
+        if (this._dogVisible && this.isOpen) this.dogPortrait.start()
+        else this.dogPortrait.stop()
     }
 
     // ═══ CV ═══════════════════════════════════════════════════════════════
@@ -822,6 +903,7 @@ export default class Overview {
         this._movePill()
         this._updateScrollState()
         this.viewport?.resize()
+        this.dogPortrait?.resize()
     }
 
     // ═══ Open / close ═════════════════════════════════════════════════════
@@ -847,6 +929,7 @@ export default class Overview {
         this._updateScrollState()
         this.viewport?.resize()
         this.viewport?.start()
+        this._syncDog()
         this.backBtn.focus({ preventScroll: true })
     }
 
@@ -856,6 +939,7 @@ export default class Overview {
 
         this.menu?.hidePopover?.()
         this.viewport?.stop()
+        this.dogPortrait?.stop()
         this.el.classList.remove('is-open')
         document.removeEventListener('keydown', this._onKeyDown)
         window.removeEventListener('resize', this._onResize)
@@ -903,7 +987,9 @@ export default class Overview {
 
     destroy() {
         this._io?.disconnect()
+        this._dogIo?.disconnect()
         this.viewport?.dispose()
+        this.dogPortrait?.dispose()
         if (this._onSourceLoaded) this.resources?.off('sourceLoaded', this._onSourceLoaded)
         document.removeEventListener('keydown', this._onKeyDown)
         window.removeEventListener('resize', this._onResize)

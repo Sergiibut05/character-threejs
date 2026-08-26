@@ -8,6 +8,7 @@ import { createModeCard, createCardGrid } from './ui/Card.js'
 import { createButton } from './ui/Button.js'
 import NameEntry from './ui/NameEntry.js'
 import Leaderboard from '../Utils/Leaderboard.js'
+
 import { buildLeaderboardList } from './ui/leaderboardView.js'
 import {
     iconTrophy, iconTarget, iconAim, iconCurve, iconPower
@@ -268,7 +269,7 @@ export default class FrisbeeSession {
         const prompt = this.experience.world?.activityPrompt
         if (prompt?.el) prompt.el.style.display = 'none'
 
-        // Entry cinematic (pan + dog gesture) before the first round.
+        // Entry cinematic (pan + dog framing) before the first round.
         await this._playEntrySequence()
         if (!this.active) return // left during the intro
 
@@ -282,7 +283,7 @@ export default class FrisbeeSession {
         this.minigame.start(mode, this._roundHasBalloon(this.round))
     }
 
-    // ─── Entry cinematic (pan + dog gesture) ─────────────────────────────
+    // ─── Entry cinematic (pan + dog framing) ─────────────────────────────
 
     async _playEntrySequence() {
         const camera = this.experience.camera
@@ -290,8 +291,33 @@ export default class FrisbeeSession {
         const dog = this.minigame.dog
         if (!this.hint) this.hint = new Hint()
 
-        // Face the pitch so the front pan (and later aim) line up.
-        this._facePitch(character, dog)
+        // 0. Iris out over the gameplay view, swing the camera to the opening
+        // frame of the pan while it is dark, iris back in. Without it the cut
+        // from the follow camera to the cinematic is a hard jump — and it is
+        // the same wipe the round start and the house doors already use, so
+        // the whole activity opens and closes the same way.
+        const renderer = this.experience.renderer
+        renderer.setIrisTransitionEnabled(true)
+        await this.experience.animateValue(1.35, 0.0, 520,
+            (v) => renderer.setIrisTransitionSize(v))
+
+        // Put the player on the throwing mark and face the pitch, so the pan
+        // (and later the aim) line up. Behind the closed iris, along with the
+        // camera move. Also stands the dog up and moves it out of the way.
+        this._placeAtThrowMark(character, dog)
+
+        camera.primeEntryPan?.()
+
+        if (!this.active) {
+            renderer.setIrisTransitionEnabled(false)
+            return
+        }
+
+        await this.experience.waitMs(120)
+        await this.experience.animateValue(0.0, 1.35, 700,
+            (v) => renderer.setIrisTransitionSize(v))
+        renderer.setIrisTransitionEnabled(false)
+        if (!this.active) return
 
         // 1. Entry pan — very slow, skippable from the start.
         this.hint?.show('saltar', 'continue')
@@ -299,10 +325,9 @@ export default class FrisbeeSession {
         this.hint?.hide()
         if (!this.active) return
 
-        // 2. Dog gesture (kept as-is) — frame, gesture, then continue.
-        await camera.frameDog?.(1400)
-        if (!this.active) return
-        await dog?.playGesture?.()
+        // 2. Hold on the pan's end pose and wait to be let go. No push-in on
+        // the dog: the pan has already introduced it, and a second camera move
+        // for the same beat only made the player wait twice before playing.
         await this._waitForContinue()
     }
 
@@ -336,15 +361,49 @@ export default class FrisbeeSession {
         })
     }
 
-    _facePitch(character, dog) {
+    /**
+     * Stand the player on the throwing mark — the activity's own anchor point,
+     * where the dog waits — facing the field, and move the dog aside.
+     *
+     * The activity triggers anywhere within 2.25 units of that anchor, so
+     * without this the round starts from wherever you happened to be when you
+     * pressed Enter: a 4.5-unit circle of possible positions, which drags the
+     * entry pan, the aim calibration and the dog's spot along with it. Pinned
+     * to the mark, every round opens from the same shot.
+     *
+     * Called behind the closed iris, so neither move is ever seen.
+     */
+    _placeAtThrowMark(character, dog) {
         if (!character) return
         const bbox = this.experience.world?.getPitchBBox?.()
         if (!bbox) return
         const cx = (bbox.min.x + bbox.max.x) / 2
         const cz = (bbox.min.z + bbox.max.z) / 2
-        const yaw = Math.atan2(cx - character.position.x, cz - character.position.z)
-        character.container.rotation.y = yaw
-        if (dog?.container) dog.container.rotation.y = yaw
+
+        const anchor = this.experience.world?.activityPrompt?.anchorPosition
+        if (!anchor) {
+            // No anchor (GLB marker missing): keep the old behaviour of just
+            // turning on the spot rather than teleporting somewhere arbitrary.
+            const yaw = Math.atan2(cx - character.position.x, cz - character.position.z)
+            character.container.rotation.y = yaw
+            if (dog?.container) dog.container.rotation.y = yaw
+            return
+        }
+
+        const yaw = Math.atan2(cx - anchor.x, cz - anchor.z)
+
+        // The pitch surface, not the GLB marker's Y (which floats above it) and
+        // not the player's own ground height (they may have walked in off the
+        // grass). No settle margin: movement is locked for the whole round, so
+        // nothing would ever bring them down the last 15cm.
+        const pitchY = (bbox.min.y + bbox.max.y) / 2
+        character.teleportTo(anchor.x, pitchY, anchor.z, yaw, 0)
+
+        // The player is standing on the dog's waiting spot now, so put the dog
+        // where it goes for the throw. Doing it here rather than at the round
+        // start means the cinematic already shows the pair as they will be —
+        // and `show` stands the dog up, which is what the intro wants.
+        dog?.show?.(character.position, yaw, pitchY)
     }
 
     /** Resolve on the next continue input (Enter/Space/click/tap). */

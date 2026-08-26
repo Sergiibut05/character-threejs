@@ -1,5 +1,9 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import {
+    collectSitBones, beginSitFrame, endSitFrame, applySitPose,
+    SIT_RIG_LIFT, SIT_BLEND_SPEED
+} from './DogSitPose.js'
 
 // Small world-space lift so the dog's feet rest ON the ground instead of
 // sinking a hair below it (the Character model applies the same trick). Tweak
@@ -61,6 +65,13 @@ export default class DogCompanion {
         // ─── Return runtime ───────────────────────────────────
         this.returnTarget = new THREE.Vector3()
 
+        // ─── Sit pose (additive layer over the idle clip) ──────
+        this._sitBones = []
+        this._sitWeight = 0
+        this._sitTarget = 0
+        this._sitLift = 0
+        this._modelBaseY = 0
+
         this.setupModel()
     }
 
@@ -101,6 +112,13 @@ export default class DogCompanion {
         // Lift the model inside the container so its feet land at Y=0, plus a
         // small fudge so they don't visually sink into the ground.
         this.model.position.y = -_box.min.y + DOG_FOOT_LIFT
+
+        // Sitting folds the hind legs and pitches the spine, which raises the
+        // contact plane — the model has to drop by the same amount to stay on
+        // the ground. Resolved here so the pose layer is pure rotation.
+        this._modelBaseY = this.model.position.y
+        this._sitLift = SIT_RIG_LIFT * this.model.scale.y
+        this._sitBones = collectSitBones(this.model)
 
         this.container.add(this.model)
         this.scene.add(this.container)
@@ -151,6 +169,9 @@ export default class DogCompanion {
         this.container.visible = true
         this.state = 'idleAnchor'
         this._playAction('idle')
+        // Waiting for the player: the dog is sat at its spot, not standing to
+        // attention. Snapped rather than blended — it has just appeared.
+        this.sit(true)
     }
 
     /**
@@ -184,9 +205,12 @@ export default class DogCompanion {
 
         this.state = 'idle'
         this._playAction('idle')
+        // Teleported next to the player, so there is nothing to get up FROM.
+        this.stand(true)
     }
 
     startChase(landingPoint, flightDuration, opts) {
+        this.stand()
         this._badThrow = opts?.badThrow ?? false
         this._giveUpDist = 0
 
@@ -219,6 +243,7 @@ export default class DogCompanion {
     }
 
     triggerCatch(frisbeeMesh, frisbeePos) {
+        this.stand()
         this._frisbeeRef = frisbeeMesh
         this._frisbeeAttached = false
         this._jumpEndPlayed = false
@@ -240,6 +265,7 @@ export default class DogCompanion {
     }
 
     startReturn(playerPosition) {
+        this.stand()
         this.returnTarget.copy(playerPosition)
         this.returnTarget.y = 0
         this.state = 'returning'
@@ -253,6 +279,7 @@ export default class DogCompanion {
         // Wii-style presentation: after the catch the dog turns around (a natural
         // walking arc, see _updatePostWalk) and trots a few steps TOWARD the
         // camera, with a small lateral offset so it doesn't march into the lens.
+        this.stand()
         const cam = this.experience.camera?.instance
         const dir = new THREE.Vector3()
         if (cam) {
@@ -280,32 +307,42 @@ export default class DogCompanion {
         this._playAction('walk')
     }
 
-    /**
-     * Pre-round "gesture" placeholder (plan §4.E.2): a happy double hop with a
-     * little wiggle. Composed from a transform animation over the idle clip —
-     * safe because idle/idleAnchor don't drive position each frame. Resolves
-     * when finished.
-     */
-    async playGesture() {
-        if (!this.container) return
-        if (this.state !== 'idle' && this.state !== 'idleAnchor') return
+    // ─── Sit ────────────────────────────────────────────────────────────
 
-        const baseY = this.container.position.y
-        const baseRot = this.container.rotation.y
-        await this.experience.animateValue(0, 1, 1200, (t) => {
-            const hop = Math.abs(Math.sin(t * Math.PI * 2)) // two bounces
-            this.container.position.y = baseY + hop * 0.45
-            this.container.rotation.y = baseRot + Math.sin(t * Math.PI * 6) * 0.12 // wiggle
-        })
-        this.container.position.y = baseY
-        this.container.rotation.y = baseRot
+    /**
+     * Sit down. The idle clip keeps playing underneath — DogSitPose is an
+     * additive layer, so the dog still breathes while seated.
+     * @param {boolean} instant  skip the blend (use when it first appears)
+     */
+    sit(instant = false) {
+        this._sitTarget = 1
+        if (instant) {
+            this._sitWeight = 1
+            this._applySit()
+        }
+    }
+
+    /**
+     * Stand back up. Cheap to call when already standing.
+     * @param {boolean} instant  skip the blend (use when the dog teleports)
+     */
+    stand(instant = false) {
+        this._sitTarget = 0
+        if (instant) {
+            this._sitWeight = 0
+            this._applySit()
+        }
     }
 
     // ─── Per-frame ──────────────────────────────────────────────────────
 
     update(dt) {
         if (this.state === 'hidden' || !this.container) return
+        // The sit layer brackets the mixer: hand the bones back untouched
+        // first, lay the pose over the result after. See DogSitPose.
+        beginSitFrame(this._sitBones)
         if (this.mixer) this.mixer.update(dt)
+        this._updateSit(dt)
         if (this.state === 'idleAnchor' || this.state === 'gaveUp') return
 
         switch (this.state) {
@@ -446,6 +483,30 @@ export default class DogCompanion {
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────
+
+    _updateSit(dt) {
+        if (this._sitWeight !== this._sitTarget) {
+            const k = 1 - Math.exp(-SIT_BLEND_SPEED * dt)
+            this._sitWeight += (this._sitTarget - this._sitWeight) * k
+            if (Math.abs(this._sitTarget - this._sitWeight) < 0.002) {
+                this._sitWeight = this._sitTarget
+            }
+        }
+        endSitFrame(this._sitBones, this._sitWeight)
+        this._syncSitLift()
+    }
+
+    /** Snap the pose outside the animation loop — no mixer tick has run. */
+    _applySit() {
+        applySitPose(this._sitBones, this._sitWeight)
+        this._syncSitLift()
+    }
+
+    _syncSitLift() {
+        if (this.model) {
+            this.model.position.y = this._modelBaseY - this._sitLift * this._sitWeight
+        }
+    }
 
     _rotateToward(direction, dt, speed) {
         const s = speed ?? this.rotationSpeed

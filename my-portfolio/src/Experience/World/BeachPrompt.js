@@ -62,6 +62,7 @@ export default class BeachPrompt {
         const distance = Math.hypot(dx, dz)
 
         const shouldOpen = distance <= this.radius
+        this.emblem.el.classList.toggle('is-out-of-range', !shouldOpen)
         if (shouldOpen !== this.isOpen) {
             this.isOpen = shouldOpen
             this.emblem.setActive(shouldOpen)

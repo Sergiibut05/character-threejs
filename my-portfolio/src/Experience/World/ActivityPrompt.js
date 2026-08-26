@@ -101,7 +101,7 @@ export default class ActivityPrompt {
     }
 
     updateOpenState() {
-        const shouldOpen = this.isInArea || this.isHovered
+        const shouldOpen = this.isInArea
         if (shouldOpen === this.isOpen) return
         this.isOpen = shouldOpen
         this.emblem?.setActive(this.isOpen)
@@ -207,6 +207,7 @@ export default class ActivityPrompt {
         const dz = character.position.z - this.anchorPosition.z
         const distance = Math.hypot(dx, dz)
         this.isInArea = distance <= this.radius
+        this.el.classList.toggle('is-out-of-range', !this.isInArea)
         this.updateOpenState()
 
         this.screenPosition.copy(this.anchorPosition)

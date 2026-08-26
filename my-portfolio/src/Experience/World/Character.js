@@ -116,6 +116,7 @@ export default class Character {
         this.isSitting = false
         this._sitBlend = 0
         this._sitBones = null
+        this._sitBind = null
         this._sitRecline = 0
 
         this.setModel()
@@ -191,6 +192,11 @@ export default class Character {
     // ─── Animations ─────────────────────────────────────────────────────
 
     setAnimation() {
+        // Capture the Mixamo bind pose BEFORE the mixer writes idle into the
+        // legs/hips. While seated we overwrite those bones from this rest + a
+        // sit offset, so the idle clip's loop hitch cannot pop the pose.
+        this._cacheSitBind()
+
         const clips = this.resource?.animations
         if (!clips?.length) return
 
@@ -463,13 +469,45 @@ export default class Character {
         }
     }
 
+    _cacheSitBind() {
+        if (this._sitBind || !this.model) return
+        const names = new Set([
+            'mixamorigHips',
+            'mixamorigLeftUpLeg', 'mixamorigRightUpLeg',
+            'mixamorigLeftLeg', 'mixamorigRightLeg',
+            'mixamorigLeftFoot', 'mixamorigRightFoot'
+        ])
+        const bind = {}
+        this.model.traverse((c) => {
+            if (!c.isBone || !names.has(c.name)) return
+            bind[c.name] = {
+                rx: c.rotation.x, ry: c.rotation.y, rz: c.rotation.z,
+                px: c.position.x, py: c.position.y, pz: c.position.z
+            }
+        })
+        this._sitBind = bind
+    }
+
+    _sitBone(bone, name, extraX = 0, extraZ = 0, overwrite) {
+        if (!bone) return
+        if (overwrite) {
+            const rest = this._sitBind?.[name]
+            if (!rest) return
+            bone.rotation.set(rest.rx + extraX, rest.ry, rest.rz + extraZ)
+        } else {
+            bone.rotation.x += extraX
+            if (extraZ) bone.rotation.z += extraZ
+        }
+    }
+
     /**
      * Layered after mixer.update — see update().
      *
-     * Angles are additive on top of the idle pose, not absolute, so the small
-     * breathing motion in the clip still comes through at the hips. The blend
-     * ramps over ~0.3 s in both directions; snapping the legs would look like a
-     * glitch rather than an action.
+     * While fully seated the idle clip's loop hitch (a one-frame pop in the
+     * hips/legs) is very visible, so those bones are overwritten from the bind
+     * rest + sit offsets. During the sit/stand blend they stay additive so the
+     * fold still eases instead of snapping. Torso/arms/head keep the idle clip
+     * either way, which is the breathing that keeps the pose alive.
      */
     _applySitPose(dt) {
         const target = this.isSitting ? 1 : 0
@@ -508,20 +546,30 @@ export default class Character {
         const shin = Math.min(0, SIT_SHIN + rec * RECLINE_STRAIGHTEN_SHIN) * k
         const splay = SIT_SPLAY * k
         const ankle = SIT_ANKLE * k
+        const overwrite = k >= 0.999
 
         // Hips is the root of the skeleton, so tipping it back carries torso,
         // head AND legs together — which is exactly how a body settles into a
-        // sloped seat: the back leans and the thighs come up to follow the
-        // fabric. Applied before the legs so their angles stay relative to it.
-        if (B.hips && this._sitRecline) B.hips.rotation.x += this._sitRecline * k
+        // sloped seat. Overwriting also freezes the idle hip bob that caused
+        // the seated loop glitch.
+        if (B.hips) {
+            if (overwrite) {
+                const rest = this._sitBind?.mixamorigHips
+                if (rest) {
+                    B.hips.rotation.set(rest.rx + rec * k, rest.ry, rest.rz)
+                    B.hips.position.set(rest.px, rest.py, rest.pz)
+                }
+            } else if (rec) {
+                B.hips.rotation.x += rec * k
+            }
+        }
 
-        if (B.lUpLeg) { B.lUpLeg.rotation.x += thigh; B.lUpLeg.rotation.z += splay }
-        if (B.rUpLeg) { B.rUpLeg.rotation.x += thigh; B.rUpLeg.rotation.z -= splay }
-        if (B.lLeg) B.lLeg.rotation.x += shin
-        if (B.rLeg) B.rLeg.rotation.x += shin
-        // Ankles level the soles back toward the ground once the knee is bent.
-        if (B.lFoot) B.lFoot.rotation.x += ankle
-        if (B.rFoot) B.rFoot.rotation.x += ankle
+        this._sitBone(B.lUpLeg, 'mixamorigLeftUpLeg', thigh, splay, overwrite)
+        this._sitBone(B.rUpLeg, 'mixamorigRightUpLeg', thigh, -splay, overwrite)
+        this._sitBone(B.lLeg, 'mixamorigLeftLeg', shin, 0, overwrite)
+        this._sitBone(B.rLeg, 'mixamorigRightLeg', shin, 0, overwrite)
+        this._sitBone(B.lFoot, 'mixamorigLeftFoot', ankle, 0, overwrite)
+        this._sitBone(B.rFoot, 'mixamorigRightFoot', ankle, 0, overwrite)
     }
 
     /**
@@ -530,9 +578,14 @@ export default class Character {
      * @param {number} groundY world Y of the FLOOR at the destination
      * @param {number} z world Z
      * @param {number} [yaw] facing after the jump
+     * @param {number} [settleMargin] how far ABOVE the floor to drop the
+     *   capsule, for physics to resolve on the next step. Pass 0 where nothing
+     *   will resolve it — during the frisbee session movement is locked for
+     *   the whole round, so the default margin would leave the player hovering
+     *   15cm over the pitch for as long as it lasts.
      */
-    teleportTo(x, groundY, z, yaw) {
-        this.position.set(x, groundY + this.capsuleCenterY + 0.15, z)
+    teleportTo(x, groundY, z, yaw, settleMargin = 0.15) {
+        this.position.set(x, groundY + this.capsuleCenterY + settleMargin, z)
         this.verticalVelocity = 0
         if (this.rigidBody) {
             this.rigidBody.setTranslation(

@@ -28,7 +28,7 @@ const PROXIMITY = 1.5
 const SIT_SINK = 0.02
 
 /** Step taken away from the seat when standing, so you don't stand inside it. */
-const STAND_STEP = 0.55
+const STAND_STEP = 0.24
 
 /** Seconds the stand-up slide takes. Matches the leg unfold so they read
  *  as one motion rather than a teleport followed by an animation. */
@@ -513,16 +513,60 @@ export default class SitPoints {
         character.setSitting(false)
         character.movementLocked = true    // released when the exit finishes
 
-        const seat = point.seatPos || point.position
+        const yaw = point.yaw + (point.tune?.yaw || 0)
+        const from = character.position.clone()
+        const toX = from.x + Math.sin(yaw) * STAND_STEP
+        const toZ = from.z + Math.cos(yaw) * STAND_STEP
+        const floorY = this._floorYAt(toX, toZ, point.seatTopY)
+        const groundY = floorY ?? Math.max(0, point.seatTopY - 0.4)
         this._exit = {
-            from: character.position.clone(),
+            from,
             to: new THREE.Vector3(
-                seat.x + Math.sin(point.yaw) * STAND_STEP,
-                point.seatTopY + character.capsuleCenterY,
-                seat.z + Math.cos(point.yaw) * STAND_STEP
+                toX,
+                groundY + character.capsuleCenterY,
+                toZ
             ),
             t: 0
         }
+    }
+
+    /**
+     * World Y of the floor under a stand-up landing, skipping the seat itself
+     * and sit-proxy meshes. Using the seat top as the landing Y left the
+     * character a few centimetres in the air with their feet still at chair
+     * height.
+     */
+    _floorYAt(x, z, seatTopY) {
+        const targets = []
+        this.scene.traverse((o) => {
+            if (!o.isMesh || !o.visible) return
+            if (/sit-proxy|Collid|Grass$|agua|river/i.test(o.name || '')) return
+            targets.push(o)
+        })
+        const ray = new THREE.Raycaster(
+            new THREE.Vector3(x, seatTopY + 0.7, z),
+            new THREE.Vector3(0, -1, 0),
+            0.05,
+            3.8
+        )
+        const hits = ray.intersectObjects(targets, false)
+        let seatHit = null
+        let below = null
+        for (const hit of hits) {
+            if (/sit-proxy|Collid/i.test(hit.object.name || '')) continue
+            // Still on the furniture (log, cushion, porch lip).
+            if (hit.point.y > seatTopY - 0.08) {
+                if (seatHit === null) seatHit = hit.point.y
+                continue
+            }
+            below = hit.point.y
+            break
+        }
+        // Prefer the real floor under the seat (grass, sand) when it's close.
+        // If the only thing far below is the world under a porch, keep the
+        // porch height so we don't drop through it.
+        if (below !== null && (seatHit === null || seatTopY - below < 0.7)) return below
+        return seatHit ?? below ?? null
     }
 
     /** Drive the easing started by _stand(). */

@@ -1,5 +1,8 @@
 import * as THREE from 'three'
-import { Fn, float, vec3, vec4, uniform, positionLocal, smoothstep, sin, time, length, mix } from 'three/tsl'
+import {
+    Fn, float, vec3, vec4, uniform, positionLocal, smoothstep, sin, time,
+    length, mix, instancedArray, instanceIndex, hash, uv, clamp
+} from 'three/tsl'
 import Experience from '../Experience.js'
 import { SOCIALS } from './ui/socialData.js'
 import { inputGlyph } from './ui/InputGlyph.js'
@@ -126,6 +129,7 @@ export default class SocialArea {
 
         this._buildRing()
         this._buildAura()
+        this._buildFireflies()
         this._ready = true
     }
 
@@ -133,6 +137,10 @@ export default class SocialArea {
         const self = this
         const io = {
             mesh: entry.node,
+            position: entry.worldPos,
+            // On the platform the statues sit at ~circleRadius; keep hover
+            // alive for the whole ring, not just the closest one.
+            proximityRadius: this.circleRadius + 2,
             onClick() {
                 if (self.state !== 'active') return
                 if (self.focused === entry) self._open()
@@ -211,6 +219,54 @@ export default class SocialArea {
         this.scene.add(this.aura)
 
         if (this.debug.active) this._setAuraDebug()
+    }
+
+    /**
+     * Five yellow fireflies that fade in with the proximity aura and drift
+     * around the ring. Same SpriteNodeMaterial + instancedArray pattern as
+     * the street-lamp embers — one draw call, GPU drift, additive glow.
+     */
+    _buildFireflies() {
+        const COUNT = 5
+        const positions = new Float32Array(COUNT * 3)
+        for (let i = 0; i < COUNT; i++) {
+            const a = (i / COUNT) * Math.PI * 2 + (i * 0.37)
+            // Orbit the visible yellow band (inner radius + glow), not the
+            // Circle mesh — its bbox is only ~1 m and would park them inside.
+            const rad = this.auraRadius + 0.2 + (i % 3) * 0.22
+            positions[i * 3 + 0] = this.center.x + Math.cos(a) * rad
+            positions[i * 3 + 1] = this.auraY + 0.32 + (i % 5) * 0.14
+            positions[i * 3 + 2] = this.center.z + Math.sin(a) * rad
+        }
+
+        this.uFireflyOpacity = uniform(0)
+        const posAttr = instancedArray(positions, 'vec3').toAttribute()
+        const d = length(uv().sub(0.5))
+        const glow = clamp(float(0.05).div(d).sub(0.1), 0.0, 1.0)
+        const baseTime = time.add(hash(instanceIndex).mul(999))
+        const blink = sin(baseTime.mul(1.15)).mul(0.5).add(0.5).mul(0.55).add(0.45)
+        const flyOffset = vec3(
+            sin(baseTime.mul(0.55)).mul(0.85),
+            sin(baseTime.mul(1.05)).mul(0.28),
+            sin(baseTime.mul(0.42)).mul(0.85)
+        )
+
+        const yellow = vec3(1.0, 0.86, 0.32)
+        const material = new THREE.SpriteNodeMaterial()
+        material.positionNode = posAttr.add(flyOffset)
+        material.scaleNode = float(0.07).mul(this.uFireflyOpacity)
+        material.outputNode = vec4(yellow.mul(glow).mul(2.0), glow.mul(blink).mul(this.uFireflyOpacity))
+        material.blending = THREE.AdditiveBlending
+        material.transparent = true
+        material.depthWrite = false
+
+        const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 8), material)
+        mesh.count = COUNT
+        mesh.frustumCulled = false
+        mesh.renderOrder = 6
+        mesh.visible = false
+        this.scene.add(mesh)
+        this.fireflies = mesh
     }
 
     // ─── Bottom pill UI ──────────────────────────────────────────────────
@@ -510,7 +566,8 @@ export default class SocialArea {
 
         // Early-out when far and everything already settled.
         const auraTarget = this.state === 'active' ? 0.4 : (this.state === 'near' ? 1 : 0)
-        if (this.state === 'far' && !this.aura.visible && this._settled) return
+        const fireflyTarget = this.state === 'far' ? 0 : 1
+        if (this.state === 'far' && !this.aura.visible && !this.fireflies?.visible && this._settled) return
 
         const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
         const alpha = (f) => 1 - Math.pow(1 - f, dt * 60)
@@ -519,6 +576,14 @@ export default class SocialArea {
         const op = this.uAuraOpacity.value
         this.uAuraOpacity.value = op + (auraTarget - op) * alpha(0.08)
         this.aura.visible = this.uAuraOpacity.value > 0.01 || auraTarget > 0
+
+        if (this.uFireflyOpacity) {
+            const fo = this.uFireflyOpacity.value
+            this.uFireflyOpacity.value = fo + (fireflyTarget - fo) * alpha(0.08)
+            if (this.fireflies) {
+                this.fireflies.visible = this.uFireflyOpacity.value > 0.01 || fireflyTarget > 0
+            }
+        }
 
         // Statue rise / focus scale
         this._settled = true
@@ -581,6 +646,12 @@ export default class SocialArea {
             this.scene.remove(this.aura)
             this.aura.geometry.dispose()
             this.aura.material.dispose()
+        }
+        if (this.fireflies) {
+            this.scene.remove(this.fireflies)
+            this.fireflies.geometry.dispose()
+            this.fireflies.material.dispose()
+            this.fireflies = null
         }
     }
 }

@@ -190,6 +190,8 @@ export default class HouseInterior {
         const self = this
         this._lampInteractive = {
             mesh: node,
+            position: pos,
+            proximityRadius: this.lamp.proximityRadius,
             onHover() {
                 if (self.lamp.isHovered) return
                 self.lamp.isHovered = true
@@ -321,6 +323,8 @@ export default class HouseInterior {
 
         const self = this
         rec.adapter = {
+            position: rec.position,
+            proximityRadius: rec.proximityRadius,
             onHover() {
                 if (rec.isHovered) return
                 rec.isHovered = true

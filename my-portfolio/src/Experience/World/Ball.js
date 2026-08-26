@@ -84,6 +84,8 @@ export default class Ball {
         this.mesh.receiveShadow = false
         this.mesh.visible = false
         this.mesh.userData.interactiveObject = {
+            position: this.position,
+            proximityRadius: this.kickRadius,
             onHover: () => {
                 if (this.isHovered) return
                 this.isHovered = true

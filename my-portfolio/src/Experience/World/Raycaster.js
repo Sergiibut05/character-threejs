@@ -19,8 +19,58 @@ export default class Raycaster
 
         // List of interactive objects to check
         this.interactiveObjects = []
+        this._worldPos = new THREE.Vector3()
 
         this.setEventListeners()
+    }
+
+    /**
+     * Hover/click only count when the character is near the object. Without
+     * this, a mouse-over from across the map still drew the outline (and
+     * opened some panels) because the raycaster has no distance of its own.
+     */
+    _isInInteractRange(io, mesh)
+    {
+        const character = this.experience.world?.character
+        if (!character || !io) return false
+
+        const base = io.hoverRadius ?? io.proximityRadius ?? io.kickRadius
+        const r = (Number.isFinite(base) ? base : 2.2) * 1.15
+
+        let x
+        let z
+        const pos = io.position
+        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z))
+        {
+            x = pos.x
+            z = pos.z
+        }
+        else if (mesh)
+        {
+            mesh.getWorldPosition(this._worldPos)
+            x = this._worldPos.x
+            z = this._worldPos.z
+        }
+        else
+        {
+            return false
+        }
+
+        const dx = character.position.x - x
+        const dz = character.position.z - z
+        return dx * dx + dz * dz <= r * r
+    }
+
+    /** First ray hit whose interactive is in range (skips far objects in front). */
+    _pickInteractive(intersects)
+    {
+        for (let i = 0; i < intersects.length; i++)
+        {
+            const mesh = intersects[i].object
+            const io = mesh.userData.interactiveObject
+            if (io && this._isInInteractRange(io, mesh)) return io
+        }
+        return null
     }
 
     // Register an interactive object to be checked by raycaster
@@ -92,15 +142,10 @@ export default class Raycaster
         const meshes = this.interactiveObjects.map(obj => obj.mesh)
         const intersects = this.raycaster.intersectObjects(meshes)
 
-        if(intersects.length > 0)
+        const interactiveObject = this._pickInteractive(intersects)
+        if(interactiveObject?.onClick)
         {
-            const clickedMesh = intersects[0].object
-            const interactiveObject = clickedMesh.userData.interactiveObject
-
-            if(interactiveObject)
-            {
-                interactiveObject.onClick()
-            }
+            interactiveObject.onClick()
         }
     }
 
@@ -117,15 +162,10 @@ export default class Raycaster
         const meshes = this.interactiveObjects.map(obj => obj.mesh)
         const intersects = this.raycaster.intersectObjects(meshes)
 
-        if(intersects.length > 0)
+        const interactiveObject = this._pickInteractive(intersects)
+        if(interactiveObject?.onClick)
         {
-            const touchedMesh = intersects[0].object
-            const interactiveObject = touchedMesh.userData.interactiveObject
-
-            if(interactiveObject)
-            {
-                interactiveObject.onClick()
-            }
+            interactiveObject.onClick()
         }
     }
 
@@ -153,36 +193,25 @@ export default class Raycaster
         const meshes = this.interactiveObjects.map(obj => obj.mesh)
         const intersects = this.raycaster.intersectObjects(meshes)
 
-        if(intersects.length > 0)
-        {
-            const hitMesh = intersects[0].object
-            const hitObject = hitMesh.userData.interactiveObject
+        const hitObject = this._pickInteractive(intersects)
 
-            // New hover target
+        if(hitObject)
+        {
             if(this.hoveredObject !== hitObject)
             {
-                // Unhover previous
                 if(this.hoveredObject)
                 {
                     this.hoveredObject.onUnhover()
                 }
 
-                // Hover new
                 this.hoveredObject = hitObject
-                if(this.hoveredObject)
-                {
-                    this.hoveredObject.onHover()
-                }
+                this.hoveredObject.onHover()
             }
         }
-        else
+        else if(this.hoveredObject)
         {
-            // No intersection - unhover if we had one
-            if(this.hoveredObject)
-            {
-                this.hoveredObject.onUnhover()
-                this.hoveredObject = null
-            }
+            this.hoveredObject.onUnhover()
+            this.hoveredObject = null
         }
     }
 }
