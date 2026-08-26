@@ -12,6 +12,7 @@ import GamepadControls from './Utils/GamepadControls.js'
 import InputDevice from './Utils/InputDevice.js'
 import AudioManager from './Utils/AudioManager.js'
 import SettingsModal from './World/ui/SettingsModal.js'
+import WorldMap from './World/ui/WorldMap.js'
 import sources from './sources.js'
 
 let instance = null
@@ -48,6 +49,9 @@ export default class Experience {
         this.gamepad = new GamepadControls()
         this.audio = new AudioManager(this)
         this.settingsUi = new SettingsModal(this)
+        // Only binds a key here; the panel and its picture are built the first
+        // time it is opened, so it costs nothing on the loading path.
+        this.worldMap = new WorldMap(this)
 
         // Cloud transition elements
         this.cloudTransition = document.getElementById('cloud-transition')
@@ -224,6 +228,9 @@ export default class Experience {
 
         // Start rendering scene immediately under the iris.
         this.ready = true
+        // Reveals the world-only chrome (the map button); the start screen has
+        // nothing to travel around.
+        document.body.classList.add('is-in-world')
 
         // Kick off the soundtrack — this click is the user gesture that unlocks
         // audio autoplay. AudioManager handles its own delay + fade-in so the

@@ -1054,6 +1054,23 @@ body:has(.cloud-transition.visible) .quality-fab
     display: block;
 }
 
+/* Map button: same pill as the quality gear, stacked underneath it. Hidden
+   until the world is running — there is nothing to travel around before that. */
+.map-fab
+{
+    top: calc(max(12px, env(safe-area-inset-top, 0px)) + 56px);
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.92);
+}
+
+body.is-in-world .map-fab
+{
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+
 .quality-modal-overlay
 {
     position: fixed;

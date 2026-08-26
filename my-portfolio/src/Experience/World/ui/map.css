@@ -1,0 +1,101 @@
+/* ── World map ────────────────────────────────────────────────────────────
+   The map sits inside the shared paper Modal, so it inherits the panel, the
+   close button and the hint bar. Everything here is the picture and its pins. */
+
+.fz-map {
+    position: relative;
+    width: min(62vh, 100%);
+    /* The art is square; anything else would letterbox the pins away from
+       where the transform says they belong. */
+    aspect-ratio: 1 / 1;
+    margin-inline: auto;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 26px rgba(40, 60, 45, 0.18);
+}
+
+.fz-map-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* Pins are positioned by percentage of the picture, so they stay put at any
+   size — which is the whole reason the map is kept square. */
+.fz-map-pin {
+    position: absolute;
+    /* left/top come from the world→map transform, in JS. */
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font: inherit;
+    color: #1d4232;
+    /* Above the picture, and above its own neighbours when raised. */
+    z-index: 1;
+}
+
+.fz-map-dot {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3.5px solid #2f8f5b;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.fz-map-label {
+    /* Sits under the dot without pushing it off its coordinate: the pin is
+       centred on the dot, and the label is pulled out of the layout flow. */
+    position: absolute;
+    top: calc(50% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-family: var(--fz-font-title, inherit);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: background 0.16s ease;
+}
+
+.fz-map-pin:hover,
+.fz-map-pin:focus-visible {
+    outline: none;
+    z-index: 2;
+}
+.fz-map-pin:hover .fz-map-dot,
+.fz-map-pin:focus-visible .fz-map-dot {
+    transform: scale(1.28);
+    border-color: #1d6f43;
+}
+.fz-map-pin:hover .fz-map-label,
+.fz-map-pin:focus-visible .fz-map-label {
+    background: #ffffff;
+}
+.fz-map-pin:active .fz-map-dot {
+    transform: scale(1.08);
+}
+
+@media (max-width: 620px) {
+    .fz-map { width: 100%; }
+    .fz-map-label { font-size: 11px; padding: 2px 6px; }
+    .fz-map-dot { width: 13px; height: 13px; border-width: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-map-dot,
+    .fz-map-label { transition: none; }
+}
