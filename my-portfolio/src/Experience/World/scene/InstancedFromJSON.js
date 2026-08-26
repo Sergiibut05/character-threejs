@@ -53,7 +53,6 @@ export default class InstancedFromJSON {
     constructor(name, gltf, instances, options = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
 
         this.name = name
         this.instancesData = instances?.instances || []
@@ -75,8 +74,8 @@ export default class InstancedFromJSON {
             materialFactory = null,
             map = null,
             color = 0xffffff,
-            castShadow = !this.isLow,
-            receiveShadow = !this.isLow,
+            castShadow = true,
+            receiveShadow = true,
             dynamic = false,
             rotationMode = undefined,
             inheritTemplateRotation = false

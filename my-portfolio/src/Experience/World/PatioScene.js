@@ -50,7 +50,6 @@ export default class PatioScene {
         this.physics = this.experience.world.physics
         this.time = this.experience.time
         this.debug = this.experience.debug
-        this.isLow = this.experience.quality.isLow
 
         this.pieces = {}
         this.colliderBodies = []
@@ -118,7 +117,7 @@ export default class PatioScene {
         mesh.material?.dispose?.()
         mesh.material = material
         mesh.castShadow = false
-        mesh.receiveShadow = !this.isLow
+        mesh.receiveShadow = true
     }
 
     _debugPalm() {

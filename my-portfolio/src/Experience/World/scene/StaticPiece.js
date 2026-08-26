@@ -14,7 +14,6 @@ export default class StaticPiece {
     constructor(name, gltf, options = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
 
         this.name = name
         this.options = options
@@ -37,8 +36,8 @@ export default class StaticPiece {
             color = null,
             flatShading = false,
             preserveOwnMaps = false,
-            castShadow = !this.isLow,
-            receiveShadow = !this.isLow,
+            castShadow = true,
+            receiveShadow = true,
             meshMaps = {}
         } = this.options
 

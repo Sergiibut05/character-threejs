@@ -11,7 +11,6 @@ export default class GrassBorders {
     constructor(gltf, sharedUniforms) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
 
         if (!gltf || !gltf.scene) {
             console.warn('GrassBorders: missing gltf.scene')
@@ -31,8 +30,8 @@ export default class GrassBorders {
             if (!child.isMesh) return
             child.material?.dispose?.()
             child.material = material
-            child.castShadow = !this.isLow
-            child.receiveShadow = !this.isLow
+            child.castShadow = true
+            child.receiveShadow = true
         })
 
         this.scene.add(this.root)

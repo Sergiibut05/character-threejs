@@ -65,7 +65,6 @@ export default class ProjectCarts {
 
         this.stands = []
         if (standTpl) {
-            const isLow = this.experience.quality?.isLow
             // Same material the instancer built, so the stands look untouched.
             const standMat = createStylizedPropNodeMaterial({ map: r.tinyAtlas || null })
             standTpl.material?.dispose?.()
@@ -78,8 +77,8 @@ export default class ProjectCarts {
                     inst.position, inst.rotation, inst.scale, mesh.matrix, 'conjugate'
                 )
                 mesh.matrixAutoUpdate = false
-                mesh.castShadow = !isLow
-                mesh.receiveShadow = !isLow
+                mesh.castShadow = true
+                mesh.receiveShadow = true
                 mesh.name = `CartStand:${this.stands.length}`
                 this.scene.add(mesh)
                 this.stands.push(mesh)

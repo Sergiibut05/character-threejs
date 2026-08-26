@@ -40,7 +40,7 @@ export default class GoalPost {
             // Plain white goal (classic look) with the stylized shading.
             child.material = createStylizedPropNodeMaterial({ color: 0xffffff })
             old?.dispose?.()
-            child.castShadow = !this.experience.quality?.isLow
+            child.castShadow = true
             child.receiveShadow = false
         })
 

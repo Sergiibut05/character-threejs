@@ -32,7 +32,6 @@ export default class BaseballPitch {
     constructor(gltf) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
 
         if (!gltf || !gltf.scene) {
             console.warn('BaseballPitch: missing gltf.scene')
@@ -60,7 +59,7 @@ export default class BaseballPitch {
             child.material.polygonOffsetFactor = -1
             child.material.polygonOffsetUnits = -1
             child.castShadow = false
-            child.receiveShadow = !this.isLow
+            child.receiveShadow = true
             old?.dispose?.()
         })
 

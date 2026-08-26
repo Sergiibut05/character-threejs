@@ -23,6 +23,11 @@ const TWO_PI = Math.PI * 2
  */
 const SHADOW_DEPTH_MARGIN = 12
 
+// Shadow bias expressed in WORLD units; converted to the camera's NDC bias in
+// _applyShadowQuality. Matches what the old hardcoded -0.0001 worked out to
+// around noon, which is where it was tuned.
+const SHADOW_BIAS_WORLD = 0.0035
+
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
 const _shadowRight = new THREE.Vector3()
@@ -163,10 +168,9 @@ export default class Environment {
         const quality = this.experience.quality
 
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 1.6)
-        this.sunLight.castShadow = quality.shadowsEnabled
         this.sunLight.shadow.camera.near = 0.5
-        this.sunLight.shadow.bias = -0.0001
         this.sunLight.shadow.normalBias = 0.04
+        // castShadow and bias are both quality-derived — see _applyShadowQuality.
 
         this._applyShadowQuality()
 
@@ -185,57 +189,55 @@ export default class Environment {
     }
 
     /**
-     * How far back the sun has to sit for the shadow frustum to actually
-     * contain the ground it claims to cover — and keep near/far in step.
+     * Half the depth the shadow camera needs along the light axis, sized for
+     * the WORST case the cycle can produce — the shallowest sun the clamp
+     * allows — and therefore constant for a given quality level.
      *
-     * This used to be a flat `SUN_DISTANCE = 8` against an ortho box of
-     * ±shadowCameraSize (50) and near 0.5, which cannot work: the box is a
-     * 100x100 window onto the ground, but the camera making it sat 8 units
-     * away, so everything more than 7.5 units *behind* the shadow centre along
-     * the sun azimuth fell outside the near plane and was shaded with no
-     * shadow lookup at all. The result was a dead-straight, dead-obvious line
-     * across the grass — the frustum's near plane intersecting the ground —
-     * with correctly shadowed terrain on one side and flat unshadowed terrain
-     * on the other. It read as a seam between two floor meshes; it was not.
+     * The geometry: the ortho box's vertical axis in light space has
+     * horizontal component `elev`, so a ground point `L` along the sun azimuth
+     * only reaches the box edge at `L = sc / elev`, and its depth offset from
+     * the centre is `L * horizontal`. Hence `sc * horizontal / elev` of depth
+     * either side of the centre. Undersize this and the frustum's near plane
+     * cuts the ground in a dead-straight line, correctly shadowed on one side
+     * and flat on the other — it reads as a seam between two floor meshes.
      *
-     * The depth actually needed follows from the geometry. The box's vertical
-     * axis in light space has horizontal component `elev`, so a ground point
-     * `L` along the sun azimuth only reaches the box edge at `L = sc / elev`,
-     * and its depth offset from the centre is `L * horizontal`. Hence
-     * `sc * horizontal / elev` of depth on EACH side of the centre. Measured
-     * over a full cycle that runs 35 units at noon up to 179 at the shallowest
-     * sun, against the flat 8 it had. Ortho shadows have uniform depth
-     * precision, so the only cost of the
-     * bigger range is that `shadow.bias` (an NDC offset) scales with it —
-     * which is why the heavy lifting here is left to `normalBias`, in world
-     * units and therefore unaffected.
+     * This used to track the LIVE elevation and rebuild the projection
+     * whenever the range moved more than a unit. A full day here is 47
+     * seconds, so that fires constantly — measured at 92 rebuilds in 120
+     * frames around sunrise — and it turns a smooth change into a staircase.
+     * `shadow.bias` is an NDC offset, so it scales with the depth range: every
+     * step nudged the effective bias and the shadows shimmered. An ortho
+     * shadow camera has UNIFORM depth precision, so holding the range at the
+     * worst case costs nothing but a constant bias scale, and buys a shadow
+     * projection that never changes mid-flight.
      */
-    _shadowDistanceFor(elevation) {
-        const sc = this.experience.quality.shadowCameraSize
-        const elev = Math.max(0.05, elevation)
+    _shadowHalfDepthFor(sc) {
+        const elev = MIN_SHADOW_ELEVATION
         const horizontal = Math.sqrt(Math.max(0, 1 - elev * elev))
-        const halfDepth = (sc * horizontal) / elev + SHADOW_DEPTH_MARGIN
-
-        const cam = this.sunLight.shadow.camera
-        const far = halfDepth * 2
-        // updateProjectionMatrix is not free and the sun barely moves between
-        // frames, so only rebuild when the range has actually shifted.
-        if (Math.abs(cam.far - far) > 1) {
-            cam.far = far
-            cam.updateProjectionMatrix()
-        }
-        return halfDepth
+        return (sc * horizontal) / elev + SHADOW_DEPTH_MARGIN
     }
 
+    /**
+     * Everything the quality level decides about shadows, in one place, and
+     * re-run on every quality change — so switching level at runtime lands in
+     * the same state a reload at that level would.
+     */
     _applyShadowQuality() {
         const quality = this.experience.quality
         const sc = quality.shadowCameraSize
         const cam = this.sunLight.shadow.camera
+
+        this.sunLight.castShadow = quality.sunShadows
+
         cam.left = -sc; cam.right = sc; cam.top = sc; cam.bottom = -sc
-        // `far` is owned by _shadowDistanceFor(), which sizes it to the box and
-        // the sun's elevation; this is only a sane value for the first frame.
-        cam.far = quality.shadowCameraFar
+        this._shadowHalfDepth = this._shadowHalfDepthFor(sc)
+        cam.far = this._shadowHalfDepth * 2
         cam.updateProjectionMatrix()
+
+        // `shadow.bias` is an NDC offset, so the same number means a different
+        // distance depending on the depth range. Author it in world units and
+        // convert, or it silently re-tunes itself whenever the range changes.
+        this.sunLight.shadow.bias = -SHADOW_BIAS_WORLD / this._shadowHalfDepth
 
         // Shadow map size is locked to 1024x1024 to avoid reallocation crashes
         this.sunLight.shadow.mapSize.width = quality.shadowMapSize
@@ -421,7 +423,9 @@ export default class Environment {
             shadowDir.normalize()
         }
 
-        const sunDistance = this._shadowDistanceFor(shadowDir.y)
+        // Constant: the range is sized for the worst case up front, so the
+        // shadow projection never has to be rebuilt mid-cycle.
+        const sunDistance = this._shadowHalfDepth
         this.sunLight.position.copy(shadowDir).multiplyScalar(sunDistance)
 
         // --- Centre the shadow camera on the character (texel-snapped) ---

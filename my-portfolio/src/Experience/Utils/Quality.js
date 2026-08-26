@@ -95,6 +95,20 @@ export default class Quality extends EventEmitter {
      */
     get shadowsEnabled() { return REAL_SHADOWS_SUPPORTED }
 
+    /**
+     * Whether the sun actually casts. This is the ONE switch that turns real
+     * shadows on and off — per-object castShadow/receiveShadow flags say what
+     * an object WOULD do, never what the current quality level allows.
+     *
+     * They used to be written as `!quality.isLow` at construction time and
+     * never revisited, so changing quality at runtime left them stale: coming
+     * from low nothing ever started casting, and coming from high everything
+     * kept casting under the low-quality shadow settings. Only a reload looked
+     * right. With the decision living here instead, a quality change is one
+     * assignment and both directions match a fresh load.
+     */
+    get sunShadows() { return REAL_SHADOWS_SUPPORTED && this.isHigh }
+
     /** Fixed to 1024. Resizing this dynamically in WebGPU causes crashes. */
     get shadowMapSize()    { return 1024 }
     /** PCF kernel half-size: 1 low (sharp, cheap) / 3 high (soft, expensive). */
@@ -106,8 +120,6 @@ export default class Quality extends EventEmitter {
      * (softer / coarser texels — fine for this art style).
      */
     get shadowCameraSize() { return this.isLow ? 40 : 50 }
-    /** Depth span of the shadow camera along the light axis (avoid far clipping on big scenes). */
-    get shadowCameraFar()  { return this.isLow ? 90 : 120 }
 
     /** Grass blade count (per spawn cluster). */
     get grassCount()      { return this.isLow ? 6000 : 10000 }

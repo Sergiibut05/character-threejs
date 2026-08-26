@@ -56,7 +56,6 @@ export default class StreetLamps {
 
         const matBody = createStylizedPropNodeMaterial({ map: r.tinyAtlas })
         const matLight = this._makeLightMaterial(r.tinyAtlas)
-        const isLow = this.experience.quality?.isLow
         const mPostInv = postNode.matrixWorld.clone().invert()
 
         for (const ref of refs) {
@@ -71,7 +70,7 @@ export default class StreetLamps {
             this.scene.add(group)
             group.updateMatrixWorld(true)
 
-            this._applyMaterials(clone, matBody, matLight, isLow)
+            this._applyMaterials(clone, matBody, matLight)
 
             const lightNode = clone.getObjectByName('lamp-light')
             if (lightNode) this.heads.push(lightNode.getWorldPosition(new THREE.Vector3()))
@@ -82,15 +81,15 @@ export default class StreetLamps {
         return true
     }
 
-    _applyMaterials(clone, matBody, matLight, isLow) {
+    _applyMaterials(clone, matBody, matLight) {
         const assign = (name, mat, glowing = false) => {
             const node = clone.getObjectByName(name)
             node?.traverse((c) => {
                 if (!c.isMesh) return
                 c.material?.dispose?.()
                 c.material = mat
-                c.castShadow = glowing ? false : !isLow
-                c.receiveShadow = glowing ? false : !isLow
+                c.castShadow = !glowing
+                c.receiveShadow = !glowing
             })
         }
         assign('post', matBody)

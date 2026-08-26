@@ -46,7 +46,6 @@ export default class ClonedFromJSON {
     constructor(name, gltf, instances, options = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
-        this.isLow = this.experience.quality.isLow
 
         this.name = name
         this.roots = []
@@ -58,8 +57,8 @@ export default class ClonedFromJSON {
         const {
             rotationMode = undefined,
             yOffset = 0,
-            castShadow = !this.isLow,
-            receiveShadow = !this.isLow
+            castShadow = true,
+            receiveShadow = true
         } = options
         this.yOffset = yOffset
 

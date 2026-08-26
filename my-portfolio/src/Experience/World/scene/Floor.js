@@ -62,7 +62,6 @@ export default class Floor {
         this.scene = this.experience.scene
         this.resources = this.experience.resources
         this.debug = this.experience.debug
-        this.isLow = this.experience.quality.isLow
 
         if (!gltf || !gltf.scene) {
             console.warn('Floor: missing gltf.scene')

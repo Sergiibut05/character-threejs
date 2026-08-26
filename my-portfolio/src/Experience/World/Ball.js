@@ -80,7 +80,7 @@ export default class Ball {
         material.colorNode = base.mul(dayNightLitTint)
 
         this.mesh = new THREE.Mesh(geometry, material)
-        this.mesh.castShadow = !this.experience.quality?.isLow
+        this.mesh.castShadow = true
         this.mesh.receiveShadow = false
         this.mesh.visible = false
         this.mesh.userData.interactiveObject = {

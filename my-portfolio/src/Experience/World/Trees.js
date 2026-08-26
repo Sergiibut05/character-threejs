@@ -93,9 +93,8 @@ export default class Trees {
             this.references.length
         )
         this.bodies.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-        const isLow = this.experience.quality?.isLow
-        this.bodies.castShadow = !isLow
-        this.bodies.receiveShadow = !isLow
+        this.bodies.castShadow = true
+        this.bodies.receiveShadow = true
 
         // Honour the trunk node's own rotation/scale (NOT its translation — the
         // reference is what says where the tree goes). Skipping it rendered the
