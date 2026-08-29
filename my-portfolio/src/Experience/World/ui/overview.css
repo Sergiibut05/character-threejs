@@ -1407,38 +1407,55 @@
     .ov-hero-pattern::before { --ov-tile: 300px; }
     .ov-hero-pattern::after  { --ov-tile: 222px; }
 
-    /* Phone hero: a masthead, not a stack.
-       Stacked, the character sat alone in a band of his own with the name far
-       below, and the two read as unrelated blocks. Pairing him with the NAME
-       makes one composition — he stands at the end of it like a nameplate —
-       while the prose and the buttons keep the full width they need.
+    /* Phone hero: name and role across the top, then the pitch and the two
+       buttons in a column with the character beside them.
        `display: contents` is what allows it: it dissolves the text wrapper so
-       the name can be a grid item beside him and the rest can span. */
+       each part can be placed on the grid independently. */
     .ov-hero-inner {
-        grid-template-columns: minmax(0, 1fr) clamp(124px, 40%, 190px);
-        column-gap: clamp(8px, 3vw, 18px);
+        grid-template-columns: minmax(0, 1fr) clamp(96px, 30%, 165px);
+        column-gap: clamp(10px, 3vw, 18px);
         row-gap: 0;
-        align-items: end;
+        align-items: start;
     }
     .ov-hero-text { display: contents; }
     .ov-name {
-        grid-column: 1;
+        grid-column: 1 / -1;
         grid-row: 1;
-        align-self: end;
-        /* The column is already narrow; the 7ch clamp would break it further. */
         max-width: none;
+    }
+    .ov-role {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        margin-top: 10px;
+    }
+    /* The pitch keeps the FULL width. Sharing its row with the character
+       squeezed it to ~26 characters a line — eight lines of ribbon on a
+       375px screen, which is well under a readable measure. */
+    .ov-lede {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        margin-top: 18px;
+    }
+    /* The buttons are what he stands next to instead: a block roughly his own
+       height, at the end of the hero where the eye lands before scrolling —
+       so he is company for the call to action rather than a wall in front of
+       the text. */
+    .ov-cta-row {
+        grid-column: 1;
+        grid-row: 4;
+        margin-top: 22px;
     }
     .ov-portal {
         grid-column: 2;
-        grid-row: 1;
+        grid-row: 4;
         order: 0;
         max-width: none;
         margin: 0;
+        align-self: end;
     }
-    .ov-role,
-    .ov-lede,
-    .ov-cta-row { grid-column: 1 / -1; }
-    .ov-role { margin-top: 14px; }
+    /* The column the buttons now live in is narrow; at the default 28px of
+       side padding "Enter the world" breaks onto a second line. */
+    .ov-cta-row .ov-btn { padding-inline: 18px; }
 
     /* Phone closing card.
        Two full columns squeezed the button until "Enter the world" broke onto
