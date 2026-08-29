@@ -155,15 +155,27 @@
     align-items: center;
     gap: 16px;
     padding: 12px var(--ov-pad);
-    background: rgba(251, 253, 245, 0.86);
-    backdrop-filter: blur(14px) saturate(1.3);
-    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    /* See-through while the page is at rest at the top, so the hero's drifting
+       motif field runs up behind the bar and straight through it instead of
+       being sliced off by a frosted band. The bar only becomes a surface once
+       there is content under it that has to stay readable. */
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border-bottom: 1px solid transparent;
-    transition: border-color 0.4s var(--ov-ease-soft), background 0.4s var(--ov-ease-soft);
+    /* Pulls the page up under the bar so the hero owns that strip. The height
+       is measured in JS (--ov-bar-h) because it changes across breakpoints;
+       the fallback is the desktop measurement. */
+    margin-bottom: calc(-1 * var(--ov-bar-h, 71px));
+    transition: border-color 0.4s var(--ov-ease-soft),
+                background 0.4s var(--ov-ease-soft),
+                backdrop-filter 0.4s var(--ov-ease-soft);
 }
 .ov-root.is-scrolled .ov-bar {
     border-bottom-color: var(--ov-line);
     background: rgba(251, 253, 245, 0.94);
+    backdrop-filter: blur(14px) saturate(1.3);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
 }
 
 /* Reading progress — a hairline that fills as you go. */
@@ -483,7 +495,11 @@
 .ov-hero {
     position: relative;
     overflow: hidden;
-    padding: clamp(40px, 7vh, 72px) var(--ov-pad) clamp(32px, 5vh, 56px);
+    /* The extra top padding is the bar's height given back: the strip behind
+       the bar belongs to the hero, so the pattern fills it, but nothing may be
+       laid out into it. */
+    padding: calc(clamp(40px, 7vh, 72px) + var(--ov-bar-h, 71px))
+             var(--ov-pad) clamp(32px, 5vh, 56px);
     background: none;
 }
 
@@ -1353,10 +1369,15 @@
 }
 
 @media (max-width: 900px) {
-    /* Stacked, a full-width dog would push the footer a long way down for no
-       gain — a smaller, centred one keeps the beat without the scroll. */
-    .ov-outro { grid-template-columns: 1fr; }
-    .ov-dog { max-width: 200px; margin: 4px auto 0; }
+    /* Kept side by side rather than stacked. Stacking put a centred dog under
+       left-aligned text and a left-aligned button — three axes in one small
+       card, with a lot of empty green beside him. Narrow, he still reads, and
+       the card goes back to being one tidy block. */
+    .ov-outro {
+        grid-template-columns: minmax(0, 1fr) clamp(96px, 30%, 150px);
+        gap: clamp(10px, 3vw, 20px);
+    }
+    .ov-dog { max-width: none; margin: 0; }
     .ov-project { grid-template-columns: 1fr; }
     .ov-project-media { min-height: 190px; max-height: 260px; }
 }
@@ -1377,6 +1398,79 @@
     .ov-back { padding: 8px 12px; margin-right: auto; }
     .ov-cta-row .ov-btn { flex: 1 1 100%; }
     .ov-skill-row { grid-template-columns: 1fr; gap: 12px; }
+
+    /* The motifs are sized for a desktop column. At 430px a 460px tile shows
+       barely one and a half of them, which reads as a few stray shapes rather
+       than a patterned field: the same count per screen needs a much smaller
+       tile. The 1.35 ratio between the layers is kept, because that ratio IS
+       the parallax — each layer travels its own tile per cycle. */
+    .ov-hero-pattern::before { --ov-tile: 300px; }
+    .ov-hero-pattern::after  { --ov-tile: 222px; }
+
+    /* Phone hero: a masthead, not a stack.
+       Stacked, the character sat alone in a band of his own with the name far
+       below, and the two read as unrelated blocks. Pairing him with the NAME
+       makes one composition — he stands at the end of it like a nameplate —
+       while the prose and the buttons keep the full width they need.
+       `display: contents` is what allows it: it dissolves the text wrapper so
+       the name can be a grid item beside him and the rest can span. */
+    .ov-hero-inner {
+        grid-template-columns: minmax(0, 1fr) clamp(124px, 40%, 190px);
+        column-gap: clamp(8px, 3vw, 18px);
+        row-gap: 0;
+        align-items: end;
+    }
+    .ov-hero-text { display: contents; }
+    .ov-name {
+        grid-column: 1;
+        grid-row: 1;
+        align-self: end;
+        /* The column is already narrow; the 7ch clamp would break it further. */
+        max-width: none;
+    }
+    .ov-portal {
+        grid-column: 2;
+        grid-row: 1;
+        order: 0;
+        max-width: none;
+        margin: 0;
+    }
+    .ov-role,
+    .ov-lede,
+    .ov-cta-row { grid-column: 1 / -1; }
+    .ov-role { margin-top: 14px; }
+
+    /* Phone closing card.
+       Two full columns squeezed the button until "Enter the world" broke onto
+       two lines — the dog was taking width the call to action needed. So only
+       the PARAGRAPH shares its row with him; the heading spans, and the button
+       spans too, which also matches the full-width buttons in the hero. */
+    .ov-outro {
+        grid-template-columns: minmax(0, 1fr) clamp(88px, 27%, 132px);
+        column-gap: clamp(10px, 3vw, 16px);
+        row-gap: 0;
+        align-items: end;
+    }
+    .ov-outro-text { display: contents; }
+    .ov-outro-title { grid-column: 1 / -1; grid-row: 1; }
+    .ov-outro-body {
+        grid-column: 1;
+        grid-row: 2;
+        margin-bottom: 0;
+    }
+    .ov-dog {
+        grid-column: 2;
+        grid-row: 2;
+        align-self: end;
+        max-width: none;
+        margin: 0;
+    }
+    .ov-outro-text .ov-btn--primary {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        justify-self: stretch;
+        margin-top: 18px;
+    }
 }
 
 @media (max-width: 420px) {

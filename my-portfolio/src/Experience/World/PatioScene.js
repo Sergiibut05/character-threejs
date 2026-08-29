@@ -234,7 +234,15 @@ export default class PatioScene {
             // scoreboards file).
             if (name === 'parkInfoBoardModel' && !this.pieces.infoBoard && r.parkInfoBoardModel) {
                 this.pieces.infoBoard = new StaticPiece('infoBoard', r.parkInfoBoardModel, {
-                    map: r.forestAtlas || null
+                    map: r.forestAtlas || null,
+                    // The frame takes the shared atlas; the `Map` plane inside
+                    // it takes the world map picture. preserveOwnMaps is what
+                    // switches StaticPiece out of its single-atlas fast path
+                    // into the per-mesh one — without it meshMaps is skipped.
+                    preserveOwnMaps: true,
+                    meshMaps: r.worldMapTexture
+                        ? { Map: { map: r.worldMapTexture, castShadow: false } }
+                        : {}
                 })
             }
         }

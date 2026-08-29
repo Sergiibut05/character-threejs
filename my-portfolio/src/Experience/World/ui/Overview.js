@@ -224,6 +224,7 @@ export default class Overview {
         // has to go too — otherwise the spy short-circuits and the active item
         // stays unmarked (and loses its white text) until the next scroll.
         this._currentId = null
+        this._syncBarHeight()
         this._updateScrollState()
         requestAnimationFrame(() => this._movePill())
     }
@@ -899,8 +900,19 @@ export default class Overview {
         })
     }
 
+    /**
+     * The bar is see-through at the top and the hero runs up behind it, which
+     * only lines up while both agree on how tall the bar is. It changes with
+     * the breakpoints, so it is measured rather than guessed.
+     */
+    _syncBarHeight() {
+        const h = this.bar?.offsetHeight
+        if (h) this.el.style.setProperty('--ov-bar-h', h + 'px')
+    }
+
     _onResize() {
         this._movePill()
+        this._syncBarHeight()
         this._updateScrollState()
         this.viewport?.resize()
         this.dogPortrait?.resize()
@@ -926,6 +938,7 @@ export default class Overview {
         document.addEventListener('keydown', this._onKeyDown)
         window.addEventListener('resize', this._onResize)
         window.addEventListener('pointermove', this._onPointerMove)
+        this._syncBarHeight()
         this._updateScrollState()
         this.viewport?.resize()
         this.viewport?.start()

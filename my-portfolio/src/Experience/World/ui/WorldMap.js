@@ -55,24 +55,29 @@ const DESTINATIONS = [
     {
         id: 'casa',
         label: 'Casa',
-        // In the open in front of the house (which occupies Z -8.9..-3.7).
-        x: 1.5, y: 0.21, z: -2.0, yaw: Math.PI,
+        // The world's own spawn point, looking at the house. Picked over a
+        // hand-placed spot in front of the door because the game already drops
+        // you here on load, so it is known-clear ground — the first attempt
+        // put you in a corner, clipped through a fence.
+        x: 0, y: 0.21, z: 0, yaw: 2.90,
         // The pin marks the house itself, not where you land.
         pin: { x: 1.55, z: -6.31 }
     },
     {
         id: 'frisbee',
         label: 'Frisbee',
-        // The activity's own anchor point, straight out of activities-points.glb,
-        // so arriving here puts the prompt up immediately.
-        x: 6.6989, y: 0.237, z: 5.72696, yaw: Math.PI / 2,
+        // Short of the activity anchor, not on it: the anchor is where the DOG
+        // waits, so landing exactly there put you inside the dog. 1.8 units
+        // back still sits inside the 2.25 activation radius, so the prompt
+        // comes up on arrival either way.
+        x: 4.9, y: 0.237, z: 5.72696, yaw: Math.PI / 2,
         pin: { x: 6.6989, z: 5.72696 }
     },
     {
         id: 'fuego',
         label: 'La hoguera',
         // Beside the fire, facing it. FIRE_POINT_THREE in World.js.
-        x: -12.8, y: 0.21, z: 3.11, yaw: -Math.PI / 2,
+        x: -12.45, y: 0.21, z: 3.11, yaw: -Math.PI / 2,
         pin: { x: -14.158, z: 3.11 }
     },
     {
@@ -86,7 +91,11 @@ const DESTINATIONS = [
         id: 'social',
         label: 'Zona social',
         x: -7.5, y: 0.21, z: 21.0, yaw: 2.66,
-        pin: { x: -5.45, z: 17.1 }
+        // Nudged west of the social-area bbox centre. This is the one pin the
+        // map art cannot corroborate — the illustration draws forest here and
+        // never depicted the structure — so unlike the rest it is placed from
+        // what the zone actually looks like in game, not from the fit.
+        pin: { x: -9.5, z: 17.1 }
     },
     {
         id: 'playa',

@@ -9,6 +9,7 @@ import SitPoints from './SitPoints.js'
 import Door from './Door.js'
 import HouseInterior from './HouseInterior.js'
 import ProjectCarts from './ProjectCarts.js'
+import MapBoard from './MapBoard.js'
 import GoalPost from './GoalPost.js'
 import Confetti from './Confetti.js'
 import Ball from './Ball.js'
@@ -148,6 +149,7 @@ export default class World {
 
             // West play area: project carts + goal + kickable ball + confetti
             this.projectCarts = new ProjectCarts()
+            this.mapBoard = new MapBoard()
             this.socialArea = new SocialArea()
             this.beachMinigame = new BeachMinigame()
             this.beachSession = new BeachSession(this.beachMinigame)
@@ -450,6 +452,7 @@ export default class World {
         if (this.houseInterior) {
             this.houseInterior.update()
         }
+        this.mapBoard?.update()
         if (this.projectCarts) {
             this.projectCarts.update()
         }

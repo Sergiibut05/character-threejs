@@ -296,6 +296,17 @@ const allSources = [
         path: '/models/InfoBoard/park-info-board-compressed.glb',
         priority: 'decorative'
     },
+    // The same picture the map panel shows, printed on the park sign.
+    {
+        name: 'worldMapTexture',
+        type: 'texture',
+        path: '/images/map/world-map.webp',
+        priority: 'decorative',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.flipY = false // Blender-authored plane UVs (glTF convention)
+        }
+    },
     {
         name: 'postModel',
         type: 'gltfModel',
