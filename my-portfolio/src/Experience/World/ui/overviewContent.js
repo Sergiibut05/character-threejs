@@ -106,6 +106,7 @@ export function getContent() {
         hero: {
             role: t('hero.role'),
             lede: t('hero.lede'),
+            ledeShort: t('hero.ledeShort'),
             enter: t('hero.enter'),
             enterLoading: t('hero.enterLoading'),
             cv: t('hero.cv'),

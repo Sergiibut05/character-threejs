@@ -299,6 +299,10 @@ export default class Overview {
         const role = txt('p', 'ov-role ov-reveal', c.hero.role)
         role.style.setProperty('--i', 1)
         const lede = txt('p', 'ov-lede ov-reveal', c.hero.lede)
+        // Two pitches, one shown at a time by CSS: the phone hero puts the
+        // text in a half-width column, where the long one is unreadable.
+        const ledeShort = txt('p', 'ov-lede ov-lede--short ov-reveal',
+            c.hero.ledeShort || c.hero.lede)
         lede.style.setProperty('--i', 2)
 
         const ctas = el('div', 'ov-cta-row ov-reveal')
@@ -322,7 +326,7 @@ export default class Overview {
         this.cvBtn = cv
         this._probeCv()
 
-        text.append(name, role, lede, ctas)
+        text.append(name, role, lede, ledeShort, ctas)
 
         // ── The window: the character from the world, and the door into it ──
         const portal = el('button', 'ov-portal ov-reveal')
