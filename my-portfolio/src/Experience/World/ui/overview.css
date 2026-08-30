@@ -1227,6 +1227,92 @@
         border-top: 1px solid var(--ov-line);
     }
 }
+
+/* ── Closing aura + frosted contact card ──────────────────────────────────
+   The page opens on a drifting motif field and, until now, ended on bare
+   paper. Two soft colour fields give the closing section that atmosphere
+   back, so the page is bookended rather than trailing off — and they are
+   what makes the frosted card possible at all: a backdrop blur over flat
+   cream has nothing to blur, and reads as a slightly grey rectangle.
+
+   They are radial-gradients, NOT solid shapes under filter: blur(). A
+   gradient is soft by construction, so this costs one paint and no filter
+   pass on a page that already drives two WebGPU canvases. Both stay inside
+   the section box: a blob hanging off the side would give .ov-root a
+   horizontal scrollbar on a phone. */
+#ov-contact {
+    position: relative;
+    /* Own stacking context, so the z-index: -1 blobs sink behind the cards
+       without falling through the page background. */
+    isolation: isolate;
+}
+#ov-contact::before,
+#ov-contact::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+}
+/* Both are placed to fall BEHIND the frosted card, not beside it — a blob in
+   the margin is decoration, a blob under the glass is what the glass is for.
+   Inset 3% rather than flush: the keyframes scale up to 1.14, and from a
+   flush edge that growth would spill out of the section and hand .ov-root a
+   horizontal scrollbar. */
+#ov-contact::before {
+    left: 3%;
+    top: 6%;
+    width: min(58%, 500px);
+    height: min(48%, 400px);
+    background: radial-gradient(closest-side,
+        rgba(65, 160, 110, 0.26), rgba(65, 160, 110, 0) 100%);
+    animation: ov-blob-a 34s var(--ov-ease-soft) infinite alternate;
+}
+#ov-contact::after {
+    right: 3%;
+    top: 20%;
+    width: min(52%, 440px);
+    height: min(42%, 350px);
+    background: radial-gradient(closest-side,
+        rgba(118, 188, 224, 0.22), rgba(118, 188, 224, 0) 100%);
+    animation: ov-blob-b 27s var(--ov-ease-soft) infinite alternate;
+}
+/* Slow enough to be atmosphere rather than movement — different periods so
+   the two never read as one shape sliding about. */
+@keyframes ov-blob-a {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(7%, -6%, 0) scale(1.14); }
+}
+@keyframes ov-blob-b {
+    from { transform: translate3d(0, 0, 0) scale(1.1); }
+    to   { transform: translate3d(-8%, 5%, 0) scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #ov-contact::before,
+    #ov-contact::after { animation: none; }
+}
+
+/* Frosted, and only here. Every other surface on this page is opaque paper
+   on purpose; the contact card is the one the page wants you to stop at, so
+   it gets the one different material — and the closing card below stays
+   paper, which now reads as hierarchy: glass holds the details, the solid
+   card is the thing you pick up and act on.
+   Guarded by @supports because without the blur a translucent card is just a
+   washed-out one. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .ov-contact-card {
+        background: rgba(255, 255, 255, 0.62);
+        -webkit-backdrop-filter: blur(20px) saturate(1.4);
+        backdrop-filter: blur(20px) saturate(1.4);
+        /* A near-white edge is the glass highlight, but white alone vanishes
+           against cream — the green ring in the shadow stack is what keeps
+           the card's outline legible where the aura does not reach. */
+        border-color: rgba(255, 255, 255, 0.72);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            0 0 0 1px rgba(65, 160, 110, 0.12),
+            0 20px 44px -22px rgba(38, 92, 70, 0.30);
+    }
+}
 .ov-fact-label {
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-2xs);

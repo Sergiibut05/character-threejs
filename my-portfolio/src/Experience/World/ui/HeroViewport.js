@@ -144,15 +144,21 @@ export default class HeroViewport {
         // Frame the whole figure with air around it, rather than a tight bust:
         // cropping a character mid-thigh reads as a mistake, and the notes need
         // headroom to rise into.
+        //
+        // Aiming ABOVE his mid-point is what buys that headroom: the camera Y
+        // is derived from this target, so raising it lifts the eye and the
+        // look-at together, sliding him down the frame without tilting him.
+        // At 0.54 he sat with his head 20% from the top and the notes flew out
+        // of frame; at 0.68 they have half again as much sky to climb.
         this._target = new THREE.Vector3(
             (box.min.x + box.max.x) * 0.5,
-            box.min.y + height * 0.54,
+            box.min.y + height * 0.68,
             (box.min.z + box.max.z) * 0.5
         )
-        // A touch further back than a tight portrait needs: the notes have to
-        // have somewhere to go, and at 2.45 his feet already grazed the bottom
-        // edge while the top note clipped.
-        this._radius = height * 2.7
+        // Pushing him down costs room at the bottom, so give a little back:
+        // 2.85 lands his feet at 91% of the frame, leaving the cast shadow
+        // (5.5% tall, centred on them) inside the portal instead of clipped.
+        this._radius = height * 2.85
         this._baseY = this._target.y + height * 0.14
         this._headY = box.max.y
         // The rig origin sits at chest height, so box.max.y (~0.23) is NOT the
@@ -294,10 +300,11 @@ export default class HeroViewport {
         }
 
         // The world lets notes climb a full body height, but that camera is far
-        // back. Here there is only ~0.4 units of sky above his head, so a 1.1
-        // climb sent them straight out of frame — they now travel the headroom
-        // that actually exists and fade before reaching the edge.
-        const rise = (this._height || 1.7) * 0.30
+        // back, so here the climb is bounded by the sky above his head — which
+        // the reframe above widened from 20% of the frame to 30%. This tracks
+        // it: 0.46 puts the apex just under the top edge, where the note is
+        // already fading out.
+        const rise = (this._height || 1.7) * 0.46
         const sway = (this._height || 1.7) * 0.18
         for (const note of this._notes) {
             if (!note.active) continue
