@@ -1461,14 +1461,14 @@
     .ov-dog {
         grid-row: 1;
         width: 100%;
-        max-width: 172px;
+        max-width: 215px;
         margin: 0 auto;
     }
-    .ov-outro-title { grid-row: 2; }
-    .ov-outro-body {
-        grid-row: 3;
-        margin: 10px 0 0;
-    }
+    .ov-outro-title { grid-row: 2; margin-top: 2px; }
+    /* No pitch here either, for the same reason as the hero: the dog, the
+       question and the button already say it, and the paragraph was only
+       taking room away from the dog. It stays on every wider screen. */
+    .ov-outro-body { display: none; }
     .ov-outro-text .ov-btn--primary {
         grid-row: 4;
         justify-self: stretch;
