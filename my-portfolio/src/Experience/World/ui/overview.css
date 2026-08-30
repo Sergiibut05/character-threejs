@@ -1290,6 +1290,9 @@
     position: relative;
     z-index: 1;
 }
+/* --ov-faint is measured against white paper; on the tinted glass it drops to
+   2.6:1. Darker here only, and still clearly subordinate to the address. */
+.ov-contact-card .ov-fact-label { color: #35604d; }
 .ov-fact-label {
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-2xs);
@@ -1302,15 +1305,21 @@
     font-family: var(--fz-font-title);
     font-size: clamp(var(--ov-t-base), 2.4vw, var(--ov-t-lg));
     font-weight: 600;
-    /* NOT --fz-green-500. That green measures 2.9:1 on white and 2.2:1 over
-       the card's green blobs, against the 4.5:1 this size needs — and this is
-       the one link on the page that has to be readable. Same hue, dark enough
-       to clear 4.9:1 on the tinted glass. */
-    color: #1a6b43;
-    text-decoration: none;
+    /* Ink, not --fz-green-500. On a desktop this card is only ~125px tall, so
+       any blob big enough to see crosses its whole height — there is no light
+       band to sit the address in, and a mid green on a green field is both
+       muddy and 2.2:1 where it needs 4.5:1. Ink reads as text on a tint and
+       measures 7.4:1; the underline carries "this is a link" now that the
+       colour no longer does. */
+    color: var(--fz-ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(65, 160, 110, 0.55);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
     word-break: break-word;
+    transition: text-decoration-color 0.2s var(--ov-ease-soft);
 }
-.ov-contact-mail:hover { text-decoration: underline; }
+.ov-contact-mail:hover { text-decoration-color: var(--fz-green-500); }
 
 .ov-socials { display: flex; flex-wrap: wrap; gap: 12px; }
 .ov-social {
@@ -1334,12 +1343,17 @@
 }
 .ov-social svg { width: 20px; height: 20px; }
 
-/* A quiet card, not a gradient banner: the button is the only saturated
-   thing here, which is what makes it read as the action. */
-/* A card laid on the paper, not a coloured banner. The blue sky it had fought
-   the warm page, and the soft ambient shadow made it float like every other
-   web block — a hard unblurred ledge, the same one the button uses, makes it
-   read as a physical piece of card you could pick up. */
+/* The dark half of the closing pair.
+   A single frosted card in a page of paper reads as an accident. Two cards
+   sharing one material — the same organic blob field, once light under glass
+   and once deep and solid — read as a coda instead: the document ends and the
+   page signs off. The masses are mirrored against the contact card above (big
+   one top-right here, top-left there) so stacked they alternate rather than
+   repeat.
+
+   It stays a card laid on the paper, not a banner: the hard unblurred ledge is
+   the same one the button uses, so it still reads as a physical thing you
+   could pick up. */
 .ov-outro {
     position: relative;
     display: grid;
@@ -1350,22 +1364,31 @@
     align-items: center;
     margin-top: 20px;
     padding: clamp(32px, 5vw, 48px);
-    border: 1.5px solid rgba(65, 160, 110, 0.24);
+    border: 1.5px solid rgba(155, 228, 202, 0.16);
     border-radius: var(--fz-radius);
-    background: #e9f2e4;
-    box-shadow: 0 6px 0 rgba(65, 160, 110, 0.16);
+    /* Radii in px for the same reason as the contact card: this box goes from
+       1120x290 to 335x385, and percentage radii would stretch with it. */
+    background:
+        radial-gradient(440px 330px at 94% 0%, rgba(65, 160, 110, 0.34), rgba(65, 160, 110, 0) 70%),
+        radial-gradient(300px 230px at 68% 66%, rgba(95, 197, 148, 0.15), rgba(95, 197, 148, 0) 72%),
+        radial-gradient(420px 320px at 4% 100%, rgba(65, 160, 110, 0.26), rgba(65, 160, 110, 0) 70%),
+        radial-gradient(260px 200px at 28% 30%, rgba(95, 197, 148, 0.12), rgba(95, 197, 148, 0) 72%),
+        #17392b;
+    box-shadow: 0 6px 0 rgba(23, 57, 43, 0.28);
 }
 .ov-outro-title {
     margin: 0;
     font-family: var(--fz-font-title);
     font-size: clamp(22px, 3.4vw, 30px);
     font-weight: 600;
-    color: #1d4232;
+    /* 11.9:1 on the base, 7.7:1 over the lightest blob. */
+    color: var(--fz-green-50);
 }
 .ov-outro-body {
     margin: 0 0 16px;
     max-width: 52ch;
-    color: var(--ov-muted);
+    /* 7.2:1 on the base, still 4.6:1 over the lightest blob. */
+    color: rgba(215, 242, 228, 0.80);
     font-size: var(--ov-t-base);
     line-height: 1.62;
 }
@@ -1420,7 +1443,10 @@
     height: 7%;
     transform: translate(-50%, -50%);
     border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(38, 92, 70, 0.30), rgba(38, 92, 70, 0) 72%);
+    /* Darker than the floor it falls on. The old (38, 92, 70) is LIGHTER than
+       the deep green card, so it painted a halo under him rather than a
+       shadow. */
+    background: radial-gradient(ellipse, rgba(4, 16, 11, 0.42), rgba(4, 16, 11, 0) 72%);
     pointer-events: none;
 }
 
