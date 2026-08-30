@@ -33,11 +33,6 @@ export default {
                 'estancias en empresa desarrollando web y móvil. Trabajo con ' +
                 'Angular, TypeScript y Kotlin, y busco mi primer puesto a ' +
                 'jornada completa.',
-            // Sólo móvil. Allí la columna es la mitad de ancha y el texto largo
-            // se convierte en una cinta de ocho líneas; esto dice lo mismo con
-            // una forma que cabe.
-            ledeShort: 'Desarrollador Multiplataforma especializado en Angular, ' +
-                'TypeScript y Kotlin. Busco puesto a jornada completa.',
             enter: 'Entrar al mundo',
             enterLoading: 'Preparando el mundo',
             cv: 'Descargar CV',

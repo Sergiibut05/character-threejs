@@ -540,9 +540,6 @@
     color: var(--ov-muted);
 }
 
-/* Shown only in the phone hero — see the 620px block. */
-.ov-lede--short { display: none; }
-
 .ov-lede {
     max-width: 46ch;
     margin: 20px 0 0;
@@ -1410,79 +1407,43 @@
     .ov-hero-pattern::before { --ov-tile: 300px; }
     .ov-hero-pattern::after  { --ov-tile: 222px; }
 
-    /* Phone hero: a centred masthead over a panel that holds the pitch, the
-       two buttons and the character together.
+    /* Phone hero: the character up top at full size, then the masthead, then
+       the buttons. One column, everything centred on the same axis.
        `display: contents` dissolves the text wrapper so each part can be
-       placed on the grid independently. */
+       placed on the grid independently of its source order. */
     .ov-hero-inner {
-        position: relative;
-        grid-template-columns: minmax(0, 1fr) clamp(104px, 32%, 158px);
-        column-gap: clamp(10px, 3vw, 16px);
+        grid-template-columns: 1fr;
+        column-gap: 0;
         row-gap: 0;
-        align-items: start;
+        align-items: stretch;
     }
     .ov-hero-text { display: contents; }
 
-    .ov-name {
-        grid-column: 1 / -1;
+    .ov-portal {
         grid-row: 1;
+        order: 0;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+    .ov-name {
+        grid-row: 2;
+        margin-top: 10px;
         max-width: none;
         text-align: center;
     }
     .ov-role {
-        grid-column: 1 / -1;
-        grid-row: 2;
+        grid-row: 3;
         margin-top: 8px;
-        margin-bottom: 26px;
         text-align: center;
     }
-
-    /* The panel is the grid's own ::before, spanning the two rows the pitch,
-       the buttons and the character occupy. A pseudo-element is a grid item
-       like any other, so the card needs no extra div — and the negative
-       margins are what turn the tracks it covers into the card's padding. */
-    .ov-hero-inner::before {
-        content: '';
-        grid-column: 1 / -1;
-        grid-row: 3 / span 2;
-        margin: -20px -10px;
-        border: 1.5px solid rgba(65, 160, 110, 0.30);
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.72);
-        z-index: 0;
-    }
-
-    /* The short pitch takes over here: in a half-width column the long one
-       runs to eight lines of ribbon. */
+    /* No pitch on the phone: the character, the name and the two buttons are
+       the whole message, and the paragraph only pushed them down. It still
+       carries the page on every wider screen. */
     .ov-lede { display: none; }
-    .ov-lede--short {
-        display: block;
-        grid-column: 1;
-        grid-row: 3;
-        margin: 0;
-        position: relative;
-        z-index: 1;
-    }
     .ov-cta-row {
-        grid-column: 1;
         grid-row: 4;
-        margin-top: 18px;
-        position: relative;
-        z-index: 1;
+        margin-top: 26px;
     }
-    .ov-portal {
-        grid-column: 2;
-        grid-row: 3 / span 2;
-        order: 0;
-        max-width: none;
-        margin: 0;
-        align-self: center;
-        position: relative;
-        z-index: 1;
-    }
-    /* The column the buttons now live in is narrow; at the default 28px of
-       side padding "Enter the world" breaks onto a second line. */
-    .ov-cta-row .ov-btn { padding-inline: 18px; }
 
     /* Phone closing card.
        Two full columns squeezed the button until "Enter the world" broke onto

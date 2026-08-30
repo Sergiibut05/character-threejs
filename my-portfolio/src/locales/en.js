@@ -28,11 +28,6 @@ export default {
                 'placements building web and mobile. I work with Angular, ' +
                 'TypeScript and Kotlin, and I am looking for my first full-time ' +
                 'role.',
-            // Phone only. The hero column there is half the width, so the full
-            // pitch runs to eight lines of ribbon; this says the same thing in
-            // a shape that fits.
-            ledeShort: 'Multiplatform App Developer specializing in Angular, ' +
-                'TypeScript and Kotlin. Seeking full-time opportunities.',
             enter: 'Enter the world',
             enterLoading: 'Getting the world ready',
             cv: 'Download CV',
