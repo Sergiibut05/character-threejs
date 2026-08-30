@@ -1445,36 +1445,34 @@
         margin-top: 26px;
     }
 
-    /* Phone closing card.
-       Two full columns squeezed the button until "Enter the world" broke onto
-       two lines — the dog was taking width the call to action needed. So only
-       the PARAGRAPH shares its row with him; the heading spans, and the button
-       spans too, which also matches the full-width buttons in the hero. */
+    /* Phone closing card — the same shape as the phone hero, on purpose.
+       The page opens with the character over the name and one button, and
+       closes with his dog over the title and one button: a pair of bookends
+       rather than two unrelated blocks. Everything on one centred axis. */
     .ov-outro {
-        grid-template-columns: minmax(0, 1fr) clamp(88px, 27%, 132px);
-        column-gap: clamp(10px, 3vw, 16px);
+        grid-template-columns: 1fr;
+        column-gap: 0;
         row-gap: 0;
-        align-items: end;
+        justify-items: center;
+        text-align: center;
+        padding: clamp(24px, 5vw, 36px) clamp(20px, 5vw, 32px) clamp(26px, 5vw, 36px);
     }
     .ov-outro-text { display: contents; }
-    .ov-outro-title { grid-column: 1 / -1; grid-row: 1; }
-    .ov-outro-body {
-        grid-column: 1;
-        grid-row: 2;
-        margin-bottom: 0;
-    }
     .ov-dog {
-        grid-column: 2;
-        grid-row: 2;
-        align-self: end;
-        max-width: none;
-        margin: 0;
+        grid-row: 1;
+        width: 100%;
+        max-width: 172px;
+        margin: 0 auto;
+    }
+    .ov-outro-title { grid-row: 2; }
+    .ov-outro-body {
+        grid-row: 3;
+        margin: 10px 0 0;
     }
     .ov-outro-text .ov-btn--primary {
-        grid-column: 1 / -1;
-        grid-row: 3;
+        grid-row: 4;
         justify-self: stretch;
-        margin-top: 18px;
+        margin-top: 22px;
     }
 }
 
