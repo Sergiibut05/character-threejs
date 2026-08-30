@@ -960,15 +960,68 @@
 }
 .ov-link svg { width: 15px; height: 15px; }
 
+/* ── The dashed ring ────────────────────────────────────────────
+   Shared by the two provisional surfaces: "a few more" and the upcoming
+   project. Both used `border-style: dashed`, which cannot be animated — the
+   dashes come out of the border painting algorithm and no property moves
+   them. An SVG rect's stroke-dashoffset IS animatable, so the outline is
+   drawn rather than bordered, and the elements keep a transparent border of
+   the same width so nothing shifts.
+
+   The SVG has NO viewBox on purpose. Without one its user units are CSS
+   pixels, so the stroke weight and dash length come out identical on a 90px
+   pill and a 700px card; with a viewBox they would scale with the box and the
+   card's dashes would be five times the button's. */
+.ov-dash {
+    position: absolute;
+    /* The border box, not the padding box: an absolutely positioned child is
+       laid out against the latter, so it has to grow back over the border. */
+    inset: -1.5px;
+    width: calc(100% + 3px);
+    height: calc(100% + 3px);
+    overflow: visible;
+    pointer-events: none;
+}
+.ov-dash rect {
+    /* Half the stroke, so the ring sits inside the box instead of straddling
+       its edge. */
+    x: 1.25px;
+    y: 1.25px;
+    width: calc(100% - 2.5px);
+    height: calc(100% - 2.5px);
+    fill: none;
+    stroke: rgba(65, 160, 110, 0.38);
+    stroke-width: 2.5;
+    /* 21px period — ov-dash-march moves exactly that, so the loop is seamless
+       and there is no jump at the restart. */
+    stroke-dasharray: 12 9;
+    stroke-linecap: round;
+    transition: stroke 0.28s var(--ov-ease-soft);
+}
+@keyframes ov-dash-march { to { stroke-dashoffset: -21; } }
+
 /* Placeholder project — deliberately quiet, never lorem ipsum on show. */
 .ov-project--upcoming {
+    position: relative;
     grid-template-columns: 1fr;
-    border-style: dashed;
-    border-color: rgba(65, 160, 110, 0.26);
+    /* Was overflow: hidden, inherited from .ov-project to clip project media.
+       This card has none, and the ring has to reach out over the border. */
+    overflow: visible;
+    border-color: transparent;
     background: linear-gradient(160deg, #fbfefc, var(--fz-green-50));
     box-shadow: none;
 }
+.ov-project--upcoming .ov-dash rect { rx: 21px; }
 .ov-project--upcoming:hover { transform: none; box-shadow: none; }
+/* Slower than the button's: the perimeter here is several times longer, and
+   at the same duration the dashes read as sliding rather than drifting. */
+.ov-project--upcoming:hover .ov-dash rect {
+    stroke: rgba(65, 160, 110, 0.55);
+    animation: ov-dash-march 1.5s linear infinite;
+}
+.ov-project--upcoming:hover .ov-upcoming-icon {
+    animation: ov-chev-float 2.4s var(--ov-ease-soft) infinite;
+}
 .ov-upcoming-inner {
     display: flex;
     align-items: center;
@@ -1125,7 +1178,10 @@
     min-height: 44px;
     margin-top: 12px;
     padding: 8px 16px;
-    border: 1.5px dashed rgba(65, 160, 110, 0.34);
+    position: relative;
+    /* Transparent, not dashed — .ov-dash draws the outline now. Kept at the
+       same width so the button's metrics do not move. */
+    border: 1.5px solid transparent;
     border-radius: var(--fz-radius-pill);
     background: none;
     color: var(--ov-muted);
@@ -1133,21 +1189,63 @@
     font-size: var(--ov-t-sm);
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.2s var(--ov-ease-soft), border-color 0.2s var(--ov-ease-soft),
-                background 0.2s var(--ov-ease-soft);
+    transition: color 0.2s var(--ov-ease-soft), background 0.2s var(--ov-ease-soft);
 }
+/* rx is clamped to half the height, so this is simply "pill". */
+.ov-cert-toggle .ov-dash rect { rx: 999px; }
 .ov-cert-toggle:hover {
     color: var(--fz-green-500);
-    border-color: var(--fz-green-400);
     background: var(--fz-green-50);
 }
-.ov-cert-toggle svg {
+.ov-cert-toggle:hover .ov-dash rect,
+.ov-cert-toggle:focus-visible .ov-dash rect {
+    stroke: var(--fz-green-400);
+    animation: ov-dash-march 0.9s linear infinite;
+}
+
+/* :not(.ov-dash) because the ring is now a sibling svg inside the button. */
+.ov-cert-toggle > svg:not(.ov-dash) {
     width: 15px;
     height: 15px;
-    transition: transform 0.28s var(--ov-ease);
+    /* `rotate` and `translate` as their own properties rather than one
+       `transform`: the chevron has to flip AND bob, and a single transform
+       cannot hold a state and an animation at once — the animation wins and
+       the flip disappears. */
+    transition: rotate 0.28s var(--ov-ease);
 }
-.ov-cert-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
-.ov-cert-rest { margin-top: 12px; }
+.ov-cert-toggle[aria-expanded='true'] > svg:not(.ov-dash) { rotate: 180deg; }
+@keyframes ov-chev-float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 2.5px; }
+}
+.ov-cert-toggle:hover > svg:not(.ov-dash) {
+    animation: ov-chev-float 1.7s var(--ov-ease-soft) infinite;
+}
+
+/* The disclosure. [hidden] is a display switch and cannot transition, so the
+   rows live in a grid whose single track runs 0fr -> 1fr — the one way to
+   animate to a height the browser still has to measure. visibility carries
+   the accessibility half: collapsed, the rows stay out of the a11y tree and
+   out of the tab order, exactly as [hidden] had them. */
+.ov-cert-rest {
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-top: 0;
+    visibility: hidden;
+    transition: grid-template-rows 0.42s var(--ov-ease),
+                margin-top 0.42s var(--ov-ease),
+                visibility 0.42s var(--ov-ease);
+}
+.ov-cert-rest.is-open {
+    grid-template-rows: 1fr;
+    margin-top: 12px;
+    visibility: visible;
+}
+.ov-cert-rest-inner {
+    /* min-height: 0, or the grid item refuses to shrink below its content. */
+    min-height: 0;
+    overflow: hidden;
+}
 
 /* ═══ Skills — an editorial spec sheet, not a row of boxes ════════════════ */
 .ov-skills { display: grid; gap: 0; }
@@ -1294,7 +1392,14 @@
     border: 1.5px solid rgba(155, 228, 202, 0.14);
     border-radius: var(--fz-radius);
     background: #1b4636;
-    box-shadow: 0 6px 0 rgba(23, 57, 43, 0.28);
+    /* An OPAQUE ledge in a darker shade of the card, the way the button does
+       it. The translucent one let cream through and read as a grey smear
+       offset below the card — worst on a phone, where the card is tall and
+       the band runs its whole width. Solid, it reads as the card's thickness;
+       the ambient shadow under it is what sits the whole thing in the room. */
+    box-shadow:
+        0 6px 0 #0e2c21,
+        0 14px 24px -10px rgba(14, 44, 33, 0.40);
 }
 .ov-outro-title {
     margin: 0;
@@ -1495,6 +1600,10 @@
 
 /* ═══ Reduced motion ══════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
+    .ov-dash rect,
+    .ov-upcoming-icon,
+    .ov-cert-toggle > svg:not(.ov-dash) { animation: none; }
+    .ov-cert-rest { transition: none; }
     .ov-root { scroll-behavior: auto; }
     .ov-root *,
     .ov-root *::before,

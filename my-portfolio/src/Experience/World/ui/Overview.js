@@ -31,7 +31,14 @@ const SVG = {
     close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
     chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`,
     seed: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c0-4 3-7 8-7 0 5-3 8-8 8Z"/><path d="M12 16c0-3-2.5-5.5-6-5.5 0 3.6 2.4 6 6 6Z"/></svg>`,
-    cap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg>`
+    cap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg>`,
+    /* The dashed outline for the two provisional surfaces — "a few more" and
+       the upcoming-project card. It is an SVG and not `border-style: dashed`
+       because a CSS dashed border cannot be animated: the dashes are painted
+       by the border algorithm and there is no property to move them. A rect's
+       stroke-dashoffset IS animatable, which is what lets them march.
+       Deliberately no viewBox — see .ov-dash in overview.css. */
+    dashRing: `<svg class="ov-dash" aria-hidden="true" focusable="false"><rect/></svg>`
 }
 
 const el = (tag, cls, html) => {
@@ -403,6 +410,7 @@ export default class Overview {
 
             if (p.upcoming) {
                 art.classList.add('ov-project--upcoming')
+                art.insertAdjacentHTML('beforeend', SVG.dashRing)
                 const inner = el('div', 'ov-upcoming-inner')
                 inner.appendChild(el('span', 'ov-upcoming-icon', SVG.seed))
                 const body = el('div')
@@ -543,20 +551,27 @@ export default class Overview {
         const rest = c.path.certificatesRest
         if (!rest.length) return block
 
-        const more = el('div', 'ov-cert-list ov-cert-rest')
+        // Two elements, not one: the outer is a grid whose single row animates
+        // from 0fr to 1fr, which is the one way to transition to a content
+        // height the browser has to measure. The inner clips during the run.
+        const more = el('div', 'ov-cert-rest')
         more.id = 'ov-cert-rest'
-        more.hidden = true
-        for (const cert of rest) more.appendChild(row(cert))
+        const moreInner = el('div', 'ov-cert-list ov-cert-rest-inner')
+        for (const cert of rest) moreInner.appendChild(row(cert))
+        more.appendChild(moreInner)
 
         const toggle = el('button', 'ov-cert-toggle',
-            `<span class="ov-cert-toggle-text">${c.path.certsMore}</span>${SVG.chevron}`)
+            `${SVG.dashRing}<span class="ov-cert-toggle-text">${c.path.certsMore}</span>${SVG.chevron}`)
         toggle.type = 'button'
         toggle.setAttribute('aria-expanded', 'false')
         toggle.setAttribute('aria-controls', 'ov-cert-rest')
         toggle.addEventListener('click', () => {
             const open = toggle.getAttribute('aria-expanded') === 'true'
             toggle.setAttribute('aria-expanded', String(!open))
-            more.hidden = open
+            // Not [hidden]: that is a display switch and cannot transition.
+            // Collapsed, the row is 0fr AND visibility:hidden, so the rows stay
+            // out of the accessibility tree and out of the tab order.
+            more.classList.toggle('is-open', !open)
             toggle.querySelector('.ov-cert-toggle-text').textContent =
                 open ? c.path.certsMore : c.path.certsLess
         })
