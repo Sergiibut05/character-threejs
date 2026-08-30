@@ -996,7 +996,10 @@
        and there is no jump at the restart. */
     stroke-dasharray: 12 9;
     stroke-linecap: round;
-    transition: stroke 0.28s var(--ov-ease-soft);
+    /* Long, because a transition declared on the base state is the one that
+       runs on the way OUT. The hover rules shorten it, so the colour arrives
+       briskly and leaves slowly. */
+    transition: stroke 0.55s var(--ov-ease-soft);
 }
 @keyframes ov-dash-march { to { stroke-dashoffset: -21; } }
 
@@ -1011,17 +1014,24 @@
     background: linear-gradient(160deg, #fbfefc, var(--fz-green-50));
     box-shadow: none;
 }
-.ov-project--upcoming .ov-dash rect { rx: 21px; }
-.ov-project--upcoming:hover { transform: none; box-shadow: none; }
 /* Slower than the button's: the perimeter here is several times longer, and
    at the same duration the dashes read as sliding rather than drifting. */
+.ov-project--upcoming .ov-dash rect {
+    rx: 21px;
+    animation: ov-dash-march 1.5s linear infinite;
+    animation-play-state: paused;
+}
+.ov-project--upcoming .ov-upcoming-icon {
+    animation: ov-chev-float 2.4s var(--ov-ease-soft) infinite;
+    animation-play-state: paused;
+}
+.ov-project--upcoming:hover { transform: none; box-shadow: none; }
 .ov-project--upcoming:hover .ov-dash rect {
     stroke: rgba(65, 160, 110, 0.55);
-    animation: ov-dash-march 1.5s linear infinite;
+    transition-duration: 0.25s;
+    animation-play-state: running;
 }
-.ov-project--upcoming:hover .ov-upcoming-icon {
-    animation: ov-chev-float 2.4s var(--ov-ease-soft) infinite;
-}
+.ov-project--upcoming:hover .ov-upcoming-icon { animation-play-state: running; }
 .ov-upcoming-inner {
     display: flex;
     align-items: center;
@@ -1189,18 +1199,34 @@
     font-size: var(--ov-t-sm);
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.2s var(--ov-ease-soft), background 0.2s var(--ov-ease-soft);
+    /* Slow here, quick in :hover — the base transition is the one the exit
+       uses, so the button settles back rather than snapping. */
+    transition: color 0.5s var(--ov-ease-soft), background 0.5s var(--ov-ease-soft);
 }
-/* rx is clamped to half the height, so this is simply "pill". */
-.ov-cert-toggle .ov-dash rect { rx: 999px; }
+/* A concrete radius, NOT a huge one. rx is clamped to half the WIDTH and ry
+   (which defaults to rx) to half the HEIGHT, so rx: 999px gave an 80px
+   horizontal radius on a 160px button — the two corner arcs met in the middle
+   and the pill came out an oval. 22px is half the rect's height, which is
+   what "pill" actually means here. */
+.ov-cert-toggle .ov-dash rect {
+    rx: 22px;
+    /* Always declared, only paused. Removing the animation on hover-out resets
+       stroke-dashoffset to 0, so the whole outline jumps; pausing leaves the
+       dashes exactly where they stopped and the next hover picks them up from
+       there. Same idea for the chevron below. */
+    animation: ov-dash-march 0.9s linear infinite;
+    animation-play-state: paused;
+}
 .ov-cert-toggle:hover {
     color: var(--fz-green-500);
     background: var(--fz-green-50);
+    transition-duration: 0.2s;
 }
 .ov-cert-toggle:hover .ov-dash rect,
 .ov-cert-toggle:focus-visible .ov-dash rect {
     stroke: var(--fz-green-400);
-    animation: ov-dash-march 0.9s linear infinite;
+    transition-duration: 0.25s;
+    animation-play-state: running;
 }
 
 /* :not(.ov-dash) because the ring is now a sibling svg inside the button. */
@@ -1212,15 +1238,18 @@
        cannot hold a state and an animation at once — the animation wins and
        the flip disappears. */
     transition: rotate 0.28s var(--ov-ease);
+    animation: ov-chev-float 1.7s var(--ov-ease-soft) infinite;
+    animation-play-state: paused;
 }
 .ov-cert-toggle[aria-expanded='true'] > svg:not(.ov-dash) { rotate: 180deg; }
+/* Centred on the resting position rather than hanging below it: paused on the
+   way out it can only be 1.1px off centre either way, instead of 2.2px below.
+   The ease dwells at both ends, so that is also where it most often stops. */
 @keyframes ov-chev-float {
-    0%, 100% { translate: 0 0; }
-    50%      { translate: 0 2.5px; }
+    0%, 100% { translate: 0 -1.1px; }
+    50%      { translate: 0 1.1px; }
 }
-.ov-cert-toggle:hover > svg:not(.ov-dash) {
-    animation: ov-chev-float 1.7s var(--ov-ease-soft) infinite;
-}
+.ov-cert-toggle:hover > svg:not(.ov-dash) { animation-play-state: running; }
 
 /* The disclosure. [hidden] is a display switch and cannot transition, so the
    rows live in a grid whose single track runs 0fr -> 1fr — the one way to
@@ -1602,7 +1631,7 @@
 @media (prefers-reduced-motion: reduce) {
     .ov-dash rect,
     .ov-upcoming-icon,
-    .ov-cert-toggle > svg:not(.ov-dash) { animation: none; }
+    .ov-cert-toggle > svg:not(.ov-dash) { animation: none !important; }
     .ov-cert-rest { transition: none; }
     .ov-root { scroll-behavior: auto; }
     .ov-root *,
