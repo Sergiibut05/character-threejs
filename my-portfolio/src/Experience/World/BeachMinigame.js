@@ -716,6 +716,7 @@ export default class BeachMinigame {
     }
 
     _hit(dx, character) {
+        this.experience.audio?.playSfx?.('ballHit')
         const t = THREE.MathUtils.clamp(dx / this.hitRadius, -1, 1)
         const centred = 1 - Math.abs(t)
 

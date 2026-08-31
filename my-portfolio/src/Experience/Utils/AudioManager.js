@@ -41,6 +41,27 @@ function proximity(near, far, d) {
     return 1 - (t * t * (3 - 2 * t)) // 1 → 0 smoothstep
 }
 
+/**
+ * Where the river is heard from — points on the channel, in world XZ.
+ *
+ * This used to measure the distance to the water MESH, which sounds right and
+ * is not: `agua` is a single flat quad of FOURTEEN vertices scaled to about
+ * 77 x 87 units, i.e. a sheet under the whole map that the terrain hides
+ * except where the river cuts through it and where the sea shows at the beach.
+ * So "distance to the nearest vertex" was the distance to one of a handful of
+ * corners of a map-sized rectangle: the sound swelled in dry places and died
+ * standing on the bank.
+ *
+ * The mesh cannot tell us where water is VISIBLE — only the terrain knows that
+ * — so the audible course is stated here instead. It follows the channel under
+ * the bridge (which spans X, so the river runs along Z). Add or move a pair to
+ * change where the river can be heard; nothing else has to change.
+ */
+const RIVER_SOURCES = [
+    [-35.4, -12.0], [-35.4, -6.0], [-35.4, 0.0],
+    [-35.4, 4.4], [-35.4, 9.0], [-35.4, 15.0]
+]
+
 // SFX bed definitions. `kind` drives how the per-frame target volume is computed.
 const SFX_DEFS = [
     {
@@ -52,12 +73,54 @@ const SFX_DEFS = [
         src: ['/sounds/fire/fire.webm', '/sounds/fire/fire.m4a']
     },
     {
-        // The water is a long, narrow strip — keep the audible band tight so it
-        // only takes over from the ambience when you're actually beside it.
-        id: 'river', kind: 'river', near: 1.5, far: 6.0,
+        // Keep the audible band tight so it only takes over from the ambience
+        // when you are actually beside the water. See RIVER_SOURCES.
+        id: 'river', kind: 'river', near: 2.5, far: 11.0,
         src: ['/sounds/water/river.webm', '/sounds/water/river.m4a']
     }
 ]
+
+/**
+ * One-shot SFX: fired by name, never looping, several allowed to overlap.
+ *
+ * `variants` is a ROUND-ROBIN, not a random pick: footsteps alternate left/right
+ * and a random choice would sometimes play the same foot twice in a row, which
+ * is instantly audible as a limp.
+ *
+ * `group` is what gets preloaded together. Only `ui` and `foot` are warmed at
+ * world start — the rest is a minigame's, and loading it before anyone has
+ * walked over to play is bandwidth spent on a maybe.
+ */
+const ONESHOT_DEFS = {
+    uiOpen: { group: 'ui', volume: 1.0, src: ['/sounds/menu/open.webm', '/sounds/menu/open.m4a'] },
+    uiClose: { group: 'ui', volume: 0.9, src: ['/sounds/menu/close.webm', '/sounds/menu/close.m4a'] },
+
+    // Deliberately quiet: this is the one sound that plays every second and a
+    // half for the whole session, and it has to sit under everything else.
+    walk: {
+        group: 'foot', volume: 0.30,
+        variants: [
+            ['/sounds/walk/walk1.webm', '/sounds/walk/walk1.m4a'],
+            ['/sounds/walk/walk2.webm', '/sounds/walk/walk2.m4a']
+        ]
+    },
+    run: {
+        group: 'foot', volume: 0.38,
+        variants: [
+            ['/sounds/run/run1.webm', '/sounds/run/run1.m4a'],
+            ['/sounds/run/run2.webm', '/sounds/run/run2.m4a']
+        ]
+    },
+
+    frisbeeThrow: { group: 'frisbee', volume: 0.9, src: ['/sounds/freesby/throw.webm', '/sounds/freesby/throw.m4a'] },
+    scoreGood: { group: 'frisbee', volume: 0.9, src: ['/sounds/freesby/good.webm', '/sounds/freesby/good.m4a'] },
+    scoreGreat: { group: 'frisbee', volume: 0.9, src: ['/sounds/freesby/great.webm', '/sounds/freesby/great.m4a'] },
+    scoreExcellent: { group: 'frisbee', volume: 0.95, src: ['/sounds/freesby/excellent.webm', '/sounds/freesby/excellent.m4a'] },
+    // Shared by both minigames' ranked results screen.
+    finish: { group: 'frisbee', volume: 0.95, src: ['/sounds/freesby/finish.webm', '/sounds/freesby/finish.m4a'] },
+
+    ballHit: { group: 'beach', volume: 0.75, src: ['/sounds/beach/ball-sound.webm', '/sounds/beach/ball-sound.m4a'] }
+}
 
 export default class AudioManager extends EventEmitter {
     constructor(experience) {
@@ -102,6 +165,11 @@ export default class AudioManager extends EventEmitter {
         // ── SFX state ──
         this.sfx = {}                   // id → { howl, soundId, level, def }
         this._sfxStarted = false
+
+        // One-shots: lazily built Howls, keyed by name. `_oneShotTurn` holds the
+        // round-robin cursor for the ones with variants.
+        this._oneShots = {}
+        this._oneShotTurn = {}
 
         // ── Restore persisted prefs ──
         this.muted = this._readBool(LS.musicMuted, false)
@@ -295,6 +363,11 @@ export default class AudioManager extends EventEmitter {
             const soundId = howl.play()
             this.sfx[def.id] = { howl, soundId, level: 0, def }
         }
+
+        // Warmed here rather than at construction: this runs on the gesture
+        // that enters the world, which is also when the audio context unlocks.
+        this.preloadSfx('ui')
+        this.preloadSfx('foot')
     }
 
     /** Per-frame: drive each bed's volume from the character's proximity. */
@@ -309,20 +382,15 @@ export default class AudioManager extends EventEmitter {
         const fireTarget = Number.isFinite(fireDist)
             ? proximity(this._defOf('fire').near, this._defOf('fire').far, fireDist) : 0
 
-        const samples = this.experience.world?.patioScene?.pieces?.river?.getWaterSamples?.()
-        let riverTarget = 0
-        if (samples && samples.length) {
-            let min2 = Infinity
-            for (let i = 0; i < samples.length; i += 2) {
-                const dx = char.x - samples[i]
-                const dz = char.z - samples[i + 1]
-                const d2 = dx * dx + dz * dz
-                if (d2 < min2) min2 = d2
-            }
-            const wd = Math.sqrt(min2)
-            const rdef = this._defOf('river')
-            riverTarget = proximity(rdef.near, rdef.far, wd)
+        let min2 = Infinity
+        for (const [sx, sz] of RIVER_SOURCES) {
+            const dx = char.x - sx
+            const dz = char.z - sz
+            const d2 = dx * dx + dz * dz
+            if (d2 < min2) min2 = d2
         }
+        const rdef = this._defOf('river')
+        const riverTarget = proximity(rdef.near, rdef.far, Math.sqrt(min2))
 
         // Ambience ducks as the river rises (crossfade ambience ↔ river), and
         // drops to a whisper inside the house (outdoor hum through the "walls").
@@ -343,6 +411,63 @@ export default class AudioManager extends EventEmitter {
     }
 
     _defOf(id) { return SFX_DEFS.find((d) => d.id === id) }
+
+    // ─── SFX (one-shots) ─────────────────────────────────────────────────
+
+    /**
+     * Build (once) the Howls for a group so the first play is not late.
+     *
+     * ALWAYS Web Audio, whatever the beds use: an <audio> element cannot play
+     * over itself, so two footsteps in quick succession would cut each other
+     * off, and it carries a start latency that a hit sound cannot afford.
+     * These files are a few KB each, so decoding them into memory is cheap.
+     */
+    preloadSfx(group) {
+        for (const name in ONESHOT_DEFS) {
+            if (ONESHOT_DEFS[name].group === group) this._oneShot(name)
+        }
+    }
+
+    _oneShot(name) {
+        if (this._oneShots[name]) return this._oneShots[name]
+        const def = ONESHOT_DEFS[name]
+        if (!def) return null
+
+        const make = (src) => new Howl({ src, html5: false, preload: true, volume: 0 })
+        const entry = def.variants
+            ? { def, howls: def.variants.map(make) }
+            : { def, howls: [make(def.src)] }
+        this._oneShots[name] = entry
+        return entry
+    }
+
+    /**
+     * Fire a one-shot by name. Silent (and free) while SFX are muted.
+     *
+     * @param {string} name  key in ONESHOT_DEFS
+     * @param {number} scale extra multiplier, for callers that want a softer
+     *                       instance of the same sound
+     */
+    playSfx(name, scale = 1) {
+        const gain = this._sfxGain()
+        if (gain <= 0) return
+        const entry = this._oneShot(name)
+        if (!entry) return
+
+        let howl = entry.howls[0]
+        if (entry.howls.length > 1) {
+            const i = (this._oneShotTurn[name] || 0) % entry.howls.length
+            this._oneShotTurn[name] = i + 1
+            howl = entry.howls[i]
+        }
+
+        try {
+            // Volume is set on the returned id, not on the Howl: setting it on
+            // the Howl would also retune every copy already playing.
+            const id = howl.play()
+            howl.volume(clamp01(gain * (entry.def.volume ?? 1) * scale), id)
+        } catch { /* a blocked autoplay is not worth breaking a frame over */ }
+    }
 
     setSfxVolume(v) {
         this.sfxVolume = clamp01(v)

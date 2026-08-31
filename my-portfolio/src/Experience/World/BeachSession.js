@@ -71,6 +71,8 @@ export default class BeachSession {
         if (!this.modal) this._buildModal()
         this.prompt.press()
         this.prompt.hide()
+        this.experience.audio?.preloadSfx?.('beach')
+        this.experience.audio?.preloadSfx?.('frisbee')   // the shared finish stinger
         this.modal.open()
     }
 
@@ -150,7 +152,8 @@ export default class BeachSession {
             variant: 'paper',
             size: 'lg',
             title: t('beach.resultsTitle'),
-            closable: false
+            closable: false,
+            openSfx: 'finish'
         })
 
         const body = document.createElement('div')

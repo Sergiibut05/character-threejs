@@ -112,6 +112,10 @@ export default class FrisbeeSession {
         const character = this.experience.world?.character
         if (character) character.movementLocked = true
 
+        // Warm the throw/score/finish clips now: the player is standing at
+        // the pitch about to choose a mode, so there is a beat to spare and
+        // the first throw must not be silent while a file downloads.
+        this.experience.audio?.preloadSfx?.('frisbee')
         if (!this.modal) this._buildModal()
         this.modal.open()
     }
@@ -500,7 +504,8 @@ export default class FrisbeeSession {
             variant: 'paper',
             size: 'lg',
             title: t('frisbee.resultsTitle'),
-            closable: false
+            closable: false,
+            openSfx: 'finish'
         })
 
         const body = document.createElement('div')

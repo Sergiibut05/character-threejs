@@ -2,6 +2,8 @@
  * Calculates frisbee score based on dog catch position vs target center,
  * and shows an animated CSS overlay with the result.
  */
+import { t } from '../Utils/gameText.js'
+
 export default class ScoreFeedback {
     constructor() {
         this._hideTimeout = null
@@ -38,24 +40,32 @@ export default class ScoreFeedback {
 
         // Ring radii MUST match the visual bullseye (ObjectiveMarker): catching
         // far from centre can no longer score like a near hit.
-        let zone, pts, color
+        let zone, pts, color, sfx
         if (dist <= 1.0) {
-            zone = 'PERFECTO!'
+            zone = t('frisbee.zoneBull')
             pts = 100
             color = '#ffd426'
+            sfx = 'scoreExcellent'
         } else if (dist <= 2.4) {
-            zone = 'GENIAL!'
+            zone = t('frisbee.zoneGreat')
             pts = 50
             color = '#40c864'
+            sfx = 'scoreGreat'
         } else if (dist <= 3.8) {
-            zone = 'BIEN!'
+            zone = t('frisbee.zoneGood')
             pts = 10
             color = '#5a8af5'
+            sfx = 'scoreGood'
         } else {
             zone = ''
             pts = 0
             color = '#aaa'
+            sfx = null
         }
+
+        // The stinger is picked by the SAME threshold ladder as the label, so
+        // the two can never disagree about how good a throw was.
+        if (sfx) window.experience?.audio?.playSfx?.(sfx)
 
         this._show(zone, pts, color)
         return { zone, points: pts, distance: dist }

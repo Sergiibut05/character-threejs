@@ -997,6 +997,7 @@ export default class FrisbeeMinigame {
     releaseThrow() {
         if (this.state !== 'charge') return
         this.state = 'flight'
+        this.experience.audio?.playSfx?.('frisbeeThrow')
 
         const character = this.experience.world.character
         character.continueThrowAnimation()

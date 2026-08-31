@@ -1,4 +1,5 @@
 import './ui.css'
+import { t } from '../../Utils/gameText.js'
 import { inputGlyph } from './InputGlyph.js'
 
 /**
@@ -11,8 +12,11 @@ import { inputGlyph } from './InputGlyph.js'
  * bar; Esc/B closes; the hint bar hides on touch.
  */
 export default class Modal {
-    constructor({ variant = 'clean', size = 'md', align = 'left', title = '', subtitle = '', closable = true } = {}) {
+    constructor({ variant = 'clean', size = 'md', align = 'left', title = '', subtitle = '', closable = true, openSfx = 'uiOpen' } = {}) {
         this.closable = closable
+        // A results screen brings its own fanfare, and the little UI blip
+        // landing on top of it just muddies the first half second.
+        this.openSfx = openSfx
         this._closeCb = null
         this._isOpen = false
 
@@ -25,7 +29,7 @@ export default class Modal {
         if (closable) {
             this.closeBtn = _el('button', 'fz-modal-close')
             this.closeBtn.type = 'button'
-            this.closeBtn.setAttribute('aria-label', 'Cerrar')
+            this.closeBtn.setAttribute('aria-label', t('project.close'))
             this.closeBtn.textContent = '✕'
             this.closeBtn.addEventListener('click', () => this.close())
             this.panel.appendChild(this.closeBtn)
@@ -108,6 +112,10 @@ export default class Modal {
     open() {
         if (this._isOpen) return
         this._isOpen = true
+        // Here rather than in each caller: every panel in the game — minigame
+        // menus, settings, the map, the computer — goes through this class, so
+        // one hook covers all of them and none can be forgotten.
+        if (this.openSfx) window.experience?.audio?.playSfx?.(this.openSfx)
         window.addEventListener('keydown', this._onKeyDown, true)
         this._renderHints()
         this._unsub = window.experience?.input?.onChange?.(() => this._renderHints()) || null
@@ -123,6 +131,7 @@ export default class Modal {
     close() {
         if (!this._isOpen) return
         this._isOpen = false
+        window.experience?.audio?.playSfx?.('uiClose')
         window.removeEventListener('keydown', this._onKeyDown, true)
         this._unsub?.()
         this._unsub = null

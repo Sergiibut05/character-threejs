@@ -837,6 +837,12 @@ export default class Character {
                     this._strideAcc = 0
                     this._strideFresh = false
                     this._footSide = -this._footSide
+                    // Sound on the SAME stride that stamps a print, not on a
+                    // timer: a timer drifts out of step with the animation as
+                    // soon as you turn, hit a slope or brush a wall, and the
+                    // mismatch reads as someone else walking nearby. The two
+                    // clips alternate, so left and right sound different.
+                    this.experience.audio?.playSfx?.(this.isSprinting ? 'run' : 'walk')
                     const yaw = this.container.rotation.y
                     const off = this.footSpacing * this._footSide
                     this.experience.world?.stampFootprint?.(
