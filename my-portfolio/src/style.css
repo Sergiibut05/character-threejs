@@ -1001,28 +1001,34 @@ body.quality-modal-open
     overflow: hidden;
 }
 
+/* Slot 0 of the shared top-right column — see --fz-fab-* in
+   Experience/World/ui/tokens.css. The material is the minigame HUD's, not a
+   generic grey system chip: same 1.5px green hairline, same translucency and
+   blur, same soft shadow, same ink. The fallbacks keep it sane on the landing
+   screen if the game stylesheet has not been parsed yet. */
 .quality-fab
 {
     position: fixed;
-    top: max(12px, env(safe-area-inset-top, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
+    top: var(--fz-fab-top, 18px);
+    right: var(--fz-fab-right, 18px);
     z-index: 2100;
-    width: 46px;
-    height: 46px;
+    width: var(--fz-fab-size, 44px);
+    height: var(--fz-fab-size, 44px);
     display: grid;
     place-items: center;
     appearance: none;
     border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1.5px solid rgba(120, 185, 150, 0.42);
     margin: 0;
     padding: 0;
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    color: rgba(50, 50, 52, 0.78);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    box-shadow: var(--fz-shadow-soft, 0 8px 18px rgba(39, 90, 70, 0.12));
+    color: var(--fz-ink, #234b3a);
     cursor: pointer;
-    transition: opacity 0.28s ease, transform 0.22s ease, background 0.15s ease;
+    transition: opacity 0.28s ease, transform 0.22s ease,
+        background 0.16s ease, border-color 0.16s ease;
 }
 
 body:has(#cloud-transition.visible) .quality-fab,
@@ -1035,7 +1041,8 @@ body:has(.cloud-transition.visible) .quality-fab
 
 .quality-fab:hover
 {
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(95, 197, 148, 0.16);
+    border-color: rgba(120, 185, 150, 0.6);
 }
 
 .quality-fab:active
@@ -1043,22 +1050,31 @@ body:has(.cloud-transition.visible) .quality-fab
     transform: scale(0.94);
 }
 
-.quality-fab:focus,
-.quality-fab:focus-visible
+/* Was `outline: none` on :focus AND :focus-visible, which left keyboard users
+   with no focus ring at all. Same ring the HUD buttons use. */
+.quality-fab:focus
 {
     outline: none;
+}
+
+.quality-fab:focus-visible
+{
+    outline: 2px solid var(--fz-green-400, #5fc594);
+    outline-offset: 2px;
 }
 
 .quality-fab-icon
 {
     display: block;
+    width: 21px;
+    height: 21px;
 }
 
-/* Map button: same pill as the quality gear, stacked underneath it. Hidden
-   until the world is running — there is nothing to travel around before that. */
+/* Slot 1. Hidden until the world is running — there is nothing to travel
+   around before that. */
 .map-fab
 {
-    top: calc(max(12px, env(safe-area-inset-top, 0px)) + 56px);
+    top: calc(var(--fz-fab-top, 18px) + var(--fz-fab-step, 56px));
     opacity: 0;
     pointer-events: none;
     transform: scale(0.92);
@@ -1069,6 +1085,18 @@ body.is-in-world .map-fab
     opacity: 1;
     pointer-events: auto;
     transform: none;
+}
+
+/* ...except inside a minigame, where it hands slot 1 to the exit button.
+   Not merely to stop them overlapping: WorldMap.canOpen() already refuses to
+   open while a session is active, so during a game that button was a dead
+   control sitting on top of a live one. Keyed off the exit button itself, so
+   it covers every minigame that puts one up. */
+body:has(.fz-hud-leave.is-visible) .map-fab
+{
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.92);
 }
 
 .quality-modal-overlay

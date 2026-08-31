@@ -31,4 +31,18 @@
     --fz-shadow: 0 18px 44px rgba(39, 90, 70, 0.18), 0 6px 14px rgba(60, 100, 80, 0.09);
     --fz-shadow-soft: 0 8px 18px rgba(39, 90, 70, 0.12);
     --fz-z: 2700;
+
+    /* ── The top-right button column ─────────────────────────────────
+       Four buttons want that corner — the settings gear and the map (global,
+       in style.css) and a minigame's exit and help (here) — and they were
+       written in two files that had never agreed on anything: 46px vs 44px,
+       right 12 vs right 18, tops of 12/68 against 74/130. The map ended up
+       sitting almost exactly on the exit button.
+
+       So the geometry lives in one place now and every button takes a SLOT
+       off it instead of hardcoding a top. Slot n = top + n * step. */
+    --fz-fab-size: 44px;
+    --fz-fab-step: 56px;   /* the button plus a 12px gap */
+    --fz-fab-top: max(18px, env(safe-area-inset-top, 0px));
+    --fz-fab-right: max(18px, env(safe-area-inset-right, 0px));
 }

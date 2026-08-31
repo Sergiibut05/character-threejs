@@ -335,14 +335,16 @@
     pointer-events: auto;
 }
 
-/* Standalone exit button — top-right, sits under the settings gear. */
+/* Slot 1 of the shared top-right column (see --fz-fab-* in tokens.css): under
+   the settings gear, in the slot the map button gives up while a game runs.
+   The top used to be a hardcoded 74px, which ignored the notch on a phone. */
 .fz-hud-leave {
     position: fixed;
-    top: 74px;
-    right: max(18px, env(safe-area-inset-right));
+    top: calc(var(--fz-fab-top) + var(--fz-fab-step));
+    right: var(--fz-fab-right);
     z-index: 2500;
-    width: 44px;
-    height: 44px;
+    width: var(--fz-fab-size);
+    height: var(--fz-fab-size);
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -628,13 +630,14 @@
 }
 
 /* ─── Help "?" button (top-right, under the exit button) ──────────────── */
+/* Slot 2. */
 .fz-hud-help {
     position: fixed;
-    top: 130px;
-    right: max(18px, env(safe-area-inset-right));
+    top: calc(var(--fz-fab-top) + 2 * var(--fz-fab-step));
+    right: var(--fz-fab-right);
     z-index: 2500;
-    width: 44px;
-    height: 44px;
+    width: var(--fz-fab-size);
+    height: var(--fz-fab-size);
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -1435,6 +1438,33 @@
 }
 
 /* ═══ Mobile compaction (settings + shared modal pieces) ═══════════════ */
+/* The frisbee score card. At its desktop size — 214px min-width plus 22px of
+   side padding, a 30px disc and a 34px score — it eats well over half the
+   width of a 390px phone, on top of the play area. Everything shrinks by
+   roughly a third and the min-width goes away entirely, so the card is only as
+   wide as the round counter and pips actually need. */
+@media (max-width: 560px) {
+    .fz-hud {
+        top: max(12px, env(safe-area-inset-top));
+        left: max(12px, env(safe-area-inset-left));
+        gap: 7px;
+        padding: 11px 14px 12px;
+        min-width: 0;
+        border-radius: 16px;
+    }
+
+    .fz-hud-top { gap: 7px; }
+    .fz-hud-icon svg { width: 22px; height: 22px; }
+    .fz-hud-round { font-size: 17px; }
+
+    .fz-hud-pips { gap: 5px; }
+    .fz-hud-pip { width: 9px; height: 9px; border-width: 1.25px; }
+
+    .fz-hud-score { gap: 8px; }
+    .fz-hud-score-label { font-size: 12px; }
+    .fz-hud-score-value { font-size: 24px; }
+}
+
 @media (max-width: 520px) {
     .fz-modal {
         padding: 24px 16px 16px;
