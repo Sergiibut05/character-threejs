@@ -219,6 +219,28 @@ export default {
         ],
         btsLinkLabel: 'Listen to the full playlist',
 
+        /* Keyed by the Spanish title rather than by position. An index array
+           would silently hand one course's name to another the day the list is
+           reordered, and these are somebody's credentials — a wrong one is a
+           misrepresentation, not a typo. A title with no entry here (Cambridge)
+           is already the name it was issued under and stays as it is. */
+        certificateTitles: {
+            'JavaScript Moderno: Guía para dominar el lenguaje':
+                'Modern JavaScript: A Guide to Mastering the Language',
+            'Curso de Firebase y Angular': 'Firebase and Angular Course',
+            'WooCommerce: Instalación y configuración':
+                'WooCommerce: Installation and Setup',
+            'Curso de Angular: Ampliando conceptos':
+                'Angular Course: Advanced Concepts',
+            'Fundamentos de Angular': 'Angular Fundamentals',
+            'Especialización en JavaScript: Asincronía, Prototipos y Clases':
+                'JavaScript Specialisation: Async, Prototypes and Classes',
+            'Dominando Bootstrap 5: Sitios Web Responsive':
+                'Mastering Bootstrap 5: Responsive Websites',
+            'Curso de Git': 'Git Course',
+            'Fundamentos de JavaScript': 'JavaScript Fundamentals'
+        },
+
         creditsTitle: 'Thanks',
         creditsBody:
             'To Bruno Simon, for Three.js Journey — where I learnt much of what makes ' +

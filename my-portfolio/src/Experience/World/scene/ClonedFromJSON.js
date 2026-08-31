@@ -75,7 +75,11 @@ export default class ClonedFromJSON {
             // (trunk, coconuts) stay fully opaque.
             child.material = createStylizedPropNodeMaterial({
                 map: old?.map || null,
-                alphaCutoff: old?.alphaTest ?? 0
+                alphaCutoff: old?.alphaTest ?? 0,
+                // The palm's three materials all ship doubleSided: true in the
+                // GLB, and the fronds NEED it — they are single planes, so
+                // front-face culling made them disappear from below.
+                side: old?.side ?? THREE.FrontSide
             })
             old?.dispose?.()
             child.castShadow = castShadow

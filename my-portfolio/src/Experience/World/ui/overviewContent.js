@@ -42,6 +42,18 @@ export function period(text) {
     return String(text).replace(MONTH_RE, (m) => MONTHS[m])
 }
 
+/**
+ * A credential as an English reader should see it: the course NAME translated,
+ * the date reformatted, and the issuer and URL left exactly as awarded.
+ */
+function certificate(c) {
+    return {
+        ...c,
+        title: i18n.opt('profile.certificateTitles')?.[c.title] || c.title,
+        date: period(c.date)
+    }
+}
+
 /** Spoken languages belong with the person, not in a list next to Kotlin. */
 const isSpokenLanguages = (group) => /^idiomas$/i.test(group)
 
@@ -185,8 +197,10 @@ export function getContent() {
                 title: opt('path.educationItems')?.[i]?.title || e.title,
                 detail: opt('path.educationItems')?.[i]?.detail ?? e.detail
             })),
-            certificatesFeatured: featured.map((c) => ({ ...c, date: period(c.date) })),
-            certificatesRest: rest.map((c) => ({ ...c, date: period(c.date) }))
+            // Same map the in-world trophy shelf uses, so one credential cannot
+            // read one way here and another way in the house.
+            certificatesFeatured: featured.map(certificate),
+            certificatesRest: rest.map(certificate)
         },
 
         skills: {

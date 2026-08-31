@@ -9,9 +9,9 @@
  *     through to the data module when the catalog has no override. That is
  *     what stops the same paragraph existing in two places and drifting.
  *
- *   - Structured facts are never translated: dates are only reformatted, and
- *     orgs, stacks, URLs and credential titles stay as issued. Translating the
- *     name a certificate is printed with would misquote the certificate.
+ *   - Structured facts are never translated: orgs, stacks and URLs stay as
+ *     they are, and dates are only reformatted. Course TITLES are the one
+ *     exception, and a deliberate one — see `certificates` below.
  *
  * Overrides that the Quick Overview already carries (experience, education,
  * skill group names, the behind-the-scenes headings) are read straight from
@@ -86,10 +86,17 @@ export function getProfile() {
             }
         },
 
-        // Titles untouched on purpose (see the header); only the date is
-        // reformatted, because "Septiembre 2025" in an English list is just an
-        // untranslated word, not a fact worth preserving.
-        certificates: CERTIFICATES.map((c) => ({ ...c, date: period(c.date) }))
+        // A course NAME is translated; everything else about the credential is
+        // not. The issuer, the URL and the date it was awarded are the record;
+        // the title is what the course is called, and a reader who cannot read
+        // Spanish learns nothing from it left as it is. Anything with no entry
+        // in the map (the Cambridge certificate) is already the name it was
+        // issued under and passes straight through.
+        certificates: CERTIFICATES.map((c) => ({
+            ...c,
+            title: opt('profile.certificateTitles')?.[c.title] || c.title,
+            date: period(c.date)
+        }))
     }
 }
 

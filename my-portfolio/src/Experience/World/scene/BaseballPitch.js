@@ -51,7 +51,8 @@ export default class BaseballPitch {
             const old = child.material
             child.material = createStylizedPropNodeMaterial({
                 map: old?.map || null,
-                color: old?.color || 0xffffff
+                color: old?.color || 0xffffff,
+                side: old?.side ?? THREE.FrontSide
             })
             // Decal-style overlay on the ground: bias it toward the camera so it
             // never z-fights the grass at the field edges.

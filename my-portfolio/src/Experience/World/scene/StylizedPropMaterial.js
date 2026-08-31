@@ -7,7 +7,7 @@ import {
     Fn, float, vec3, vec4,
     uniform,
     texture, uv,
-    normalWorld, positionWorld, cameraPosition,
+    normalWorld, positionWorld, cameraPosition, frontFacing,
     mix, smoothstep, max, pow, normalize,
     If, Discard
 } from 'three/tsl'
@@ -63,7 +63,12 @@ export function createStylizedPropNodeMaterial(options = {}) {
         mapAlpha = false,
         alphaCutoff = 0,
         gloss = 0,
-        shininess = 26
+        shininess = 26,
+        // Which faces to draw. Worth passing through rather than defaulting,
+        // because a glTF says so per material: an artist marks flat foliage
+        // doubleSided precisely because a frond is a plane with nothing on its
+        // back, and dropping the flag makes it vanish from underneath.
+        side = THREE.FrontSide
     } = options
 
     // Cutout (MASK) wins over blending: opaque + depth write + discard.
@@ -77,6 +82,7 @@ export function createStylizedPropNodeMaterial(options = {}) {
 
     const material = new THREE.MeshLambertNodeMaterial({
         flatShading,
+        side,
         transparent: useBlend,
         depthWrite: !useBlend
     })
@@ -107,7 +113,14 @@ export function createStylizedPropNodeMaterial(options = {}) {
             If(texel.a.lessThan(float(alphaCutoff)), () => { Discard() })
         }
 
-        const N = normalWorld.normalize()
+        // frontFacing flips the normal on back faces. The shading below is a
+        // hand-rolled N·L against a fake sun, so nothing upstream does this for
+        // it: without the flip the underside of a double-sided leaf is lit by a
+        // normal pointing away from the camera and reads as permanently in
+        // shadow — visible, but a flat dark grey.
+        const N = side === THREE.DoubleSide
+            ? normalWorld.normalize().mul(frontFacing.select(float(1), float(-1)))
+            : normalWorld.normalize()
         const ndl = N.dot(propSunDirection.normalize())
         const coreMix = float(1).sub(smoothstep(propCoreLit0, propCoreLit1, ndl))
         const dropMix = catchedShadow.oneMinus()
