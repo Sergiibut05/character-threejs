@@ -368,8 +368,10 @@
     pointer-events: auto;
 }
 
+/* Same fix as .fz-hud-help:hover — the red tint composited over white
+   instead of a 14% wash that made the button more see-through than at rest. */
 .fz-hud-leave:hover {
-    background: rgba(255, 120, 120, 0.14);
+    background: rgba(255, 236, 236, 0.94);
     border-color: rgba(255, 120, 120, 0.5);
     color: var(--fz-red);
 }
@@ -661,8 +663,10 @@
     pointer-events: auto;
 }
 
+/* Opaque, not a 16% tint over a 60% rest state — that made hover fade the
+   button into the scene rather than light it up. Same mint, composited. */
 .fz-hud-help:hover {
-    background: rgba(95, 197, 148, 0.16);
+    background: rgba(226, 245, 236, 0.94);
     border-color: var(--fz-green-400);
 }
 

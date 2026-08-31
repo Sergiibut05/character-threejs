@@ -1039,9 +1039,14 @@ body:has(.cloud-transition.visible) .quality-fab
     transform: scale(0.92);
 }
 
+/* Note the ALPHA. Tinting with rgba(95, 197, 148, 0.16) over a rest state of
+   rgba(255, 255, 255, 0.6) took the surface from 60% opaque to 16%, so hover
+   made the button fade INTO the scene instead of lighting up. This is the same
+   mint — the tint already composited over white — at a higher opacity, so it
+   reads as a lift. */
 .quality-fab:hover
 {
-    background: rgba(95, 197, 148, 0.16);
+    background: rgba(226, 245, 236, 0.94);
     border-color: rgba(120, 185, 150, 0.6);
 }
 
