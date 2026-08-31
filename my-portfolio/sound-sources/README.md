@@ -6,6 +6,11 @@ ship 2.6 MB of masters next to the 183 KB the browser actually downloads.
 
 Each one is encoded to the pair the game loads, matching the existing beds:
 
+`menu/open.wav` is kept as a source but is **not** encoded: opening and
+closing a panel now share `menu/close.wav`, because the longer open flourish
+read as an event of its own beside the short close tick and made the two
+halves of one gesture feel unrelated.
+
 | use | channels | Opus (webm) | AAC (m4a) |
 |---|---|---|---|
 | footsteps | mono | 40 kbps | 64 kbps |

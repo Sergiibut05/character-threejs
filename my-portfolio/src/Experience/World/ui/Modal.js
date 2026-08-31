@@ -12,7 +12,7 @@ import { inputGlyph } from './InputGlyph.js'
  * bar; Esc/B closes; the hint bar hides on touch.
  */
 export default class Modal {
-    constructor({ variant = 'clean', size = 'md', align = 'left', title = '', subtitle = '', closable = true, openSfx = 'uiOpen' } = {}) {
+    constructor({ variant = 'clean', size = 'md', align = 'left', title = '', subtitle = '', closable = true, openSfx = 'ui' } = {}) {
         this.closable = closable
         // A results screen brings its own fanfare, and the little UI blip
         // landing on top of it just muddies the first half second.
@@ -116,6 +116,7 @@ export default class Modal {
         // menus, settings, the map, the computer — goes through this class, so
         // one hook covers all of them and none can be forgotten.
         if (this.openSfx) window.experience?.audio?.playSfx?.(this.openSfx)
+        window.experience?.audio?.pushPanel?.()
         window.addEventListener('keydown', this._onKeyDown, true)
         this._renderHints()
         this._unsub = window.experience?.input?.onChange?.(() => this._renderHints()) || null
@@ -131,7 +132,8 @@ export default class Modal {
     close() {
         if (!this._isOpen) return
         this._isOpen = false
-        window.experience?.audio?.playSfx?.('uiClose')
+        window.experience?.audio?.playSfx?.('ui')
+        window.experience?.audio?.popPanel?.()
         window.removeEventListener('keydown', this._onKeyDown, true)
         this._unsub?.()
         this._unsub = null
@@ -142,6 +144,14 @@ export default class Modal {
     isOpen() { return this._isOpen }
 
     destroy() {
+        // Release the duck if this panel is torn down without being closed
+        // first — the results flow does exactly that, swapping one modal for
+        // the next, and a leaked count would leave the music quiet for the rest
+        // of the session with nothing on screen to explain why.
+        if (this._isOpen) {
+            this._isOpen = false
+            window.experience?.audio?.popPanel?.()
+        }
         window.removeEventListener('keydown', this._onKeyDown, true)
         this._unsub?.()
         this.overlay.removeEventListener('click', this._onOverlayClick)

@@ -92,8 +92,10 @@ const SFX_DEFS = [
  * walked over to play is bandwidth spent on a maybe.
  */
 const ONESHOT_DEFS = {
-    uiOpen: { group: 'ui', volume: 1.0, src: ['/sounds/menu/open.webm', '/sounds/menu/open.m4a'] },
-    uiClose: { group: 'ui', volume: 0.9, src: ['/sounds/menu/close.webm', '/sounds/menu/close.m4a'] },
+    // One click for opening AND closing. The longer open flourish read as an
+    // event of its own next to the short close tick, which made the two halves
+    // of the same gesture feel like different things.
+    ui: { group: 'ui', volume: 0.9, src: ['/sounds/menu/close.webm', '/sounds/menu/close.m4a'] },
 
     // Deliberately quiet: this is the one sound that plays every second and a
     // half for the whole session, and it has to sit under everything else.
@@ -138,6 +140,14 @@ export default class AudioManager extends EventEmitter {
         // ── Music tuning ──
         this.musicVolume = 0.5          // slider position (0..1)
         this.musicCeiling = 0.3         // real gain = musicVolume * musicCeiling
+        // Music ducking while a panel is open. 0.25 is deliberately audible:
+        // the point is to make the modal feel like it took over the screen, and
+        // a polite 0.8 just sounds like the track wandered off.
+        this.duckLevel = 0.25
+        this.duckInMs = 220             // quick to get out of the way
+        this.duckOutMs = 600            // slow to come back, so it is not a pop
+        this._duck = 1
+        this._openPanels = 0
         this.fadeInMs = 2000
         this.fadeOutMs = 1500
         this.gapBetweenMs = 2500
@@ -225,7 +235,41 @@ export default class AudioManager extends EventEmitter {
 
     // ─── Music playback core ─────────────────────────────────────────────
 
-    _musicGain() { return this.muted ? 0 : this.musicVolume * this.musicCeiling }
+    _musicGain() {
+        return this.muted ? 0 : this.musicVolume * this.musicCeiling * this._duck
+    }
+
+    /**
+     * Panels duck the music. Counted, not a boolean: a results screen opens the
+     * leaderboard on top of itself, and closing the top one must not bring the
+     * music back while a panel is still up.
+     *
+     * Only the MUSIC ducks. The ambience is the world still being there behind
+     * the panel; silencing it would feel like the world had been switched off.
+     */
+    pushPanel() {
+        this._openPanels++
+        if (this._openPanels === 1) this._applyDuck(this.duckLevel, this.duckInMs)
+    }
+
+    popPanel() {
+        this._openPanels = Math.max(0, this._openPanels - 1)
+        if (this._openPanels === 0) this._applyDuck(1, this.duckOutMs)
+    }
+
+    _applyDuck(target, ms) {
+        if (this._duck === target) return
+        this._duck = target
+        if (!this.howl || this.soundId == null) return
+        try {
+            const from = this.howl.volume(this.soundId)
+            const to = this._musicGain()
+            // fade() from the CURRENT value, not from the nominal one: a track
+            // may still be in its own fade-in, and jumping to full first would
+            // be the exact pop this is meant to avoid.
+            this.howl.fade(typeof from === 'number' ? from : to, to, ms, this.soundId)
+        } catch { /* */ }
+    }
 
     _playCurrent({ fadeIn = true, announce = true } = {}) {
         this._clearTimers()
