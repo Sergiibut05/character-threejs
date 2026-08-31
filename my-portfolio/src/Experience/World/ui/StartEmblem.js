@@ -1,5 +1,6 @@
 import './ui.css'
 import { inputGlyph } from './InputGlyph.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 
 /**
  * StartEmblem — the reusable leaf mark for an interactive start point (and the
@@ -51,8 +52,23 @@ export default class StartEmblem {
         this.glyphEl.appendChild(inputGlyph('confirm'))
     }
 
-    /** Activity name shown when the emblem opens. */
-    setLabel(text) { this.labelEl.textContent = text }
+    /**
+      * Activity name shown when the emblem opens, as a CATALOG KEY.
+      *
+      * A key and not a string because this label is painted once and then
+      * lives in the world for the whole session: a plain string would sit
+      * there in the old language until the page was reloaded. Holding the key
+      * lets the emblem repaint itself on 'change'.
+      */
+    setLabelKey(key) {
+        this._labelKey = key
+        this.labelEl.textContent = t(key)
+        if (!this._unsubLocale) {
+            this._unsubLocale = onLocaleChange(() => {
+                if (this._labelKey) this.labelEl.textContent = t(this._labelKey)
+            })
+        }
+    }
 
     /** 0 = far, 1 = right next to it → subtle scale/glow on the closed logo. */
     setProximity(t) { this.el.style.setProperty('--p', Math.max(0, Math.min(1, t)).toFixed(3)) }
@@ -76,6 +92,8 @@ export default class StartEmblem {
 
     destroy() {
         this._unsub?.()
+        this._unsubLocale?.()
+        this._unsubLocale = null
         this.el?.remove()
     }
 }

@@ -37,7 +37,7 @@ export default class BeachPrompt {
         this.isOpen = false
 
         this.emblem = new StartEmblem({ svg: BALL_SVG })
-        this.emblem.setLabel('Voleibol de playa')
+        this.emblem.setLabelKey('beach.title')
         this.emblem.setVisible(false)
     }
 

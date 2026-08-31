@@ -294,6 +294,14 @@ export default {
             education: 'Educación'
         },
 
+        project: {
+            close: 'Cerrar',
+            badge: 'Proyecto',
+            screenshot: 'Captura {n}',
+            highlights: 'Lo destacado',
+            stack: 'Stack'
+        },
+
         trophy: { title: 'Certificados' }
     }
 }

@@ -349,6 +349,14 @@ export default {
             education: 'Education'
         },
 
+        project: {
+            close: 'Close',
+            badge: 'Project',
+            screenshot: 'Screenshot {n}',
+            highlights: 'Highlights',
+            stack: 'Stack'
+        },
+
         trophy: { title: 'Certificates' }
     }
 }

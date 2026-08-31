@@ -1,5 +1,5 @@
 import './ui.css'
-import { t } from '../../Utils/gameText.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 import Modal from './Modal.js'
 
 /**
@@ -22,6 +22,9 @@ export default class Stepper {
         this._done = false
         // Re-render so device-aware step text updates when the control changes.
         this._unsub = window.experience?.input?.onChange?.(() => this._render()) || null
+        // Same reason as the device listener above: the panel stays open while
+        // someone reads it, and the language can change under it.
+        this._unsubLocale = onLocaleChange(() => this._render())
 
         this.modal = new Modal({ variant: 'paper', align: 'center', title, closable: true })
 

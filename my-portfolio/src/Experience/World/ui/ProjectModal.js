@@ -1,4 +1,5 @@
 import './project.css'
+import { t } from '../../Utils/gameText.js'
 import { PROJECTS } from './projectsData.js'
 
 /** Escape HTML, then allow ONLY the **bold** marker → <strong>. */
@@ -56,7 +57,7 @@ export default class ProjectModal {
         } else {
             this.closeBtn = _el('button', 'fz-modal-close')
             this.closeBtn.type = 'button'
-            this.closeBtn.setAttribute('aria-label', 'Cerrar')
+            this.closeBtn.setAttribute('aria-label', t('project.close'))
             this.closeBtn.textContent = '✕'
             this.closeBtn.addEventListener('click', () => this.close())
             this.panel.appendChild(this.closeBtn)
@@ -137,7 +138,7 @@ export default class ProjectModal {
         img.loading = 'lazy'
         hero.appendChild(img)
         const flag = _el('span', 'fz-proj-flag')
-        flag.textContent = 'Proyecto'
+        flag.textContent = t('project.badge')
         hero.appendChild(flag)
         this.content.appendChild(hero)
 
@@ -149,7 +150,7 @@ export default class ProjectModal {
             const buttons = sources.map((src, i) => {
                 const b = _el('button', `fz-proj-thumb${i === 0 ? ' is-active' : ''}`)
                 b.type = 'button'
-                b.setAttribute('aria-label', `Captura ${i + 1}`)
+                b.setAttribute('aria-label', t('project.screenshot', { n: i + 1 }))
                 const t = _el('img')
                 t.src = src
                 t.alt = ''
@@ -179,7 +180,7 @@ export default class ProjectModal {
 
         // Highlights — check icons scan far better than plain dots.
         const hlLabel = _el('div', 'fz-proj-kicker fz-proj-kicker--section')
-        hlLabel.textContent = 'Lo destacado'
+        hlLabel.textContent = t('project.highlights')
         this.content.appendChild(hlLabel)
 
         for (const h of project.highlights) {
@@ -195,7 +196,7 @@ export default class ProjectModal {
 
         if (project.stack?.length) {
             const label = _el('div', 'fz-proj-kicker fz-proj-kicker--section')
-            label.textContent = 'Stack'
+            label.textContent = t('project.stack')
             this.content.appendChild(label)
             const chips = _el('div', 'fz-chips fz-proj-chips')
             for (const s of project.stack) {

@@ -1,5 +1,5 @@
 import './ui.css'
-import { t } from '../../Utils/gameText.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 import { iconDisc, iconExit, iconHelp } from './icons.js'
 
 /**
@@ -46,6 +46,10 @@ export default class Hud {
         this.helpBtn.innerHTML = `<span class="fz-hud-help-icon">${iconHelp}</span>`
         document.body.appendChild(this.helpBtn)
 
+        // The HUD is on screen for a whole game; switching language from the
+        // settings mid-game has to reach it.
+        this._unsubLocale = onLocaleChange(() => this._relabel())
+
         this.mode = 'competitivo'
         this.totalRounds = 10
         this.balloonFrom = 6
@@ -72,6 +76,7 @@ export default class Hud {
     }
 
     setRound(current) {
+        this._round = current
         if (this.mode === 'competitivo') {
             this.roundEl.textContent = t('frisbee.roundOf', { n: current, total: this.totalRounds })
             const pips = this.pipsEl.children
@@ -125,7 +130,18 @@ export default class Hud {
     onExit(cb) { this.exitBtn.onclick = cb }
     onHelp(cb) { this.helpBtn.onclick = cb }
 
+    /** Re-read the strings this HUD paints. The round line is derived, so it
+      * is easier to re-run setRound() than to remember its last text. */
+    _relabel() {
+        const label = this.el.querySelector('.fz-hud-score-label')
+        if (label) label.textContent = t('frisbee.points')
+        this.exitBtn?.setAttribute('aria-label', t('common.leaveGame'))
+        this.helpBtn?.setAttribute('aria-label', t('common.howToPlay'))
+        if (this._round) this.setRound(this._round)
+    }
+
     destroy() {
+        this._unsubLocale?.()
         this.el?.remove()
         this.exitBtn?.remove()
         this.helpBtn?.remove()

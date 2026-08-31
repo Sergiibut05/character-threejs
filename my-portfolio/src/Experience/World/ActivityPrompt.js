@@ -59,7 +59,7 @@ export default class ActivityPrompt {
         // Reusable "Órbita" emblem (the portfolio's start mark). ActivityPrompt
         // projects the 3D anchor and drives its position/proximity/active state.
         this.emblem = new StartEmblem({ svg: DISC_SVG })
-        this.emblem.setLabel('Frisbee con el perro')
+        this.emblem.setLabelKey('frisbee.title')
         this.el = this.emblem.el
 
         this.onMouseEnterBound = () => { this.isHovered = true; this.updateOpenState() }

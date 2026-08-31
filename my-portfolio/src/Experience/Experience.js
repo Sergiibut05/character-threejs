@@ -31,6 +31,15 @@ export default class Experience {
         this.canvas = canvas
         this.ready = false
 
+        // The landing button is painted once and then sits there — and the
+        // Quick Overview, reachable from that very screen, has its own language
+        // toggle. Without this it would still read "Explorar" after a switch.
+        i18n.on('change', () => {
+            if (this.loadingEnterBtn?.classList.contains('ready') && this.progressBtnText) {
+                this.progressBtnText.textContent = t('landing.explore')
+            }
+        })
+
         // Kick the catalog off FIRST. Everything below can render text, and
         // t() only works synchronously once a catalog is resident — so the
         // sooner this starts, the smaller the window in which a string could

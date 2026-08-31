@@ -1,6 +1,6 @@
 import './ui.css'
 // `tr`, not `t`: this file already binds `t` to a local <span>.
-import { t as tr } from '../../Utils/gameText.js'
+import { t as tr, onLocaleChange } from '../../Utils/gameText.js'
 import { inputGlyph } from './InputGlyph.js'
 
 /**
@@ -18,6 +18,7 @@ export default class Hint {
         this._verb = ''
         this._action = 'continue'
         this._unsub = null
+        this._unsubLocale = onLocaleChange(() => { if (this._verb) this._render() })
     }
 
     /** @param verb e.g. "continuar"/"saltar"  @param action input action (default 'continue') */
@@ -56,6 +57,7 @@ export default class Hint {
     }
 
     destroy() {
+        this._unsubLocale?.()
         this._unsub?.()
         this.el?.remove()
     }
