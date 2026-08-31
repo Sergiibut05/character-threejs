@@ -1,4 +1,6 @@
 import './ui.css'
+// `tr`, not `t`: this file already binds `t` to a local <span>.
+import { t as tr } from '../../Utils/gameText.js'
 import { inputGlyph } from './InputGlyph.js'
 
 /**
@@ -36,7 +38,7 @@ export default class Hint {
         if (device === 'touch') {
             const t = document.createElement('span')
             t.className = 'fz-hint-text'
-            t.textContent = `Toca para ${this._verb}`
+            t.textContent = tr('hint.touchTo', { verb: this._verb })
             this.el.appendChild(t)
             return
         }

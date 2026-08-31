@@ -14,6 +14,8 @@ import AudioManager from './Utils/AudioManager.js'
 import SettingsModal from './World/ui/SettingsModal.js'
 import WorldMap from './World/ui/WorldMap.js'
 import sources from './sources.js'
+import i18n from './Utils/i18n.js'
+import { t } from './Utils/gameText.js'
 
 let instance = null
 
@@ -28,6 +30,13 @@ export default class Experience {
 
         this.canvas = canvas
         this.ready = false
+
+        // Kick the catalog off FIRST. Everything below can render text, and
+        // t() only works synchronously once a catalog is resident — so the
+        // sooner this starts, the smaller the window in which a string could
+        // fall back to its key. Anything that paints before it resolves is
+        // re-rendered by the 'change' event that setLocale fires.
+        i18n.init()
 
         // Setup
         this.debug = new Debug()
@@ -203,7 +212,7 @@ export default class Experience {
             this.progressFill.style.width = '100%'
         }
         if (this.progressBtnText) {
-            this.progressBtnText.textContent = 'Explorar'
+            this.progressBtnText.textContent = t('landing.explore')
         }
         if (this.loadingEnterBtn) {
             this.loadingEnterBtn.disabled = false

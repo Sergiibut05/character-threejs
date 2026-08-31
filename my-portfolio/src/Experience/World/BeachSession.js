@@ -3,6 +3,7 @@ import Modal from './ui/Modal.js'
 import BeachPrompt from './BeachPrompt.js'
 import NameEntry from './ui/NameEntry.js'
 import Leaderboard from '../Utils/Leaderboard.js'
+import { t } from '../Utils/gameText.js'
 import { buildLeaderboardList } from './ui/leaderboardView.js'
 import { createModeCard, createCardGrid } from './ui/Card.js'
 import { createButton } from './ui/Button.js'
@@ -76,21 +77,21 @@ export default class BeachSession {
     _buildModal() {
         this.modal = new Modal({
             variant: 'paper',
-            title: 'Voleibol de playa',
-            subtitle: 'Encadena toques sin que la pelota toque la arena'
+            title: t('beach.title'),
+            subtitle: t('beach.chooseMode')
         })
 
         this.modal.append(createCardGrid([
             createModeCard({
                 icon: iconTrophy,
-                title: 'Competitivo',
-                desc: 'Un fallo y se acaba · entra en el ranking',
+                title: t('common.competitive'),
+                desc: t('beach.competitiveDesc'),
                 onSelect: () => this._choose('competitivo')
             }),
             createModeCard({
                 icon: iconInfinity,
-                title: 'Libre',
-                desc: 'Práctica · el peloteo se reinicia solo',
+                title: t('common.free'),
+                desc: t('beach.freeDesc'),
                 onSelect: () => this._choose('libre')
             })
         ]))
@@ -148,16 +149,16 @@ export default class BeachSession {
         this.resultsModal = new Modal({
             variant: 'paper',
             size: 'lg',
-            title: '¡Se acabó el peloteo!',
+            title: t('beach.resultsTitle'),
             closable: false
         })
 
         const body = document.createElement('div')
         body.className = 'fz-result'
         body.innerHTML =
-            '<span class="fz-result-label">Toques encadenados</span>' +
+            `<span class="fz-result-label">${t('beach.touches')}</span>` +
             `<span class="fz-result-total">${touches}</span>` +
-            `<span class="fz-result-sub">tu mejor marca: ${Math.max(this.minigame.best, touches)}</span>`
+            `<span class="fz-result-sub">${t('beach.best', { n: Math.max(this.minigame.best, touches) })}</span>`
         this.resultsModal.append(body)
 
         const row = document.createElement('div')
@@ -166,25 +167,25 @@ export default class BeachSession {
         if (qualifies && touches > 0) {
             const badge = document.createElement('div')
             badge.className = 'fz-result-badge'
-            badge.textContent = '¡Has entrado en el Top 10!'
+            badge.textContent = t('beach.top10Badge')
             this.resultsModal.append(badge)
 
             row.appendChild(createButton({
-                label: 'Guardar récord', variant: 'primary',
+                label: t('common.saveRecord'), variant: 'primary',
                 onClick: () => this._enterName(touches)
             }))
             row.appendChild(createButton({
-                label: 'Salir', variant: 'ghost', onClick: () => this._end()
+                label: t('common.exit'), variant: 'ghost', onClick: () => this._end()
             }))
         } else {
             row.appendChild(createButton({
-                label: 'Jugar otra vez', variant: 'primary', onClick: () => this._replay()
+                label: t('common.playAgain'), variant: 'primary', onClick: () => this._replay()
             }))
             row.appendChild(createButton({
-                label: 'Ver ranking', variant: 'ghost', onClick: () => this._showLeaderboard()
+                label: t('common.seeRanking'), variant: 'ghost', onClick: () => this._showLeaderboard()
             }))
             row.appendChild(createButton({
-                label: 'Salir', variant: 'ghost', onClick: () => this._end()
+                label: t('common.exit'), variant: 'ghost', onClick: () => this._end()
             }))
         }
 
@@ -217,8 +218,8 @@ export default class BeachSession {
         this.lbModal = new Modal({
             variant: 'paper',
             size: 'lg',
-            title: 'Ranking',
-            subtitle: 'Top 10 · Voleibol de playa',
+            title: t('common.ranking'),
+            subtitle: t('beach.lbSubtitle'),
             closable: false
         })
         this.lbModal.append(buildLeaderboardList(top10, myBest, highlightEntry))
@@ -226,11 +227,11 @@ export default class BeachSession {
         const row = document.createElement('div')
         row.className = 'fz-btn-row'
         row.appendChild(createButton({
-            label: 'Jugar otra vez', variant: 'primary',
+            label: t('common.playAgain'), variant: 'primary',
             onClick: () => { this._destroyLeaderboard(); this._replay() }
         }))
         row.appendChild(createButton({
-            label: 'Salir', variant: 'ghost',
+            label: t('common.exit'), variant: 'ghost',
             onClick: () => { this._destroyLeaderboard(); this._end() }
         }))
         this.lbModal.append(row)

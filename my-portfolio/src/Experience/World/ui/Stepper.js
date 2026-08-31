@@ -1,4 +1,5 @@
 import './ui.css'
+import { t } from '../../Utils/gameText.js'
 import Modal from './Modal.js'
 
 /**
@@ -10,9 +11,12 @@ import Modal from './Modal.js'
  * Closing via ✕ also finishes (treated as "skip"). `onFinish` runs once.
  */
 export default class Stepper {
-    constructor({ title = '', steps = [], onFinish, finishLabel = '¡Jugar!' } = {}) {
+    constructor({ title = '', steps = [], onFinish, finishLabel = null } = {}) {
         this.steps = steps
         this.onFinish = onFinish
+        // null, not a literal default: a default parameter is evaluated when
+        // the stepper is constructed, and _render() re-reads the catalog on
+        // every step so the label follows a language switch.
         this.finishLabel = finishLabel
         this.index = 0
         this._done = false
@@ -47,7 +51,7 @@ export default class Stepper {
         this.backBtn = document.createElement('button')
         this.backBtn.type = 'button'
         this.backBtn.className = 'fz-btn fz-btn--ghost'
-        this.backBtn.textContent = 'Atrás'
+        this.backBtn.textContent = t('common.back')
         this.backBtn.addEventListener('click', () => this._back())
         this.nextBtn = document.createElement('button')
         this.nextBtn.type = 'button'
@@ -86,7 +90,9 @@ export default class Stepper {
 
         const isLast = this.index === this.steps.length - 1
         this.backBtn.style.visibility = this.index === 0 ? 'hidden' : 'visible'
-        this.nextBtn.textContent = isLast ? this.finishLabel : 'Siguiente'
+        this.nextBtn.textContent = isLast
+            ? (this.finishLabel || t('common.play'))
+            : t('common.next')
     }
 
     _back() {

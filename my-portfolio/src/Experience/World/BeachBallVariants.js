@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Fn, vec3, vec4, uv, float, mix, smoothstep, sin, abs, fract } from 'three/tsl'
 import Experience from '../Experience.js'
+import { t } from '../Utils/gameText.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
 /**
@@ -27,9 +28,12 @@ import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
  * like an unfair tax on every ball alike.
  */
 export const VARIANTS = [
-    { id: 'playa', label: 'Pelota de playa', gravityScale: 1.0, windScale: 1.0 },
-    { id: 'futbol', label: 'Balón de fútbol', gravityScale: 1.3, windScale: 0.5 },
-    { id: 'coco', label: 'Coco', gravityScale: 1.6, windScale: 0.18 }
+    // labelKey, not label: this table is built at module load, before any
+    // catalog exists, and the name has to follow a language switch. The `label`
+    // getter below resolves it at the moment it is read.
+    { id: 'playa', labelKey: 'beach.ballBeach', gravityScale: 1.0, windScale: 1.0 },
+    { id: 'futbol', labelKey: 'beach.ballFootball', gravityScale: 1.3, windScale: 0.5 },
+    { id: 'coco', labelKey: 'beach.ballCoconut', gravityScale: 1.6, windScale: 0.18 }
 ]
 
 export default class BeachBallVariants {
@@ -117,7 +121,8 @@ export default class BeachBallVariants {
         return VARIANTS.find((v) => v.id === this.current?.id)?.windScale ?? 1
     }
     get label() {
-        return VARIANTS.find((v) => v.id === this.current?.id)?.label || ''
+        const key = VARIANTS.find((v) => v.id === this.current?.id)?.labelKey
+        return key ? t(key) : ''
     }
 
     setIndex(i) {

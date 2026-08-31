@@ -87,7 +87,10 @@ export default class Overview {
 
     /** Loads the catalog for the detected locale, then builds the DOM. */
     async init() {
-        await i18n.setLocale(i18n.detect())
+        // init() is idempotent and does the same detect() — whichever of the
+        // world boot and this page runs first wins, and neither persists a
+        // merely detected locale.
+        await i18n.init()
         this._build()
         this._watchResources()
         return this

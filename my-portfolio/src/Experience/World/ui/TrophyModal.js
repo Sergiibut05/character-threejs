@@ -1,5 +1,6 @@
 import './profile.css'
 import Modal from './Modal.js'
+import { t } from '../../Utils/gameText.js'
 import { CERTIFICATES } from './profileData.js'
 import { iconBadge } from './icons.js'
 
@@ -12,7 +13,7 @@ export default class TrophyModal {
         this.modal = new Modal({
             variant: 'paper',
             size: 'lg',
-            title: 'Certificados'
+            title: t('trophy.title')
         })
 
         const scroll = document.createElement('div')

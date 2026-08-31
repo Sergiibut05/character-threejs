@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { t } from '../Utils/gameText.js'
 import WindLines from './WindLines.js'
 import CourtBounds from './CourtBounds.js'
 import BeachBallVariants from './BeachBallVariants.js'
@@ -266,7 +267,7 @@ export default class BeachMinigame {
 
     _renderHud() {
         this.hudCount.textContent = String(this.touches)
-        this.hudBest.textContent = this.best > 0 ? `récord ${this.best}` : ''
+        this.hudBest.textContent = this.best > 0 ? t('beach.record', { n: this.best }) : ''
     }
 
     _showFlash(text, modifier = '') {
@@ -330,7 +331,7 @@ export default class BeachMinigame {
         this.exitBtn.classList.add('is-visible')
         this.windEl.classList.toggle('is-visible', this.windEnabled)
         this._renderHud()
-        this._showFlash('¡A jugar!')
+        this._showFlash(t('beach.go'))
         return true
     }
 
@@ -366,7 +367,7 @@ export default class BeachMinigame {
         this._widthT = 0
         this._renderHud()
         this._serve()
-        this._showFlash('¡A jugar!')
+        this._showFlash(t('beach.go'))
         return true
     }
 
@@ -638,7 +639,7 @@ export default class BeachMinigame {
             : '<span class="fz-beach-banner-arrow">&#8594;</span><span class="fz-beach-banner-arrow">&#8592;</span>'
         this.bannerEl.innerHTML =
             `<span class="fz-beach-banner-arrows">${arrows}</span>` +
-            `<span class="fz-beach-banner-text">${wider ? 'Pista más ancha' : 'Pista más estrecha'}</span>`
+            `<span class="fz-beach-banner-text">${wider ? t('beach.widerCourt') : t('beach.narrowerCourt')}</span>`
         this.bannerEl.className =
             `fz-beach-banner is-visible ${wider ? 'is-wider' : 'is-narrower'}`
         this._bannerTimer = setTimeout(() => {
@@ -742,7 +743,7 @@ export default class BeachMinigame {
 
         // A clean, central touch is the skilful one — call it out.
         if (announced) { /* a milestone flash already fired */ }
-        else if (centred > 0.72) this._showFlash('¡Perfecto!', 'is-perfect')
+        else if (centred > 0.72) this._showFlash(t('beach.perfect'), 'is-perfect')
         else if (this.touches % 10 === 0) this._showFlash(`¡${this.touches}!`, 'is-milestone')
 
         // Arms only — the hop that used to go with it read as a weird jump.

@@ -1,5 +1,6 @@
 import './ui.css'
 import Modal from './Modal.js'
+import { t } from '../../Utils/gameText.js'
 import { createButton } from './Button.js'
 
 // Web3Forms — sends the message to the owner's inbox (no backend). The access
@@ -19,24 +20,24 @@ export default class ContactModal {
             variant: 'paper',
             size: 'lg',
             align: 'center',
-            title: 'Contacto',
-            subtitle: '¿Trabajamos juntos? Cuéntame tu idea y te respondo pronto.'
+            title: t('contact.title'),
+            subtitle: t('contact.subtitle')
         })
 
         // ─── Form view ───────────────────────────────────────────────────
         this.form = _el('div', 'fz-contact')
         this.form.innerHTML = `
             <label class="fz-field">
-                <span class="fz-field-label">Nombre</span>
-                <input class="fz-input" type="text" placeholder="Tu nombre" autocomplete="name" />
+                <span class="fz-field-label">${t('contact.nameLabel')}</span>
+                <input class="fz-input" type="text" placeholder="${t('contact.namePlaceholder')}" autocomplete="name" />
             </label>
             <label class="fz-field">
-                <span class="fz-field-label">Tu email</span>
-                <input class="fz-input" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email" />
+                <span class="fz-field-label">${t('contact.emailLabel')}</span>
+                <input class="fz-input" type="email" placeholder="${t('contact.emailPlaceholder')}" autocomplete="email" />
             </label>
             <label class="fz-field">
-                <span class="fz-field-label">Mensaje</span>
-                <textarea class="fz-input fz-textarea" rows="4" placeholder="Cuéntame…"></textarea>
+                <span class="fz-field-label">${t('contact.messageLabel')}</span>
+                <textarea class="fz-input fz-textarea" rows="4" placeholder="${t('contact.messagePlaceholder')}"></textarea>
             </label>
             <p class="fz-form-error" role="alert"></p>
         `
@@ -48,7 +49,7 @@ export default class ContactModal {
         this.modal.append(this.form)
 
         this.row = _el('div', 'fz-btn-row')
-        this.sendBtn = createButton({ label: 'Enviar', variant: 'primary', onClick: () => this._send() })
+        this.sendBtn = createButton({ label: t('common.send'), variant: 'primary', onClick: () => this._send() })
         this.row.appendChild(this.sendBtn)
         this.modal.append(this.row)
 
@@ -62,13 +63,13 @@ export default class ContactModal {
                 </svg>
             </span>
             <span class="fz-sent-title">¡Mensaje enviado!</span>
-            <span class="fz-sent-text">Gracias por escribir. Te responderé pronto.</span>
+            <span class="fz-sent-text">${t('contact.thanks')}</span>
         `
         this.sentView.style.display = 'none'
         this.modal.append(this.sentView)
 
         this.sentRow = _el('div', 'fz-btn-row')
-        this.sentRow.appendChild(createButton({ label: 'Hecho', variant: 'primary', onClick: () => this.modal.close() }))
+        this.sentRow.appendChild(createButton({ label: t('common.done'), variant: 'primary', onClick: () => this.modal.close() }))
         this.sentRow.style.display = 'none'
         this.modal.append(this.sentRow)
 
@@ -81,9 +82,9 @@ export default class ContactModal {
         const email = (this.emailEl.value || '').trim()
         const msg = (this.msgEl.value || '').trim()
 
-        if (!msg) { this._setError('Escribe un mensaje antes de enviar.'); this.msgEl.focus(); return }
+        if (!msg) { this._setError(t('contact.emptyMessage')); this.msgEl.focus(); return }
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            this._setError('Revisa tu email, no parece válido.'); this.emailEl.focus(); return
+            this._setError(t('contact.badEmail')); this.emailEl.focus(); return
         }
         this._setError('')
         this._setSending(true)
@@ -94,18 +95,18 @@ export default class ContactModal {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                 body: JSON.stringify({
                     access_key: ACCESS_KEY,
-                    subject: `Portfolio — ${name || 'Nuevo mensaje'}`,
-                    from_name: name || 'Visitante del portfolio',
-                    name: name || '(sin nombre)',
+                    subject: t('contact.subject', { name: name || t('contact.subjectFallback') }),
+                    from_name: name || t('contact.visitor'),
+                    name: name || t('contact.noName'),
                     email: email || 'sin-email@portfolio',
                     message: msg
                 })
             })
             const data = await res.json()
             if (data.success) this._showSent()
-            else this._setError(data.message || 'No se pudo enviar. Inténtalo de nuevo.')
+            else this._setError(data.message || t('contact.sendFailed'))
         } catch {
-            this._setError('Sin conexión. Inténtalo de nuevo en un momento.')
+            this._setError(t('contact.offline'))
         } finally {
             this._setSending(false)
         }

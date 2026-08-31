@@ -5,11 +5,13 @@ import {
     BTS_INTRO, BEHIND_THE_SCENES, BTS_CREDITS, LINKS
 } from './profileData.js'
 import { iconGithub, iconLinkedin, iconMail } from './icons.js'
+import { t } from '../../Utils/gameText.js'
 
+// Keys, resolved when the tabs are built — see the note in gameText.js.
 const TABS = [
-    { id: 'about', label: 'Sobre mí' },
-    { id: 'experience', label: 'Experiencia' },
-    { id: 'bts', label: 'Behind the scenes' }
+    { id: 'about', labelKey: 'computer.about' },
+    { id: 'experience', labelKey: 'computer.experience' },
+    { id: 'bts', labelKey: 'computer.behindScenes' }
 ]
 
 /**
@@ -37,7 +39,7 @@ export default class ComputerModal {
         TABS.forEach((tab, i) => {
             const b = _el('button', 'fz-settings-tab')
             b.type = 'button'
-            b.textContent = tab.label
+            b.textContent = t(tab.labelKey)
             b.addEventListener('click', () => this._select(i))
             this.nav.appendChild(b)
             this._tabs.push(b)
@@ -77,7 +79,7 @@ export default class ComputerModal {
             this.content.appendChild(_xpEntry(e.role, e.org, e.period, e.detail))
         }
 
-        this._heading('Educación')
+        this._heading(t('computer.education'))
         for (const e of EDUCATION) {
             this.content.appendChild(_xpEntry(e.title, e.org, e.period, e.detail))
         }

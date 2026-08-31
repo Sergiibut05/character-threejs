@@ -20,14 +20,28 @@ const LOADERS = {
 }
 
 export const LOCALES = Object.keys(LOADERS)
-export const FALLBACK = 'es'
+
+/**
+ * These are two DIFFERENT jobs that used to share one constant.
+ *
+ * BASE is the translation floor: the catalog every missing key resolves
+ * against. It has to stay Spanish, because Spanish is this project's source
+ * language — the data modules (profileData, projectsData) are written in it and
+ * the English catalog exists as a layer of overrides on top.
+ *
+ * DEFAULT is what a visitor gets when nothing else says otherwise. That is
+ * English: this is a portfolio aimed at anyone, and only a browser that asks
+ * for Spanish should get Spanish.
+ */
+export const BASE = 'es'
+export const DEFAULT = 'en'
 
 const STORAGE_KEY = 'portfolio-locale'
 
 class I18n extends EventEmitter {
     constructor() {
         super()
-        this.locale = FALLBACK
+        this.locale = DEFAULT
         this._catalogs = {}
         this._loading = {}
     }
@@ -45,7 +59,20 @@ class I18n extends EventEmitter {
             const base = String(tag).toLowerCase().split('-')[0]
             if (LOCALES.includes(base)) return base
         }
-        return FALLBACK
+        return DEFAULT
+    }
+
+    /**
+     * Resolve the starting locale and load its catalog. Call once, as early as
+     * possible: everything that renders text has to be able to call t()
+     * synchronously afterwards.
+     *
+     * Idempotent, because both the world boot and the Quick Overview want to be
+     * sure it has happened and neither knows which of them runs first.
+     */
+    async init() {
+        if (!this._initPromise) this._initPromise = this.setLocale(this.detect(), { persist: false })
+        return this._initPromise
     }
 
     /** Fetch a catalog without switching to it (used to warm the other language). */
@@ -64,16 +91,26 @@ class I18n extends EventEmitter {
         return this._loading[locale]
     }
 
-    /** Switch language. Resolves once the catalog is in memory. */
-    async setLocale(locale) {
+    /**
+     * Switch language. Resolves once the catalog is in memory.
+     *
+     * `persist` is what separates a CHOICE from a DETECTION. Storing the
+     * detected locale would freeze it: detect() reads storage first, so a
+     * visitor who later switches their browser to another language would keep
+     * getting the one guessed on their first visit, for ever, having never
+     * asked for it. Only an explicit pick is remembered.
+     */
+    async setLocale(locale, { persist = true } = {}) {
         if (!LOADERS[locale]) return this.locale
         await this.load(locale)
-        // The fallback catalog backs every lookup, so it has to be resident.
-        if (locale !== FALLBACK) await this.load(FALLBACK)
+        // The base catalog backs every lookup, so it has to be resident.
+        if (locale !== BASE) await this.load(BASE)
 
         if (this.locale !== locale) {
             this.locale = locale
-            try { localStorage.setItem(STORAGE_KEY, locale) } catch { /* private mode */ }
+            if (persist) {
+                try { localStorage.setItem(STORAGE_KEY, locale) } catch { /* private mode */ }
+            }
             document.documentElement.lang = locale
             this.trigger('change', [locale])
         }
@@ -82,7 +119,7 @@ class I18n extends EventEmitter {
 
     /** The other language — the only thing a two-language toggle needs. */
     other() {
-        return LOCALES.find((l) => l !== this.locale) || FALLBACK
+        return LOCALES.find((l) => l !== this.locale) || DEFAULT
     }
 
     _lookup(catalog, key) {
@@ -101,7 +138,7 @@ class I18n extends EventEmitter {
      */
     t(key, params) {
         let value = this._lookup(this._catalogs[this.locale], key)
-        if (value === undefined) value = this._lookup(this._catalogs[FALLBACK], key)
+        if (value === undefined) value = this._lookup(this._catalogs[BASE], key)
         if (value === undefined) {
             console.warn(`i18n: missing key "${key}" (${this.locale})`)
             return key

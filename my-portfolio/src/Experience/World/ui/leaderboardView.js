@@ -3,6 +3,7 @@
  * row) plus a "your position" pill when you're outside the Top 10. Used by both
  * the post-game results flow (FrisbeeSession) and the in-world ranking sign.
  */
+import { t } from '../../Utils/gameText.js'
 export function buildLeaderboardList(top10, myBest, highlightEntry = null) {
     const wrap = document.createElement('div')
     wrap.className = 'fz-lb-wrap'
@@ -13,7 +14,7 @@ export function buildLeaderboardList(top10, myBest, highlightEntry = null) {
     if (!top10.length) {
         const empty = document.createElement('div')
         empty.className = 'fz-lb-empty'
-        empty.textContent = 'Aún no hay puntuaciones. ¡Sé el primero!'
+        empty.textContent = t('leaderboard.empty')
         list.appendChild(empty)
     } else {
         top10.forEach((e, i) => {
@@ -34,7 +35,7 @@ export function buildLeaderboardList(top10, myBest, highlightEntry = null) {
     if (myBest?.rank && myBest.rank > 10) {
         const me = document.createElement('div')
         me.className = 'fz-lb-me-out'
-        me.textContent = `Tú · #${myBest.rank} · ${myBest.score} pts`
+        me.textContent = t('leaderboard.yourPosition', { rank: myBest.rank, score: myBest.score })
         wrap.appendChild(me)
     }
 

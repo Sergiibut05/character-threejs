@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import Experience from '../Experience.js'
 import Modal from './ui/Modal.js'
 import Leaderboard from '../Utils/Leaderboard.js'
+import { t } from '../Utils/gameText.js'
 import { buildLeaderboardList } from './ui/leaderboardView.js'
 import { _findNode } from './ScoreboardScreen.js'
 
@@ -26,7 +27,7 @@ export default class ScoreboardInteractive {
         this.renderer = this.experience.renderer
         this.nodeName = o.nodeName || 'leaderboard'
         this.screenName = o.screenName || 'scoreboard'
-        this.subtitle = o.subtitle || 'Top 10 · Frisbee con el perro'
+        this.subtitleKey = o.subtitleKey || 'frisbee.lbSubtitle'
         this.leaderboard = new Leaderboard(o.board || 'frisbee')
 
         this.position = new THREE.Vector3()
@@ -134,8 +135,8 @@ export default class ScoreboardInteractive {
                 this.modal = new Modal({
                     variant: 'paper',
                     size: 'lg',
-                    title: 'Ranking',
-                    subtitle: this.subtitle
+                    title: t('common.ranking'),
+                    subtitle: t(this.subtitleKey)
                 })
                 this.modal.onClose(() => this._onModalClosed())
             }

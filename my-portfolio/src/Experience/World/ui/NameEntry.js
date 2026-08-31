@@ -1,4 +1,5 @@
 import './ui.css'
+import { t } from '../../Utils/gameText.js'
 import Modal from './Modal.js'
 import { createButton } from './Button.js'
 
@@ -26,8 +27,8 @@ export default class NameEntry {
         this.modal = new Modal({
             variant: 'paper',
             align: 'center',
-            title: '¡Estás en el Top 10!',
-            subtitle: 'Pon tus iniciales',
+            title: t('nameEntry.title'),
+            subtitle: t('nameEntry.subtitle'),
             closable: false
         })
 
@@ -50,7 +51,7 @@ export default class NameEntry {
         this.modal.append(this.reels)
 
         this.row = _el('div', 'fz-btn-row')
-        this.row.appendChild(createButton({ label: 'Aceptar', variant: 'primary', onClick: () => this._confirm() }))
+        this.row.appendChild(createButton({ label: t('common.accept'), variant: 'primary', onClick: () => this._confirm() }))
         this.modal.append(this.row)
 
         this._onKeyDown = (e) => this._handleKey(e)

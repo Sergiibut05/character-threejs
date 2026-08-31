@@ -163,7 +163,7 @@ export default class World {
             this.scoreboardScreen = new ScoreboardScreen()
             this.beachScoreboard = new ScoreboardScreen({
                 targetName: 'scoreboard001', board: 'beach',
-                footer: 'Top 5 · Voleibol de playa'
+                footerKey: 'beach.boardFooter'
             })
             // …and the physical boards are interactive: outline + top-10 modal.
             this.scoreboardInteractive = new ScoreboardInteractive()
@@ -171,7 +171,7 @@ export default class World {
                 nodeName: 'leaderboard001',
                 screenName: 'scoreboard001',
                 board: 'beach',
-                subtitle: 'Top 10 · Voleibol de playa'
+                subtitleKey: 'beach.lbSubtitle'
             })
 
             this._showDogAtAnchor()

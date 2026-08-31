@@ -14,6 +14,7 @@
  */
 import './map.css'
 import Modal from './Modal.js'
+import { t } from '../../Utils/gameText.js'
 
 /**
  * World (X, Z) → map image pixels, as a 2D affine transform.
@@ -54,7 +55,7 @@ const MAP_PX = 1024
 const DESTINATIONS = [
     {
         id: 'casa',
-        label: 'Casa',
+        labelKey: 'map.house',
         // The world's own spawn point, looking at the house. Picked over a
         // hand-placed spot in front of the door because the game already drops
         // you here on load, so it is known-clear ground — the first attempt
@@ -65,7 +66,7 @@ const DESTINATIONS = [
     },
     {
         id: 'frisbee',
-        label: 'Frisbee',
+        labelKey: 'map.frisbee',
         // Short of the activity anchor, not on it: the anchor is where the DOG
         // waits, so landing exactly there put you inside the dog. 1.8 units
         // back still sits inside the 2.25 activation radius, so the prompt
@@ -75,21 +76,21 @@ const DESTINATIONS = [
     },
     {
         id: 'fuego',
-        label: 'La hoguera',
+        labelKey: 'map.fire',
         // Beside the fire, facing it. FIRE_POINT_THREE in World.js.
         x: -12.45, y: 0.21, z: 3.11, yaw: -Math.PI / 2,
         pin: { x: -14.158, z: 3.11 }
     },
     {
         id: 'puente',
-        label: 'El puente',
+        labelKey: 'map.bridge',
         // East bank, looking across (the bridge spans X -37.5..-33.2).
         x: -32.4, y: 0.21, z: 4.44, yaw: -Math.PI / 2,
         pin: { x: -35.36, z: 4.44 }
     },
     {
         id: 'social',
-        label: 'Zona social',
+        labelKey: 'map.social',
         x: -7.5, y: 0.21, z: 21.0, yaw: 2.66,
         // Nudged west of the social-area bbox centre. This is the one pin the
         // map art cannot corroborate — the illustration draws forest here and
@@ -99,7 +100,7 @@ const DESTINATIONS = [
     },
     {
         id: 'playa',
-        label: 'La playa',
+        labelKey: 'map.beach',
         // On the sand, facing the sea (+Z).
         x: 1.65, y: 0.21, z: 40.0, yaw: 0,
         pin: { x: 1.65, z: 42.44 }
@@ -176,8 +177,8 @@ export default class WorldMap {
             variant: 'paper',
             size: 'lg',
             align: 'center',
-            title: 'Mapa',
-            subtitle: 'Elige a dónde ir'
+            title: t('map.title'),
+            subtitle: t('map.subtitle')
         })
 
         const stage = document.createElement('div')
@@ -197,8 +198,8 @@ export default class WorldMap {
             pin.className = 'fz-map-pin'
             pin.style.left = `${(u * 100).toFixed(2)}%`
             pin.style.top = `${(v * 100).toFixed(2)}%`
-            pin.setAttribute('aria-label', `Ir a ${dest.label}`)
-            pin.innerHTML = `<span class="fz-map-dot"></span><span class="fz-map-label">${dest.label}</span>`
+            pin.setAttribute('aria-label', t('map.goTo', { place: t(dest.labelKey) }))
+            pin.innerHTML = `<span class="fz-map-dot"></span><span class="fz-map-label">${t(dest.labelKey)}</span>`
             pin.addEventListener('click', () => this._travelTo(dest))
             stage.appendChild(pin)
         }

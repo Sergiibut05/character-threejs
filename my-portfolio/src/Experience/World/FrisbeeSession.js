@@ -10,6 +10,7 @@ import NameEntry from './ui/NameEntry.js'
 import Leaderboard from '../Utils/Leaderboard.js'
 
 import { buildLeaderboardList } from './ui/leaderboardView.js'
+import { t, controls } from '../Utils/gameText.js'
 import {
     iconTrophy, iconTarget, iconAim, iconCurve, iconPower
 } from './ui/icons.js'
@@ -20,33 +21,34 @@ const RING_MAX = 100           // best ring score
 const BALLOON_BONUS = 100      // popping the balloon
 const TUTORIAL_SEEN_KEY = 'frisbee.tutorialSeen'
 
-// Control labels per active device — keeps the tutorial text accurate.
-const CTRL = (device) => ({
-    move: device === 'gamepad' ? 'el stick' : device === 'touch' ? 'el joystick' : 'A y D',
-    press: device === 'gamepad' ? 'Pulsa A' : device === 'touch' ? 'toca el botón' : 'Pulsa Enter'
-})
-
-const TUTORIAL_STEPS = [
+// A FUNCTION, not a constant. The old array baked its strings at module load,
+// which is before any catalog is resident and long before the player can switch
+// language — it has to be rebuilt every time the stepper renders.
+const tutorialSteps = () => [
     {
         icon: iconAim,
         image: '/images/first.png',
-        title: 'Apuntar',
-        body: (d) => `Mueve con ${CTRL(d).move} para apuntar al objetivo. ${CTRL(d).press} para fijar la puntería.`
+        title: t('frisbee.tutorial.aimTitle'),
+        body: (d) => t('frisbee.tutorial.aimBody', controls(d))
     },
     {
         icon: iconCurve,
         image: '/images/second.png',
-        title: 'Curva',
-        body: (d) => `Después inclina el disco con ${CTRL(d).move} para curvar el lanzamiento: rodea y revienta el globo de camino a la diana.`
+        title: t('frisbee.tutorial.curveTitle'),
+        body: (d) => t('frisbee.tutorial.curveBody', controls(d))
     },
     {
         icon: iconPower,
         image: '/images/third.png',
-        title: 'Fuerza',
+        title: t('frisbee.tutorial.powerTitle'),
         body: (d) => {
-            const c = CTRL(d)
-            const press = c.press.charAt(0).toUpperCase() + c.press.slice(1)
-            return `Una barra oscila sola. ${press} en el momento justo para fijar la fuerza y lanzar. ¡Más fuerza, más lejos!`
+            const c = controls(d)
+            // The press label is mid-sentence in one language and sentence-initial
+            // in another, so it is capitalised here rather than in the catalog.
+            return t('frisbee.tutorial.powerBody', {
+                move: c.move,
+                press: c.press.charAt(0).toUpperCase() + c.press.slice(1)
+            })
         }
     }
 ]
@@ -117,21 +119,21 @@ export default class FrisbeeSession {
     _buildModal() {
         this.modal = new Modal({
             variant: 'paper',
-            title: 'Frisbee con el perro',
-            subtitle: 'Elige cómo quieres jugar'
+            title: t('frisbee.title'),
+            subtitle: t('frisbee.chooseMode')
         })
 
         const grid = createCardGrid([
             createModeCard({
                 icon: iconTrophy,
-                title: 'Competitivo',
-                desc: '10 rondas · puntúa al máximo',
+                title: t('common.competitive'),
+                desc: t('frisbee.competitiveDesc'),
                 onSelect: () => this._choose('competitivo')
             }),
             createModeCard({
                 icon: iconTarget,
-                title: 'Libre',
-                desc: 'Práctica · tiradas infinitas',
+                title: t('common.free'),
+                desc: t('frisbee.freeDesc'),
                 onSelect: () => this._choose('libre')
             })
         ])
@@ -175,8 +177,8 @@ export default class FrisbeeSession {
     _showTutorial(onDone) {
         this.tutorial?.destroy()
         this.tutorial = new Stepper({
-            title: 'Como jugar',
-            steps: TUTORIAL_STEPS,
+            title: t('common.howToPlay'),
+            steps: tutorialSteps(),
             onFinish: () => {
                 this.tutorial?.destroy()
                 this.tutorial = null
@@ -242,8 +244,10 @@ export default class FrisbeeSession {
     _playRoundStart() {
         if (!this.announce) this.announce = new Announce()
         const text = this.mode === 'competitivo'
-            ? (this.round >= COMPETITIVE_ROUNDS ? '¡Última ronda!' : `Ronda ${this.round}`)
-            : `Tirada ${this.round}`
+            ? (this.round >= COMPETITIVE_ROUNDS
+                ? t('frisbee.lastRound')
+                : t('frisbee.round', { n: this.round }))
+            : t('frisbee.shot', { n: this.round })
         this.announce.show(text, 1900)
         this.experience.camera.playRoundStartDescend?.(1800)
     }
@@ -495,16 +499,16 @@ export default class FrisbeeSession {
         this.resultsModal = new Modal({
             variant: 'paper',
             size: 'lg',
-            title: '¡Partida terminada!',
+            title: t('frisbee.resultsTitle'),
             closable: false
         })
 
         const body = document.createElement('div')
         body.className = 'fz-result'
         body.innerHTML = `
-            <span class="fz-result-label">Puntuación final</span>
+            <span class="fz-result-label">${t('frisbee.finalScore')}</span>
             <span class="fz-result-total">${this.score}</span>
-            <span class="fz-result-sub">de ${maxScore} posibles</span>
+            <span class="fz-result-sub">${t('frisbee.ofPossible', { max: maxScore })}</span>
         `
         this.resultsModal.append(body)
 
@@ -514,32 +518,32 @@ export default class FrisbeeSession {
         if (qualifies) {
             const badge = document.createElement('div')
             badge.className = 'fz-result-badge'
-            badge.textContent = '🏆 ¡Has entrado en el Top 10!'
+            badge.textContent = t('frisbee.top10Badge')
             this.resultsModal.append(badge)
 
             row.appendChild(createButton({
-                label: 'Guardar récord',
+                label: t('common.saveRecord'),
                 variant: 'primary',
                 onClick: () => this._enterName()
             }))
             row.appendChild(createButton({
-                label: 'Salir',
+                label: t('common.exit'),
                 variant: 'ghost',
                 onClick: () => this._endSession()
             }))
         } else {
             row.appendChild(createButton({
-                label: 'Jugar otra vez',
+                label: t('common.playAgain'),
                 variant: 'primary',
                 onClick: () => this._replay()
             }))
             row.appendChild(createButton({
-                label: 'Ver ranking',
+                label: t('common.seeRanking'),
                 variant: 'ghost',
                 onClick: () => this._showLeaderboard()
             }))
             row.appendChild(createButton({
-                label: 'Salir',
+                label: t('common.exit'),
                 variant: 'ghost',
                 onClick: () => this._endSession()
             }))
@@ -575,8 +579,8 @@ export default class FrisbeeSession {
         this.lbModal = new Modal({
             variant: 'paper',
             size: 'lg',
-            title: 'Ranking',
-            subtitle: 'Top 10 · Frisbee',
+            title: t('common.ranking'),
+            subtitle: t('frisbee.lbSubtitle'),
             closable: false
         })
 
@@ -585,12 +589,12 @@ export default class FrisbeeSession {
         const row = document.createElement('div')
         row.className = 'fz-btn-row'
         row.appendChild(createButton({
-            label: 'Jugar otra vez',
+            label: t('common.playAgain'),
             variant: 'primary',
             onClick: () => { this._destroyLeaderboard(); this._replay() }
         }))
         row.appendChild(createButton({
-            label: 'Salir',
+            label: t('common.exit'),
             variant: 'ghost',
             onClick: () => { this._destroyLeaderboard(); this._endSession() }
         }))

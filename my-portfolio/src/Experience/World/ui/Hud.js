@@ -1,4 +1,5 @@
 import './ui.css'
+import { t } from '../../Utils/gameText.js'
 import { iconDisc, iconExit, iconHelp } from './icons.js'
 
 /**
@@ -19,7 +20,7 @@ export default class Hud {
             </div>
             <div class="fz-hud-pips"></div>
             <div class="fz-hud-score">
-                <span class="fz-hud-score-label">Puntos</span>
+                <span class="fz-hud-score-label">${t('frisbee.points')}</span>
                 <span class="fz-hud-score-value">0</span>
             </div>
         `
@@ -32,7 +33,7 @@ export default class Hud {
         this.exitBtn = document.createElement('button')
         this.exitBtn.type = 'button'
         this.exitBtn.className = 'fz-hud-leave'
-        this.exitBtn.setAttribute('aria-label', 'Salir del minijuego')
+        this.exitBtn.setAttribute('aria-label', t('common.leaveGame'))
         this.exitBtn.innerHTML = `<span class="fz-hud-leave-icon">${iconExit}</span>`
         document.body.appendChild(this.exitBtn)
 
@@ -41,7 +42,7 @@ export default class Hud {
         this.helpBtn = document.createElement('button')
         this.helpBtn.type = 'button'
         this.helpBtn.className = 'fz-hud-help'
-        this.helpBtn.setAttribute('aria-label', 'Cómo jugar')
+        this.helpBtn.setAttribute('aria-label', t('common.howToPlay'))
         this.helpBtn.innerHTML = `<span class="fz-hud-help-icon">${iconHelp}</span>`
         document.body.appendChild(this.helpBtn)
 
@@ -72,7 +73,7 @@ export default class Hud {
 
     setRound(current) {
         if (this.mode === 'competitivo') {
-            this.roundEl.textContent = `Ronda ${current} / ${this.totalRounds}`
+            this.roundEl.textContent = t('frisbee.roundOf', { n: current, total: this.totalRounds })
             const pips = this.pipsEl.children
             for (let i = 0; i < pips.length; i++) {
                 // Only the current pip toggles here; completed pips keep their
@@ -80,7 +81,7 @@ export default class Hud {
                 pips[i].classList.toggle('is-current', i === current - 1)
             }
         } else {
-            this.roundEl.textContent = `Libre · Tirada ${current}`
+            this.roundEl.textContent = t('frisbee.freeShot', { n: current })
         }
     }
 

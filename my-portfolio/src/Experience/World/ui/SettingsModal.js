@@ -8,24 +8,40 @@ import {
     iconMusic, iconVolume, iconMute, iconPrev, iconNext
 } from './icons.js'
 import { leaderboardStatus, getLeaderboardStatus } from '../../Utils/Leaderboard.js'
+import i18n, { LOCALES } from '../../Utils/i18n.js'
+import { t } from '../../Utils/gameText.js'
 
-// Connection status → UI label + dot colour class.
+// Endonyms on purpose: someone hunting for their language scans for the word
+// as THEY write it, not as the current UI language translates it.
+const LOCALE_NAMES = { es: 'Español', en: 'English' }
+
+// Connection status → catalog key for the label beside the dot.
 const CONN_LABELS = {
-    online: 'En línea',
-    offline: 'Sin conexión',
-    connecting: 'Conectando…',
-    disabled: 'No configurado'
+    online: 'settings.connOnline',
+    offline: 'settings.connOffline',
+    connecting: 'settings.connConnecting',
+    disabled: 'settings.connDisabled'
 }
 
-// Controls shown per device, grouped by context.
+// Controls shown per device, grouped by context. Keys, resolved when the
+// section is built, so the table survives a language switch.
 const CONTROL_GROUPS = [
-    ['Mundo', [['Mover', 'move'], ['Correr', 'sprint'], ['Interactuar', 'interact']]],
-    ['Frisbee', [['Apuntar', 'aim'], ['Curva', 'tilt'], ['Fuerza / Lanzar', 'confirm'], ['Salir', 'back']]]
+    ['settings.groupWorld', [
+        ['settings.ctrlMove', 'move'],
+        ['settings.ctrlSprint', 'sprint'],
+        ['settings.ctrlInteract', 'interact']
+    ]],
+    ['settings.groupFrisbee', [
+        ['settings.ctrlAim', 'aim'],
+        ['settings.ctrlTilt', 'tilt'],
+        ['settings.ctrlThrow', 'confirm'],
+        ['settings.ctrlBack', 'back']
+    ]]
 ]
 const DEVICES = [
-    ['keyboard', 'Teclado', iconKeyboard],
-    ['gamepad', 'Mando', iconGamepad],
-    ['touch', 'Táctil', iconMobile]
+    ['keyboard', 'settings.deviceKeyboard', iconKeyboard],
+    ['gamepad', 'settings.devicePad', iconGamepad],
+    ['touch', 'settings.deviceTouch', iconMobile]
 ]
 
 /**
@@ -40,18 +56,25 @@ export default class SettingsModal {
         this.sections = []
         this.activeIndex = 0
 
-        this.modal = new Modal({ variant: 'clean', size: 'lg', title: 'Ajustes' })
+        this.modal = new Modal({ variant: 'clean', size: 'lg', title: t('settings.title') })
         this.nav = _el('div', 'fz-settings-nav')
         this.content = _el('div', 'fz-settings-content')
         this.modal.append(this.nav)
         this.modal.append(this.content)
 
-        this._registerSection({ id: 'general', label: 'General', build: (c) => this._buildGeneral(c) })
-        this._registerSection({ id: 'sfx', label: 'Efectos', build: (c) => this._buildSfx(c) })
-        this._registerSection({ id: 'controls', label: 'Controles', build: (c) => this._buildControls(c) })
+        this._registerSection({ id: 'general', label: t('settings.tabGeneral'), build: (c) => this._buildGeneral(c) })
+        this._registerSection({ id: 'sfx', label: t('settings.tabSfx'), build: (c) => this._buildSfx(c) })
+        this._registerSection({ id: 'controls', label: t('settings.tabControls'), build: (c) => this._buildControls(c) })
 
         // Keep the quality cards in sync with external changes.
         this.quality?.on?.('change', () => this._syncQuality())
+
+        // Every label in this modal comes from the catalog, so a language
+        // switch redraws the whole thing rather than patching strings one by
+        // one — patching is what leaves one behind. Cheap: it only runs while
+        // the modal is actually on screen, and switching is a rare, deliberate
+        // act.
+        i18n.on('change', () => this._relabel())
 
         // Restore character movement when the modal is dismissed.
         this.modal.onClose(() => this._onClosed())
@@ -76,6 +99,16 @@ export default class SettingsModal {
     /** Public: lets later phases add sections (e.g. Controls). */
     addSection(section) { this._registerSection(section) }
 
+    /** Re-read every string from the catalog. Safe to call when closed. */
+    _relabel() {
+        this.modal.setTitle(t('settings.title'))
+        const labels = [t('settings.tabGeneral'), t('settings.tabSfx'), t('settings.tabControls')]
+        for (let i = 0; i < this.nav.children.length; i++) {
+            if (labels[i]) this.nav.children[i].textContent = labels[i]
+        }
+        this._select(this.activeIndex)
+    }
+
     _select(i) {
         this._teardownSound()
         this.activeIndex = i
@@ -88,10 +121,11 @@ export default class SettingsModal {
     // ─── General section (Calidad + Sonido + Conexión) ───────────────────
     _buildGeneral(container) {
         const qHead = _el('div', 'fz-sound-heading')
-        qHead.textContent = 'Calidad'
+        qHead.textContent = t('settings.quality')
         container.appendChild(qHead)
         this._buildQuality(container)
         this._buildSound(container)
+        this._buildLanguage(container)
         this._buildConnection(container)
     }
 
@@ -99,7 +133,7 @@ export default class SettingsModal {
     _buildConnection(container) {
         const wrap = _el('div', 'fz-sound')
         const heading = _el('div', 'fz-sound-heading')
-        heading.textContent = 'Conexión'
+        heading.textContent = t('settings.connection')
         wrap.appendChild(heading)
 
         const row = _el('div', 'fz-conn-row')
@@ -113,19 +147,56 @@ export default class SettingsModal {
 
         const render = (status) => {
             dot.dataset.status = status
-            label.textContent = CONN_LABELS[status] || status
+            label.textContent = CONN_LABELS[status] ? t(CONN_LABELS[status]) : status
             hint.textContent = status === 'online'
-                ? 'Ranking online activo: tus récords se guardan en el servidor.'
+                ? t('settings.connOnlineHint')
                 : status === 'offline'
-                    ? 'Sin servidor ahora mismo — las puntuaciones se guardan en este dispositivo y se subirán al reconectar.'
+                    ? t('settings.connOfflineHint')
                     : status === 'connecting'
-                        ? 'Comprobando conexión con el servidor…'
-                        : 'Ranking online no configurado — las puntuaciones se guardan en este dispositivo.'
+                        ? t('settings.connConnectingHint')
+                        : t('settings.connUnsetHint')
         }
         render(getLeaderboardStatus())
 
         this._onConnChange = (s) => render(s)
         leaderboardStatus.on('change', this._onConnChange)
+    }
+
+    /**
+     * Language. Detection already picked one from the browser at boot; this is
+     * the manual override, and choosing here is what makes it stick (setLocale
+     * writes to localStorage, so detect() honours it on the next visit).
+     *
+     * Rebuilding the whole modal on 'change' rather than patching strings in
+     * place: every label in here comes from the catalog, and a full rebuild
+     * cannot leave one behind.
+     */
+    _buildLanguage(container) {
+        const wrap = _el('div', 'fz-sound')
+        const heading = _el('div', 'fz-sound-heading')
+        heading.textContent = t('settings.language')
+        wrap.appendChild(heading)
+
+        const nav = _el('div', 'fz-settings-nav')
+        for (const code of LOCALES) {
+            const b = _el('button', 'fz-settings-tab')
+            b.type = 'button'
+            b.textContent = LOCALE_NAMES[code] || code.toUpperCase()
+            b.classList.toggle('is-active', code === i18n.locale)
+            b.setAttribute('aria-pressed', String(code === i18n.locale))
+            b.addEventListener('click', () => {
+                if (code === i18n.locale) return
+                i18n.setLocale(code)
+            })
+            nav.appendChild(b)
+        }
+        wrap.appendChild(nav)
+
+        const hint = _el('div', 'fz-conn-hint')
+        hint.textContent = t('settings.languageDesc')
+        wrap.appendChild(hint)
+
+        container.appendChild(wrap)
     }
 
     _buildQuality(container) {
@@ -135,8 +206,8 @@ export default class SettingsModal {
             card.dataset.level = String(level)
             grid.appendChild(card)
         }
-        make(0, iconScenery, 'Alta', 'Máxima calidad visual')
-        make(1, iconBolt, 'Ligera', 'Mejor rendimiento')
+        make(0, iconScenery, t('settings.qualityHigh'), t('settings.qualityHighDesc'))
+        make(1, iconBolt, t('settings.qualityLight'), t('settings.qualityLightDesc'))
         container.appendChild(grid)
         this._syncQuality()
     }
@@ -148,7 +219,7 @@ export default class SettingsModal {
 
         const wrap = _el('div', 'fz-sound')
         const heading = _el('div', 'fz-sound-heading')
-        heading.textContent = 'Sonido'
+        heading.textContent = t('settings.sound')
         wrap.appendChild(heading)
 
         // Now-playing preview card
@@ -165,15 +236,15 @@ export default class SettingsModal {
         info.append(title, prog)
         const controls = _el('div', 'fz-np-controls')
         controls.append(
-            _iconBtn(iconPrev, 'Canción anterior', () => audio.prev()),
-            _iconBtn(iconNext, 'Siguiente canción', () => audio.next())
+            _iconBtn(iconPrev, t('settings.prevTrack'), () => audio.prev()),
+            _iconBtn(iconNext, t('settings.nextTrack'), () => audio.next())
         )
         np.append(cover, info, controls)
         wrap.appendChild(np)
 
         // Volume row (mute toggle + slider)
         const volRow = _el('div', 'fz-vol-row')
-        const muteBtn = _iconBtn(iconVolume, 'Silenciar', () => audio.toggleMute())
+        const muteBtn = _iconBtn(iconVolume, t('settings.mute'), () => audio.toggleMute())
         const vol = document.createElement('input')
         vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'
         vol.className = 'fz-vol'
@@ -195,7 +266,7 @@ export default class SettingsModal {
         }
         const renderTrack = () => {
             const s = audio.getNowPlaying()
-            if (!s) { title.textContent = 'Sin música'; setCover(null); dur.textContent = '0:00'; return }
+            if (!s) { title.textContent = t('settings.noMusic'); setCover(null); dur.textContent = '0:00'; return }
             title.textContent = s.title || ''
             setCover(s.cover)
             dur.textContent = fmt(s.duration)
@@ -233,15 +304,15 @@ export default class SettingsModal {
 
         const wrap = _el('div', 'fz-sound')
         const heading = _el('div', 'fz-sound-heading')
-        heading.textContent = 'Efectos de sonido'
+        heading.textContent = t('settings.sfx')
         wrap.appendChild(heading)
 
         const desc = _el('div', 'fz-sfx-desc')
-        desc.textContent = 'Ambiente, fuego y agua según te mueves por el mundo.'
+        desc.textContent = t('settings.sfxDesc')
         wrap.appendChild(desc)
 
         const volRow = _el('div', 'fz-vol-row')
-        const muteBtn = _iconBtn(audio.isSfxMuted() ? iconMute : iconVolume, 'Silenciar efectos', () => {
+        const muteBtn = _iconBtn(audio.isSfxMuted() ? iconMute : iconVolume, t('settings.muteSfx'), () => {
             audio.toggleSfxMute(); render()
         })
         const vol = document.createElement('input')
@@ -294,14 +365,14 @@ export default class SettingsModal {
         const list = _el('div', 'fz-ctrl-list')
         const renderList = () => {
             list.innerHTML = ''
-            for (const [title, rows] of CONTROL_GROUPS) {
+            for (const [titleKey, rows] of CONTROL_GROUPS) {
                 const h = _el('div', 'fz-ctrl-group')
-                h.textContent = title
+                h.textContent = t(titleKey)
                 list.appendChild(h)
-                for (const [label, action] of rows) {
+                for (const [labelKey, action] of rows) {
                     const row = _el('div', 'fz-ctrl-row')
                     const l = _el('span', 'fz-ctrl-label')
-                    l.textContent = label
+                    l.textContent = t(labelKey)
                     const g = _el('span', 'fz-ctrl-glyph')
                     g.appendChild(inputGlyph(action, current))
                     row.appendChild(l)
@@ -310,10 +381,10 @@ export default class SettingsModal {
                 }
             }
         }
-        for (const [id, label, icon] of DEVICES) {
+        for (const [id, labelKey, icon] of DEVICES) {
             const b = _el('button', 'fz-settings-tab fz-settings-tab--icon')
             b.type = 'button'
-            b.innerHTML = `<span class="fz-tab-icon">${icon}</span>${label}`
+            b.innerHTML = `<span class="fz-tab-icon">${icon}</span>${t(labelKey)}`
             b.classList.toggle('is-active', id === current)
             b.addEventListener('click', () => {
                 current = id

@@ -165,5 +165,190 @@ export default {
             outroBody: 'Everything on this page is scattered across a world you ' +
                 'can walk through, minigames included.'
         }
+    },
+
+    /* ── The 3D world ───────────────────────────────────────────────────
+       Mirrors game.* in es.js key for key. */
+    game: {
+        landing: { explore: 'Explore' },
+
+        common: {
+            play: 'Play!',
+            next: 'Next',
+            playAgain: 'Play again',
+            back: 'Back',
+            exit: 'Leave',
+            accept: 'OK',
+            done: 'Done',
+            send: 'Send',
+            ranking: 'Leaderboard',
+            seeRanking: 'See leaderboard',
+            saveRecord: 'Save score',
+            howToPlay: 'How to play',
+            leaveGame: 'Leave the minigame',
+            competitive: 'Ranked',
+            free: 'Practice'
+        },
+
+        controls: {
+            moveKeyboard: 'A and D',
+            movePad: 'the stick',
+            moveTouch: 'the joystick',
+            pressKeyboard: 'Press Enter',
+            pressPad: 'Press A',
+            pressTouch: 'tap the button'
+        },
+
+        hint: { touchTo: 'Tap to {verb}' },
+
+        frisbee: {
+            title: 'Frisbee',
+            chooseMode: 'Pick how you want to play',
+            competitiveDesc: '10 rounds · score as high as you can',
+            freeDesc: 'Practice · unlimited throws',
+            round: 'Round {n}',
+            roundOf: 'Round {n} / {total}',
+            lastRound: 'Last round!',
+            shot: 'Throw {n}',
+            freeShot: 'Practice · Throw {n}',
+            points: 'Points',
+            resultsTitle: 'That is a wrap!',
+            finalScore: 'Final score',
+            ofPossible: 'out of {max}',
+            top10Badge: '🏆 You made the Top 10!',
+            lbSubtitle: 'Top 10 · Frisbee',
+            boardFooter: 'Top 5 · Frisbee',
+            tutorial: {
+                aimTitle: 'Aim',
+                aimBody: 'Move with {move} to line up the target. {press} to lock ' +
+                    'your aim.',
+                curveTitle: 'Curve',
+                curveBody: 'Then tilt the disc with {move} to bend the throw: swing ' +
+                    'around and pop the balloon on the way to the target.',
+                powerTitle: 'Power',
+                powerBody: 'A bar swings on its own. {press} at the right moment to ' +
+                    'lock the power and throw. More power, more distance!'
+            }
+        },
+
+        beach: {
+            title: 'Beach volleyball',
+            chooseMode: 'Keep the rally going without letting the ball hit the sand',
+            competitiveDesc: 'One miss and it is over · counts for the leaderboard',
+            freeDesc: 'Practice · the rally restarts on its own',
+            resultsTitle: 'Rally over!',
+            touches: 'Touches in a row',
+            best: 'your best: {n}',
+            top10Badge: 'You made the Top 10!',
+            lbSubtitle: 'Top 10 · Beach volleyball',
+            boardFooter: 'Top 5 · Beach volleyball',
+            go: 'Go!',
+            perfect: 'Perfect!',
+            record: 'best {n}',
+            widerCourt: 'Wider court',
+            narrowerCourt: 'Narrower court',
+            ballBeach: 'Beach ball',
+            ballFootball: 'Football',
+            ballCoconut: 'Coconut'
+        },
+
+        leaderboard: {
+            heading: 'LEADERBOARD',
+            empty: 'No scores yet. Be the first!',
+            boardEmpty: 'No scores yet',
+            boardBeFirst: 'Be the first!',
+            yourPosition: 'You · #{rank} · {score} pts'
+        },
+
+        nameEntry: {
+            title: 'You are in the Top 10!',
+            subtitle: 'Enter your initials'
+        },
+
+        map: {
+            title: 'Map',
+            goTo: 'Go to {place}',
+            subtitle: 'Pick where to go',
+            house: 'The house',
+            frisbee: 'Frisbee',
+            fire: 'The campfire',
+            bridge: 'The bridge',
+            social: 'Social corner',
+            beach: 'The beach'
+        },
+
+        settings: {
+            title: 'Settings',
+            connConnecting: 'Connecting…',
+            connDisabled: 'Not configured',
+            groupWorld: 'World',
+            groupFrisbee: 'Frisbee',
+            ctrlMove: 'Move',
+            ctrlSprint: 'Run',
+            ctrlInteract: 'Interact',
+            ctrlAim: 'Aim',
+            ctrlTilt: 'Curve',
+            ctrlThrow: 'Power / Throw',
+            ctrlBack: 'Leave',
+            deviceKeyboard: 'Keyboard',
+            devicePad: 'Gamepad',
+            deviceTouch: 'Touch',
+            tabGeneral: 'General',
+            tabSfx: 'Effects',
+            tabControls: 'Controls',
+            quality: 'Quality',
+            qualityHigh: 'High',
+            qualityHighDesc: 'Best it looks',
+            qualityLight: 'Light',
+            qualityLightDesc: 'Best it runs',
+            sound: 'Sound',
+            noMusic: 'No music',
+            prevTrack: 'Previous track',
+            nextTrack: 'Next track',
+            mute: 'Mute',
+            muteSfx: 'Mute effects',
+            sfx: 'Sound effects',
+            sfxDesc: 'Ambience, fire and water as you move around the world.',
+            language: 'Language',
+            languageDesc: 'Detected from your browser; change it by hand here.',
+            connection: 'Connection',
+            connOnline: 'Online',
+            connOffline: 'Offline',
+            connOnlineHint: 'Online leaderboard is live: your scores are saved on the server.',
+            connOfflineHint: 'No server right now — scores are kept on this device and ' +
+                'uploaded when the connection is back.',
+            connConnectingHint: 'Checking the connection to the server…',
+            connUnsetHint: 'Online leaderboard is not configured — scores are kept on ' +
+                'this device.'
+        },
+
+        contact: {
+            title: 'Contact',
+            nameLabel: 'Name',
+            emailLabel: 'Your email',
+            messageLabel: 'Message',
+            emptyMessage: 'Write a message before sending.',
+            thanks: 'Thanks for writing. I will get back to you soon.',
+            visitor: 'Portfolio visitor',
+            subtitle: 'Fancy working together? Tell me your idea and I will get back to you.',
+            namePlaceholder: 'Your name',
+            emailPlaceholder: 'you@example.com',
+            messagePlaceholder: 'Tell me…',
+            badEmail: 'Check your email address, it does not look valid.',
+            sendFailed: 'Could not send. Please try again.',
+            offline: 'No connection. Try again in a moment.',
+            noName: '(no name)',
+            subject: 'Portfolio — {name}',
+            subjectFallback: 'New message'
+        },
+
+        computer: {
+            about: 'About me',
+            experience: 'Experience',
+            behindScenes: 'Behind the scenes',
+            education: 'Education'
+        },
+
+        trophy: { title: 'Certificates' }
     }
 }

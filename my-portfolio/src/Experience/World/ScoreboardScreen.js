@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { texture, uv, vec2 } from 'three/tsl'
 import Experience from '../Experience.js'
 import Leaderboard from '../Utils/Leaderboard.js'
+import i18n from '../Utils/i18n.js'
+import { t } from '../Utils/gameText.js'
 
 /**
  * ScoreboardScreen — a live ranking rendered onto a CanvasTexture, ready to drop
@@ -27,13 +29,15 @@ const ROWS = 5
 const REFRESH_MS = 30000
 
 export default class ScoreboardScreen {
-    constructor({ targetName = TARGET_NODE, board = 'frisbee', footer = 'Top 5 · Frisbee con el perro', width = CANVAS_W, height = CANVAS_H, rows = ROWS, refreshMs = REFRESH_MS } = {}) {
+    constructor({ targetName = TARGET_NODE, board = 'frisbee', footerKey = 'frisbee.boardFooter', width = CANVAS_W, height = CANVAS_H, rows = ROWS, refreshMs = REFRESH_MS } = {}) {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.leaderboard = new Leaderboard(board)
 
         this.targetName = targetName
-        this.footer = footer
+        // A KEY, not a string: the sign is a canvas that redraws on demand, so
+        // it can simply resolve the caption again on the next _draw().
+        this.footerKey = footerKey
         this.rows = rows
         this.refreshMs = refreshMs
         this.attached = false
@@ -50,6 +54,10 @@ export default class ScoreboardScreen {
         this.material = null
         this.target = null
         this._lastAt = 0
+
+        // The sign is painted, not composed of DOM, so a language switch has to
+        // ask it to repaint — nothing else would.
+        i18n.on('change', () => this.render())
 
         this.render() // draw once up-front (works even before it's attached)
     }
@@ -149,7 +157,7 @@ export default class ScoreboardScreen {
         ctx.fillStyle = '#ffffff'
         ctx.font = `bold ${Math.round(headH * 0.46)}px sans-serif`
         // Hand-drawn trophy icon (no emoji) + centred title as one block.
-        const title = 'RANKING'
+        const title = t('leaderboard.heading')
         const iconS = headH * 0.52
         const gap = iconS * 0.35
         const titleW = ctx.measureText(title).width
@@ -165,9 +173,9 @@ export default class ScoreboardScreen {
         if (!entries.length) {
             ctx.fillStyle = '#7a9b8c'
             ctx.font = `${Math.round(rowH * 0.34)}px sans-serif`
-            ctx.fillText('Sin puntuaciones aún', w / 2, headH + (h - headH) / 2 - 20)
+            ctx.fillText(t('leaderboard.boardEmpty'), w / 2, headH + (h - headH) / 2 - 20)
             ctx.font = `${Math.round(rowH * 0.28)}px sans-serif`
-            ctx.fillText('¡Sé el primero!', w / 2, headH + (h - headH) / 2 + 24)
+            ctx.fillText(t('leaderboard.boardBeFirst'), w / 2, headH + (h - headH) / 2 + 24)
         } else {
             for (let i = 0; i < this.rows; i++) {
                 const y = rowsY + i * rowH + rowH / 2
@@ -201,7 +209,7 @@ export default class ScoreboardScreen {
         ctx.textAlign = 'center'
         ctx.fillStyle = '#9a8a66'
         ctx.font = `${Math.round(h * 0.045)}px sans-serif`
-        ctx.fillText(this.footer, w / 2, h - 26)
+        ctx.fillText(t(this.footerKey), w / 2, h - 26)
     }
 
     destroy() {
