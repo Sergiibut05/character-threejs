@@ -122,18 +122,27 @@ export default class ScoreboardScreen {
         const w = this.canvas.width
         const h = this.canvas.height
 
-        ctx.clearRect(0, 0, w, h)
-
-        // Panel
+        // Panel — OPAQUE and edge to edge.
+        //
+        // This used to be clearRect + a rounded panel, which left the four
+        // corners fully transparent. The material has no alpha, so the GPU read
+        // those texels as RGB (0, 0, 0): black notches at every corner of the
+        // sign.
+        //
+        // Cutting them out with alpha instead is not an option here. There is
+        // no backing plane behind this board — hide the screen mesh and the
+        // frame looks straight through to the park — so transparent corners
+        // would be four holes rather than a rounded card.
         ctx.fillStyle = '#f4ecd6'
-        roundRect(ctx, 0, 0, w, h, 36)
-        ctx.fill()
+        ctx.fillRect(0, 0, w, h)
 
-        // Header bar
+        // Header bar. Still rounded where it meets the cream, squared off along
+        // the top so the sign keeps clean outer corners inside its frame.
         const headH = Math.round(h * 0.17)
         ctx.fillStyle = '#41a06e'
         roundRect(ctx, 0, 0, w, headH + 24, 36)
         ctx.fill()
+        ctx.fillRect(0, 0, w, 36)
         ctx.fillStyle = '#41a06e'
         ctx.fillRect(0, headH - 12, w, 24)
         ctx.textBaseline = 'middle'
