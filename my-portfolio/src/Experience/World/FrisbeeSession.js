@@ -662,6 +662,44 @@ export default class FrisbeeSession {
         if (this.minigame.state !== 'idle' && this.minigame.state !== 'exiting') {
             this.minigame.exitMinigame()
         }
+        this._stepOffAnchor()
+    }
+
+    /**
+     * Get out of the dog's spot on the way out.
+     *
+     * Entering teleported the player ONTO the anchor — the dog's waiting place
+     * — and moved the dog aside for the throw (see _placeAtThrowMark). Leaving
+     * sends the dog straight back to that anchor, so a player left standing
+     * where they were ends up inside it.
+     *
+     * The step is BACKWARDS along the entry facing, so they end just behind the
+     * dog and still looking at the pitch, which reads as having stepped back
+     * after a game. That is also the direction they walked in from, so it is
+     * ground already known to be clear — unlike sideways, which on this pitch
+     * is the fence.
+     */
+    _stepOffAnchor() {
+        const character = this.experience.world?.character
+        const anchor = this.experience.world?.activityPrompt?.anchorPosition
+        const bbox = this.experience.world?.getPitchBBox?.()
+        if (!character || !anchor || !bbox) return
+
+        const cx = (bbox.min.x + bbox.max.x) / 2
+        const cz = (bbox.min.z + bbox.max.z) / 2
+        const yaw = Math.atan2(cx - anchor.x, cz - anchor.z)
+
+        // Forward is (sin yaw, cos yaw), so subtracting it walks backwards.
+        const back = 2.0
+        // Default settle margin this time, unlike the entry: movement is
+        // unlocked again, so gravity can drop them onto whatever is actually
+        // underfoot rather than being pinned to the pitch plane.
+        character.teleportTo(
+            anchor.x - Math.sin(yaw) * back,
+            (bbox.min.y + bbox.max.y) / 2,
+            anchor.z - Math.cos(yaw) * back,
+            yaw
+        )
     }
 
     _destroyResults() {
