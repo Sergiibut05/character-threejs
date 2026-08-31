@@ -76,7 +76,7 @@ export default class Character {
         this.strideWalk = 0.7         // metres between prints when walking
         this.strideRun = 1.15         // metres between prints when sprinting
         this.strideStartDelay = 0     // extra metres before the FIRST print after stopping
-        this.footSpacing = 0.09       // lateral offset of each print from the centreline (±)
+        this.footSpacing = 0.04       // lateral offset of each print from the centreline (±)
         this._strideAcc = 0
         this._strideFresh = true
         this._footSide = 1
