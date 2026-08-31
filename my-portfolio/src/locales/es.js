@@ -288,6 +288,9 @@ export default {
         },
 
         computer: {
+            quickBio: 'Bio rápida',
+            fullBio: 'Bio completa',
+            technicalSkills: 'Habilidades técnicas',
             about: 'Sobre mí',
             experience: 'Experiencia',
             behindScenes: 'Behind the scenes',
@@ -302,6 +305,9 @@ export default {
             stack: 'Stack'
         },
 
-        trophy: { title: 'Certificados' }
+        trophy: {
+            title: 'Certificados',
+            viewCredential: 'Ver certificado: {title}'
+        }
     }
 }

@@ -1,9 +1,7 @@
 import './profile.css'
 import Modal from './Modal.js'
-import {
-    ABOUT, EXPERIENCE, EDUCATION, SKILLS,
-    BTS_INTRO, BEHIND_THE_SCENES, BTS_CREDITS, LINKS
-} from './profileData.js'
+import { LINKS } from './profileData.js'
+import { getProfile } from './profileContent.js'
 import { iconGithub, iconLinkedin, iconMail } from './icons.js'
 import { t } from '../../Utils/gameText.js'
 
@@ -59,11 +57,12 @@ export default class ComputerModal {
 
     // ─── Sobre mí ────────────────────────────────────────────────────────
     _buildAbout() {
-        this._heading('Quick bio')
-        this._paragraph(ABOUT.quickBio)
+        const { about } = getProfile()
+        this._heading(t('computer.quickBio'))
+        this._paragraph(about.quickBio)
 
-        this._heading('Full bio')
-        for (const p of ABOUT.fullBio) this._paragraph(p)
+        this._heading(t('computer.fullBio'))
+        for (const p of about.fullBio) this._paragraph(p)
 
         const links = _el('div', 'fz-profile-links')
         links.appendChild(_link(iconGithub, 'GitHub', LINKS.github))
@@ -74,18 +73,19 @@ export default class ComputerModal {
 
     // ─── Experiencia ─────────────────────────────────────────────────────
     _buildExperience() {
-        this._heading('Experiencia')
-        for (const e of EXPERIENCE) {
+        const { experience, education, skills } = getProfile()
+        this._heading(t('computer.experience'))
+        for (const e of experience) {
             this.content.appendChild(_xpEntry(e.role, e.org, e.period, e.detail))
         }
 
         this._heading(t('computer.education'))
-        for (const e of EDUCATION) {
+        for (const e of education) {
             this.content.appendChild(_xpEntry(e.title, e.org, e.period, e.detail))
         }
 
-        this._heading('Technical skills')
-        for (const g of SKILLS) {
+        this._heading(t('computer.technicalSkills'))
+        for (const g of skills) {
             const group = _el('div', 'fz-skill-group')
             const label = _el('div', 'fz-skill-label')
             label.textContent = g.group
@@ -103,23 +103,24 @@ export default class ComputerModal {
 
     // ─── Behind the scenes (fluid editorial flow) ────────────────────────
     _buildBts() {
+        const { bts } = getProfile()
         const intro = _el('p', 'fz-bts-intro')
-        intro.textContent = BTS_INTRO
+        intro.textContent = bts.intro
         this.content.appendChild(intro)
 
-        for (const item of BEHIND_THE_SCENES) {
+        for (const item of bts.sections) {
             this.content.appendChild(_btsSection(item))
         }
 
         // Credits — closing note
         const credits = _el('div', 'fz-bts-credits')
         const head = _el('div', 'fz-bts-head')
-        head.innerHTML = BTS_CREDITS.icon
-        head.appendChild(document.createTextNode(BTS_CREDITS.title))
+        head.innerHTML = bts.credits.icon
+        head.appendChild(document.createTextNode(bts.credits.title))
         const body = _el('div', 'fz-bts-body')
-        body.textContent = BTS_CREDITS.body
+        body.textContent = bts.credits.body
         const links = _el('div', 'fz-bts-credit-links')
-        for (const l of BTS_CREDITS.links) {
+        for (const l of bts.credits.links) {
             const a = _el('a', 'fz-bts-link')
             a.href = l.url
             a.target = '_blank'

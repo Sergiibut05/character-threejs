@@ -32,8 +32,12 @@ const MONTHS = {
 
 const MONTH_RE = new RegExp(`\\b(${Object.keys(MONTHS).join('|')})\\b`, 'g')
 
-/** Dates are stored Spanish; English readers get English month names. */
-function period(text) {
+/**
+  * Dates are stored Spanish; English readers get English month names.
+  * Exported because the in-world computer and trophy shelf show the SAME dates
+  * and must reformat them identically — see profileContent.js.
+  */
+export function period(text) {
     if (i18n.locale !== 'en') return text
     return String(text).replace(MONTH_RE, (m) => MONTHS[m])
 }

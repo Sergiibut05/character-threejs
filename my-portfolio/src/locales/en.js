@@ -167,6 +167,65 @@ export default {
         }
     },
 
+    /* ── Profile prose, English side only ──────────────────────────────────
+       There is no `profile` branch in es.js and there should not be: Spanish is
+       the source language and profileData.js already holds it, so these are
+       read with opt() and simply fall through when the locale is Spanish. A
+       second Spanish copy could only drift from the first.
+
+       Only what the in-world computer shows lives here. Experience, education,
+       skill group names and the behind-the-scenes headings are already under
+       overview.* and are shared, not duplicated. */
+    profile: {
+        quickBio:
+            'Qualified in Multiplatform App Development (DAM) at Málaga TechPark. ' +
+            'I build web and mobile applications, and I love making interactive ' +
+            'experiences — like this 3D world you are walking around.',
+        fullBio: [
+            'I trained in the core technologies of web and mobile development: Java, ' +
+            'JavaScript, TypeScript and Kotlin as languages, with Angular, Ionic and ' +
+            'Android Studio as working environments, plus experience in relational ' +
+            '(MySQL) and non-relational (Firebase) databases. I did the dual-track ' +
+            'half at Aliqindoi, working on real projects from day one.',
+            'I hold a Cambridge-certified C1 in English (CAE, 190 points), speak ' +
+            'Ukrainian natively and Spanish as my mother tongue. I would describe ' +
+            'myself as curious, hard-working and always learning: I am driven by new ' +
+            'challenges, by working in a team, and by building things people enjoy ' +
+            'using.'
+        ],
+
+        spokenGroup: 'Spoken languages',
+        spokenItems: ['Spanish (native)', 'Ukrainian (native)', 'English (C1)'],
+
+        btsIntro:
+            'This world uses no game engine: it is built piece by piece to run ' +
+            'straight in your browser. Here is what is under the hood.',
+        btsBodies: [
+            'Everything you see is drawn with Three.js, a library that talks directly ' +
+            'to your graphics card. The effects — the water, the fire, the swaying ' +
+            'grass — are made with TSL, a modern way of writing them in JavaScript ' +
+            'instead of the specialised code it used to take.',
+            'A physics engine is what lets the character walk, climb steps and not ' +
+            'wander through walls.',
+            'The music rotates between tracks with soft crossfades, and the sound ' +
+            'reacts to where you are: the river and the campfire come up as you ' +
+            'get closer.',
+            'The background tracks are made with Suno, an AI that generates music.',
+            'Your score in the frisbee minigame is saved online and shows up live on ' +
+            'the board beside the pitch.',
+            'The models are low-poly: some made by hand in Blender, others the work ' +
+            'of the artist Isa Lousberg. Everything is compressed so the world loads ' +
+            'in seconds.'
+        ],
+        btsLinkLabel: 'Listen to the full playlist',
+
+        creditsTitle: 'Thanks',
+        creditsBody:
+            'To Bruno Simon, for Three.js Journey — where I learnt much of what makes ' +
+            'this world work — and for his portfolio, the great inspiration behind ' +
+            'this one. And to Isa Lousberg, for her beautiful low-poly models.'
+    },
+
     /* ── The 3D world ───────────────────────────────────────────────────
        Mirrors game.* in es.js key for key. */
     game: {
@@ -343,6 +402,9 @@ export default {
         },
 
         computer: {
+            quickBio: 'Quick bio',
+            fullBio: 'Full bio',
+            technicalSkills: 'Technical skills',
             about: 'About me',
             experience: 'Experience',
             behindScenes: 'Behind the scenes',
@@ -357,6 +419,9 @@ export default {
             stack: 'Stack'
         },
 
-        trophy: { title: 'Certificates' }
+        trophy: {
+            title: 'Certificates',
+            viewCredential: 'View credential: {title}'
+        }
     }
 }

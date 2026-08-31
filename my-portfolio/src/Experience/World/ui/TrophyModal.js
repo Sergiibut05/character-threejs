@@ -1,7 +1,7 @@
 import './profile.css'
 import Modal from './Modal.js'
 import { t } from '../../Utils/gameText.js'
-import { CERTIFICATES } from './profileData.js'
+import { getProfile } from './profileContent.js'
 import { iconBadge } from './icons.js'
 
 /**
@@ -21,7 +21,7 @@ export default class TrophyModal {
         const list = document.createElement('div')
         list.className = 'fz-certs'
 
-        for (const c of CERTIFICATES) {
+        for (const c of getProfile().certificates) {
             // Each row is a link to the credential itself.
             const item = document.createElement(c.url ? 'a' : 'div')
             item.className = 'fz-cert'
@@ -29,7 +29,7 @@ export default class TrophyModal {
                 item.href = c.url
                 item.target = '_blank'
                 item.rel = 'noopener noreferrer'
-                item.setAttribute('aria-label', `Ver certificado: ${c.title}`)
+                item.setAttribute('aria-label', t('trophy.viewCredential', { title: c.title }))
             }
 
             const icon = document.createElement('div')
