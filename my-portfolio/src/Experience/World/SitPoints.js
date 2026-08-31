@@ -609,9 +609,11 @@ export default class SitPoints {
             this._updateExit(character, Math.min(this.experience.time.delta * 0.001, 0.05))
         }
 
-        // Exactly one seat may glow: a cluster of five logs all lit at once says
-        // "something is here", not "sit on THIS one". While seated it is the one
-        // being sat on; otherwise the nearest in range.
+        // At most one seat may glow, and none at all while you are sat on one.
+        // The outline is an invitation — "sit on THIS one" — so a cluster of
+        // five logs all lit says nothing useful, and a halo around the log you
+        // are already sitting on says less than nothing. Standing up puts it
+        // back through the same proximity sweep.
         //
         // Resolved by sweeping every point each frame rather than by tracking
         // changes. The bookkeeping version leaked — hopping straight from one
@@ -619,14 +621,16 @@ export default class SitPoints {
         // never cleared the old one, and they piled up in the outline's
         // selection until several seats glowed at once. Twelve early-outs a
         // frame is nothing, and it cannot drift out of sync.
-        let best = this.active
-        if (!best) {
+        let best = null
+        if (!this.active) {
             let bestDist = PROXIMITY
             for (const point of this.points) {
                 const d = point.position.distanceTo(character.position)
                 if (d < bestDist) { bestDist = d; best = point }
             }
         }
+        // Null while seated is correct for `nearest` too: nothing is on offer.
+        // _toggle() tests `active` first, so standing up is unaffected.
         this.nearest = best
         for (const point of this.points) this._setHighlight(point, point === best)
 
