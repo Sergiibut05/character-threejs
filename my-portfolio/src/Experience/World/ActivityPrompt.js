@@ -220,7 +220,13 @@ export default class ActivityPrompt {
         const onScreen = this.screenPosition.z <= 1 &&
             Math.abs(this.screenPosition.x) <= 1.05 &&
             Math.abs(this.screenPosition.y) <= 1.05
-        if (!onScreen && !this.devLightMode) {
+        // Also gone once you have simply walked away. The opacity below floors
+        // at 0.35 so the emblem stays readable at a glance from across the
+        // park — but a floor means it NEVER reaches zero, so without this the
+        // logo hung in the sky for the whole map. BeachPrompt already cuts it
+        // the same way; this one had been left behind.
+        const tooFar = distance > this.fadeDistance
+        if ((!onScreen || tooFar) && !this.devLightMode) {
             this.emblem.setVisible(false)
             return
         }
@@ -233,7 +239,7 @@ export default class ActivityPrompt {
 
         const x = (this.screenPosition.x * 0.5 + 0.5) * this.sizes.width
         const y = (-this.screenPosition.y * 0.5 + 0.5) * this.sizes.height
-        const visibility = THREE.MathUtils.clamp(1 - distance / this.fadeDistance, 0.3, 1)
+        const visibility = THREE.MathUtils.clamp(1 - distance / this.fadeDistance, 0.35, 1)
         // Proximity 0→1 as the player closes in (1 within range).
         const proximity = THREE.MathUtils.clamp((this.radius + 4 - distance) / 4, 0, 1)
 

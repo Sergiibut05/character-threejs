@@ -81,7 +81,14 @@ export const iconScenery = `
 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
   <circle cx="34" cy="14" r="5" fill="#ffd84d"/>
   <path d="M5 39 L18 19 L27 31 L33 22 L43 39 Z" fill="#5fc594" stroke="#3f9e6b" stroke-width="2.4" stroke-linejoin="round"/>
-  <path d="M14.5 25 L18 19 L21.5 25" stroke="#ffffff" stroke-width="2" opacity="0.6" fill="none" stroke-linecap="round"/>
+  <!-- A filled cap, not two open strokes. The base also follows the actual
+       slopes: at y=24.5 the left flank is at x≈14.4 and the right at x≈22.1,
+       so the old symmetric 14.5→21.5 V sat a unit short on the right and read
+       as leaning. -->
+  <!-- Fill only, no stroke of its own. A white stroke is centred on the path,
+       so half of it sat OUTSIDE the shape and ate into the dark outline that
+       crowns the peak. -->
+  <path d="M14.4 24.5 L18 19 L22.1 24.5 Z" fill="#ffffff"/>
 </svg>`
 
 // Device icons (use currentColor so they adapt to the tab state).
@@ -114,7 +121,10 @@ export const iconMobile = `
 // Bolt — light/performance.
 export const iconBolt = `
 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
-  <path d="M27 5 12 27h9l-3 16 18-23H26l5-15Z" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6" stroke-linejoin="round"/>
+  <!-- The tip really is a single point. The old outline ran (31,5)→(27,5),
+       a flat 4-unit edge across the top, so the bolt looked snipped off up
+       there while the bottom came to a proper point. -->
+  <path d="M29 5 L12 27 L21 27 L18 43 L36 20 L26 20 Z" fill="#ffd84d" stroke="#e8a200" stroke-width="2.6" stroke-linejoin="round"/>
 </svg>`
 
 // ─── Tutorial step icons ─────────────────────────────────────────────────
