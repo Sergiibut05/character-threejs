@@ -1,16 +1,19 @@
-# Three.js Journey
+# my-portfolio
 
-## Setup
-Download [Node.js](https://nodejs.org/en/download/).
-Run this followed commands:
+The app itself. The project README — what this is, screenshots, how it is put
+together — lives at the repository root: [`../README.md`](../README.md).
 
-``` bash
-# Install dependencies (only the first time)
+```bash
 npm install
+npm run dev      # https://localhost:5173  (HTTPS: WebGPU needs a secure context)
+npm run build    # → dist/
+```
 
-# Run the local server at localhost:8080
-npm run dev
+Asset pipelines, all using `ffmpeg-static` / npm deps so nothing has to be
+installed system-wide:
 
-# Build for production in the dist/ directory
-npm run build
+```bash
+node tools/compress-glbs.mjs      # meshes  → Draco
+node tools/convert-ktx2.mjs       # textures → KTX2 / UASTC
+node tools/transcode-sfx.mjs      # audio    → Opus (.webm) + AAC (.m4a)
 ```
