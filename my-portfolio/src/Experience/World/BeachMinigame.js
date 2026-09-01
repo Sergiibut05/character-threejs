@@ -304,6 +304,11 @@ export default class BeachMinigame {
         this._captureDay()
 
         // Drop the player onto the play line, facing the camera (+Z).
+        // BEFORE the teleport, not after: the destination is the middle of
+        // the ball prop's collider, and landing inside it is what wedged the
+        // player in place. Cleared for the whole rally, not just the spawn —
+        // the run crosses that point constantly.
+        this._releaseCourt = this._clearCourtColliders()
         character.teleportTo(this.courtCenter.x, this.courtCenter.y, this.courtCenter.z, 0)
         character.planarLock = {
             z: this.courtCenter.z,
@@ -335,6 +340,26 @@ export default class BeachMinigame {
         return true
     }
 
+    /**
+     * Clear the static colliders standing in the court, and return the undo.
+     *
+     * The region is the player's whole run, and it starts just ABOVE the sand:
+     * the ground slab is a collider too and it also contains the court centre,
+     * so a box that reached down to it would switch off the floor and drop the
+     * player out of the world.
+     */
+    _clearCourtColliders() {
+        const ps = this.experience.world?.patioScene
+        if (!ps?.suspendCollidersIn) return null
+        const c = this.courtCenter
+        const hw = this.courtHalfWidth + 0.6
+        const box = new THREE.Box3(
+            new THREE.Vector3(c.x - hw, c.y + 0.06, c.z - 1.4),
+            new THREE.Vector3(c.x + hw, c.y + 2.2, c.z + 1.4)
+        )
+        return ps.suspendCollidersIn(box)
+    }
+
     stop() {
         if (this.state === 'idle') return
         this.state = 'idle'
@@ -352,6 +377,9 @@ export default class BeachMinigame {
         this.windEl.classList.remove('is-visible')
         this._restoreDay()
         this.balls.rest()
+        // Give the ball prop its collider back now the court is free again.
+        this._releaseCourt?.()
+        this._releaseCourt = null
     }
 
     /** Restart a rally without leaving the court (used by "Jugar otra vez"). */

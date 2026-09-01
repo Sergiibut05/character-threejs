@@ -431,6 +431,47 @@ export default class PatioScene {
      * Still scheduled across frames (via chunkedInBackground) so the browser
      * stays responsive during startup.
      */
+    /**
+     * Switch off every static collider that overlaps `box`, and hand back a
+     * function that switches them on again.
+     *
+     * The beach court needs this. The ball prop resting at the centre of the
+     * court has its own collider so you cannot walk through it while roaming —
+     * but that centre is exactly where the minigame stands the player, and the
+     * whole rally is spent running left and right through it. Without this the
+     * player materialises INSIDE the box and the character controller has no
+     * way out: stuck on the spot, with nothing on screen to explain it.
+     *
+     * Selected by overlap rather than by mesh name on purpose. The names come
+     * out of Blender (Cube094 today) and would silently point at a different
+     * box the next time the file is re-exported.
+     *
+     * @param {THREE.Box3} box  world-space region to clear
+     * @returns {() => void}    restores exactly what it disabled
+     */
+    suspendCollidersIn(box) {
+        const suspended = []
+        const bounds = new THREE.Box3()
+        for (const entry of this.colliderBodies) {
+            const collider = entry.collider
+            if (!collider?.setEnabled || collider.isEnabled?.() === false) continue
+            const geometry = entry.mesh?.geometry
+            if (!geometry) continue
+            entry.mesh.updateWorldMatrix(true, false)
+            geometry.computeBoundingBox()
+            bounds.copy(geometry.boundingBox).applyMatrix4(entry.mesh.matrixWorld)
+            if (!bounds.intersectsBox(box)) continue
+            collider.setEnabled(false)
+            suspended.push(collider)
+        }
+        return () => {
+            for (const collider of suspended) {
+                try { collider.setEnabled(true) } catch { /* world torn down */ }
+            }
+            suspended.length = 0
+        }
+    }
+
     async _buildCollidersAsync() {
         if (this.physics?.world && this.physics?.RAPIER) {
             this._scheduleCollidersBuild()
