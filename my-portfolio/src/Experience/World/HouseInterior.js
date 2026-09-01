@@ -340,7 +340,7 @@ export default class HouseInterior {
                     bounced: false
                 }))
             }
-            this._toasterProp = this._makeProp(toasterMeshes, 1.0, () => this._popToast())
+            this._toasterProp = this._makeProp(toasterMeshes, 1.0, () => this._popToast(), { once: true })
         } else console.warn('HouseInterior: toaster/toast meshes not found')
 
         // The console on the shelf is a Nintendo Switch — hence a games panel
@@ -450,8 +450,17 @@ export default class HouseInterior {
         else console.warn('HouseInterior: computer meshes not found')
     }
 
-    /** Generic prop interactive: outline on near/hover + action on interact. */
-    _makeProp(meshes, radius, onInteract) {
+    /**
+     * Generic prop interactive: outline on near/hover + action on interact.
+     *
+     * `once` makes it a one-shot — after the first interaction the prop is
+     * spent: no outline however close you stand, no pointer cursor, and no
+     * second trigger from click, Enter, the mobile button or the pad. Spending
+     * it is what a one-off flourish wants: the outline is a promise that
+     * something will happen, so it has to stop being made once nothing will.
+     * Spent-ness is per session; reloading gives the prop back.
+     */
+    _makeProp(meshes, radius, onInteract, { once = false } = {}) {
         const box = new THREE.Box3()
         for (const m of meshes) box.expandByObject(m)
 
@@ -462,6 +471,8 @@ export default class HouseInterior {
             isNear: false,
             isHovered: false,
             isHighlighted: false,
+            once,
+            spent: false,
             onInteract
         }
 
@@ -470,7 +481,7 @@ export default class HouseInterior {
             position: rec.position,
             proximityRadius: rec.proximityRadius,
             onHover() {
-                if (rec.isHovered) return
+                if (rec.isHovered || rec.spent) return
                 rec.isHovered = true
                 self._refreshPropHighlight(rec)
                 document.body.style.cursor = 'pointer'
@@ -495,16 +506,28 @@ export default class HouseInterior {
     }
 
     _tryProp(rec) {
+        if (rec.spent) return
         if (!this.isInside || this._busy) return
         if (!(rec.isNear || rec.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
+
+        // Spent BEFORE the action runs, not after: _popToast turns the outline
+        // off through _refreshPropHighlight, and that has to already know the
+        // prop is finished or it would light it straight back up on landing.
+        if (rec.once) {
+            rec.spent = true
+            rec.isHovered = false
+            document.body.style.cursor = ''
+        }
         rec.onInteract()
+        if (rec.spent) this._refreshPropHighlight(rec)
     }
 
     _refreshPropHighlight(rec) {
-        // `suppressed` is how a prop drops its own outline while it is busy
-        // doing the thing you just asked it for (see _popToast).
-        const should = this.isInside && !rec.suppressed && (rec.isHovered || rec.isNear)
+        // `suppressed` drops the outline while a prop is busy doing the thing
+        // you just asked for; `spent` drops it for good (see _makeProp).
+        const should = this.isInside && !rec.spent && !rec.suppressed
+            && (rec.isHovered || rec.isNear)
         if (should === rec.isHighlighted) return
         rec.isHighlighted = should
         for (const m of rec.meshes) {
