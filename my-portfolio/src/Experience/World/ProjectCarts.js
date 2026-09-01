@@ -1,10 +1,25 @@
 import * as THREE from 'three'
-import { texture, uv, vec4 } from 'three/tsl'
+import { texture, uv, vec3, vec4, uniform, mix } from 'three/tsl'
 import Experience from '../Experience.js'
 import { blenderTransformToMatrix } from './scene/SceneUtils.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 import ProjectModal from './ui/ProjectModal.js'
+
+/**
+ * How a cart's picture reacts to you walking up to it.
+ *
+ * NOT a plain multiply. These textures are screenshots of web pages, so most
+ * of every one of them is near-white — multiplying just clips the whites and
+ * washes the page out instead of lighting it up. Instead the day/night tint is
+ * blended toward LIT_TINT, which means the screen "switches on" to its own
+ * authored colour: bounded by construction, so it can never blow out, and
+ * strongest exactly at dusk and at night when the tint is dimming it most.
+ * The small overshoot past 1 is what keeps it visible in broad daylight too.
+ */
+const LIT_TINT = 1.14
+/** Approach speed of that lighting-up, per second. */
+const LIFT_LERP = 7
 
 /**
  * ProjectCarts — the three project stands in the west play area.
@@ -96,10 +111,17 @@ export default class ProjectCarts {
             if (!plane) return
 
             // Unlit screen: the page texture, day/night tinted like the world.
+            //
+            // `lift` is 0..1 and rides ON the day/night tint, so it never
+            // touches alpha — and it stays a uniform, so lighting up costs no
+            // shader rebuild and no second material, just one float a frame.
             const map = r[PAGE_SOURCES[index]]
+            const lift = uniform(0)
             const mat = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide })
-            if (map) mat.colorNode = texture(map, uv()).mul(vec4(dayNightTint, 1.0))
-            else mat.colorNode = vec4(0.92, 0.94, 0.95, 1.0)
+            if (map) {
+                const litTint = mix(dayNightTint, vec3(LIT_TINT), lift)
+                mat.colorNode = texture(map, uv()).mul(vec4(litTint, 1.0))
+            } else mat.colorNode = vec4(0.92, 0.94, 0.95, 1.0)
             plane.material?.dispose?.()
             plane.material = mat
             plane.castShadow = false
@@ -114,7 +136,7 @@ export default class ProjectCarts {
 
             const position = new THREE.Vector3().setFromMatrixPosition(worldMatrix)
             const cart = {
-                index, plane, position,
+                index, plane, position, lift,
                 isNear: false, isHovered: false, isHighlighted: false
             }
             // Mouse hover/click via the shared raycaster.
@@ -216,6 +238,18 @@ export default class ProjectCarts {
         for (const cart of this.carts) {
             const near = cart.index === best
             if (near !== cart.isNear) { cart.isNear = near; this._refreshHighlight(cart) }
+        }
+
+        // Ease the page brightness toward the highlight state. Eased, not
+        // switched: the outline can snap because it is a hard edge, but a
+        // picture that jumps in brightness reads as a flicker rather than as
+        // something waking up.
+        const dt = Math.min(0.05, (this.experience.time?.delta || 16) * 0.001)
+        const k = Math.min(1, dt * LIFT_LERP)
+        for (const cart of this.carts) {
+            if (!cart.lift) continue
+            const target = cart.isHighlighted ? 1 : 0
+            cart.lift.value += (target - cart.lift.value) * k
         }
 
         // Mobile action button + gamepad A (rising edge).

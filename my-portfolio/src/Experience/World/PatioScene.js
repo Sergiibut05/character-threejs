@@ -230,20 +230,10 @@ export default class PatioScene {
                     map: r.forestAtlas || null
                 })
             }
-            // Park info sign (was inside InfoBoard.glb before it became the
-            // scoreboards file).
-            if (name === 'parkInfoBoardModel' && !this.pieces.infoBoard && r.parkInfoBoardModel) {
-                this.pieces.infoBoard = new StaticPiece('infoBoard', r.parkInfoBoardModel, {
-                    map: r.forestAtlas || null,
-                    // The frame takes the shared atlas; the `Map` plane inside
-                    // it takes the world map picture. preserveOwnMaps is what
-                    // switches StaticPiece out of its single-atlas fast path
-                    // into the per-mesh one — without it meshMaps is skipped.
-                    preserveOwnMaps: true,
-                    meshMaps: r.worldMapTexture
-                        ? { Map: { map: r.worldMapTexture, castShadow: false } }
-                        : {}
-                })
+            // Park info sign. Either arrival can complete it — see
+            // _buildInfoBoard for why waiting on both matters.
+            if (name === 'parkInfoBoardModel' || name === 'worldMapTexture') {
+                this._buildInfoBoard()
             }
         }
 
@@ -403,9 +393,10 @@ export default class PatioScene {
         if (!this.pieces.bridge && r.bridgeModel) {
             this.pieces.bridge = new StaticPiece('bridge', r.bridgeModel, { map: r.forestAtlas || null })
         }
-        if (!this.pieces.infoBoard && r.infoBoardModel) {
-            this.pieces.infoBoard = new StaticPiece('infoBoard', r.infoBoardModel, { map: r.forestAtlas || null })
-        }
+        // Last resort: build the sign even if the map picture never turned up,
+        // so a failed texture costs the map ON it rather than the whole sign
+        // (and with it the way to open the map from the world).
+        this._buildInfoBoard({ allowWithoutMap: true })
 
         if (!this.pieces.baseballPitch && r.baseballPitchModel) {
             this.pieces.baseballPitch = new BaseballPitch(r.baseballPitchModel)
@@ -470,6 +461,50 @@ export default class PatioScene {
             }
             suspended.length = 0
         }
+    }
+
+    /**
+     * The park info sign — built in ONE place, deliberately.
+     *
+     * It used to be built in two, and both were wrong in their own way.
+     *
+     * The progressive path fired on `parkInfoBoardModel` alone and read
+     * `worldMapTexture` at that instant. Both are decorative-priority, so their
+     * arrival order is not fixed: whenever the picture came second, meshMaps
+     * went out EMPTY and the `Map` plane kept the shared forest atlas — for
+     * good, because nothing revisited it. That is the "sometimes the map,
+     * sometimes the bark".
+     *
+     * The other built this same slot from `infoBoardModel`, which is a
+     * DIFFERENT file (InfoBoard-compressed.glb, the scoreboards) with no
+     * meshMaps at all — left over from before the sign was split out of it.
+     * Whichever path ran first claimed `pieces.infoBoard`; the other saw the
+     * slot taken and quietly did nothing.
+     *
+     * @param {object}  [o]
+     * @param {boolean} [o.allowWithoutMap]  build even with no picture yet
+     * @returns {boolean} whether the piece exists now
+     */
+    _buildInfoBoard({ allowWithoutMap = false } = {}) {
+        if (this.pieces.infoBoard) return true
+        const r = this.resources.items
+        if (!r.parkInfoBoardModel) return false
+        // Normally hold out for the picture: a sign whose whole job is to show
+        // the map is worth waiting a moment for.
+        if (!r.worldMapTexture && !allowWithoutMap) return false
+
+        this.pieces.infoBoard = new StaticPiece('infoBoard', r.parkInfoBoardModel, {
+            map: r.forestAtlas || null,
+            // The frame takes the shared atlas; the `Map` plane inside it takes
+            // the world map picture. preserveOwnMaps is what switches
+            // StaticPiece out of its single-atlas fast path into the per-mesh
+            // one — without it meshMaps is skipped entirely.
+            preserveOwnMaps: true,
+            meshMaps: r.worldMapTexture
+                ? { Map: { map: r.worldMapTexture, castShadow: false } }
+                : {}
+        })
+        return true
     }
 
     async _buildCollidersAsync() {
