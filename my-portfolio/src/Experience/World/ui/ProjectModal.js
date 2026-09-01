@@ -1,5 +1,5 @@
 import './project.css'
-import { t } from '../../Utils/gameText.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 import { PROJECTS } from './projectsData.js'
 
 /** Escape HTML, then allow ONLY the **bold** marker → <strong>. */
@@ -58,6 +58,9 @@ export default class ProjectModal {
             this.closeBtn = _el('button', 'fz-modal-close')
             this.closeBtn.type = 'button'
             this.closeBtn.setAttribute('aria-label', t('project.close'))
+            this._unsubLocale = onLocaleChange(() => {
+                this.closeBtn?.setAttribute('aria-label', t('project.close'))
+            })
             this.closeBtn.textContent = '✕'
             this.closeBtn.addEventListener('click', () => this.close())
             this.panel.appendChild(this.closeBtn)
@@ -275,6 +278,8 @@ export default class ProjectModal {
     onClose(cb) { this._closeCb = cb }
 
     destroy() {
+        this._unsubLocale?.()
+        this._unsubLocale = null
         window.removeEventListener('keydown', this._onKeyDown, true)
         this._dragCleanup?.()
         this.backdrop.remove()

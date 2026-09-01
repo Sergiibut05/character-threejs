@@ -1,5 +1,5 @@
 import './ui.css'
-import { t } from '../../Utils/gameText.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 import { inputGlyph } from './InputGlyph.js'
 
 /**
@@ -30,6 +30,12 @@ export default class Modal {
             this.closeBtn = _el('button', 'fz-modal-close')
             this.closeBtn.type = 'button'
             this.closeBtn.setAttribute('aria-label', t('project.close'))
+            // This label is written ONCE, at construction — and the settings
+            // modal is constructed during boot, before any catalog has
+            // arrived. Re-read it whenever one does.
+            this._unsubLocale = onLocaleChange(() => {
+                this.closeBtn?.setAttribute('aria-label', t('project.close'))
+            })
             this.closeBtn.textContent = '✕'
             this.closeBtn.addEventListener('click', () => this.close())
             this.panel.appendChild(this.closeBtn)
@@ -144,6 +150,8 @@ export default class Modal {
     isOpen() { return this._isOpen }
 
     destroy() {
+        this._unsubLocale?.()
+        this._unsubLocale = null
         // Release the duck if this panel is torn down without being closed
         // first — the results flow does exactly that, swapping one modal for
         // the next, and a leaked count would leave the music quiet for the rest

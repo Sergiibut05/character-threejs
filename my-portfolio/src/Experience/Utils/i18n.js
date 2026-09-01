@@ -102,18 +102,30 @@ class I18n extends EventEmitter {
      */
     async setLocale(locale, { persist = true } = {}) {
         if (!LOADERS[locale]) return this.locale
+
+        // Whether this catalog was ALREADY in memory decides half of what
+        // happens below, so it has to be sampled before the await.
+        const wasResident = !!this._catalogs[locale]
         await this.load(locale)
         // The base catalog backs every lookup, so it has to be resident.
         if (locale !== BASE) await this.load(BASE)
 
-        if (this.locale !== locale) {
-            this.locale = locale
-            if (persist) {
-                try { localStorage.setItem(STORAGE_KEY, locale) } catch { /* private mode */ }
-            }
-            document.documentElement.lang = locale
-            this.trigger('change', [locale])
+        const changed = this.locale !== locale
+        this.locale = locale
+        if (changed && persist) {
+            try { localStorage.setItem(STORAGE_KEY, locale) } catch { /* private mode */ }
         }
+        document.documentElement.lang = locale
+
+        // Fire on a CHANGE of language *or* on a catalog arriving for the first
+        // time. That second case is not an edge: `locale` starts out as the
+        // default, so for a visitor who gets that default `changed` is false on
+        // the very first call — and the old code emitted nothing at all. Every
+        // component built during the boot (SettingsModal is constructed in the
+        // Experience constructor) had already asked for its strings while the
+        // catalog was still being fetched, got the raw keys back, and was never
+        // told to ask again. Hence "it only fixes itself if I reload".
+        if (changed || !wasResident) this.trigger('change', [locale])
         return this.locale
     }
 
@@ -140,7 +152,15 @@ class I18n extends EventEmitter {
         let value = this._lookup(this._catalogs[this.locale], key)
         if (value === undefined) value = this._lookup(this._catalogs[BASE], key)
         if (value === undefined) {
-            console.warn(`i18n: missing key "${key}" (${this.locale})`)
+            // Only complain once there is something to have missed the key IN.
+            // Catalogs load asynchronously, so anything that renders during the
+            // boot asks before the fetch resolves; warning there reports a race
+            // as if it were a typo, and buries the real ones. Those callers get
+            // the key back and are repainted by the 'change' setLocale fires
+            // when the catalog lands.
+            if (this._catalogs[BASE] || this._catalogs[this.locale]) {
+                console.warn(`i18n: missing key "${key}" (${this.locale})`)
+            }
             return key
         }
         if (typeof value === 'function') return value(params)
