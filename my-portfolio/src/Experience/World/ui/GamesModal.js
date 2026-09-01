@@ -51,8 +51,7 @@ export default class GamesModal {
         this.shelf.replaceChildren()
 
         for (const entry of SHELF) {
-            const key = `games.items.${entry.id}`
-            const name = t(`${key}.title`)
+            const name = t(`games.items.${entry.id}.title`)
 
             const card = document.createElement('div')
             card.className = `fz-game${entry.now ? ' fz-game--now' : ''}`
@@ -83,11 +82,7 @@ export default class GamesModal {
             title.className = 'fz-game-title'
             title.textContent = name
 
-            const meta = document.createElement('div')
-            meta.className = 'fz-game-meta'
-            meta.textContent = t(`${key}.note`)
-
-            card.append(cover, title, meta)
+            card.append(cover, title)
             this.shelf.appendChild(card)
         }
     }

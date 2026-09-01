@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { texture, uv, vec3, vec4, uniform, mix } from 'three/tsl'
 import Experience from '../Experience.js'
+import { seatOwnsInteract } from './seated.js'
 import { blenderTransformToMatrix } from './scene/SceneUtils.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
@@ -250,6 +251,7 @@ export default class ProjectCarts {
 
     _open(index, fromPointer) {
         if (document.querySelector('.fz-modal-overlay.is-open')) return
+        if (seatOwnsInteract(this.carts[index]?.position)) return  // the seat you are at wins the key
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
         if (this.modal?.isOpen()) return

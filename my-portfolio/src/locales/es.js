@@ -314,22 +314,13 @@ export default {
         },
 
         games: {
-            title: 'Mi estantería',
+            title: 'Mis favoritos',
             now: 'Jugando ahora',
             coverAlt: 'Carátula de {title}',
             items: {
-                zelda: {
-                    title: 'The Legend of Zelda: Breath of the Wild',
-                    note: 'Favorito · Nintendo Switch'
-                },
-                persona: {
-                    title: 'Persona 3 Reload',
-                    note: 'Lo que estoy jugando estos días'
-                },
-                rdr2: {
-                    title: 'Red Dead Redemption 2',
-                    note: 'Favorito · Rockstar Games'
-                }
+                zelda: { title: 'The Legend of Zelda: Breath of the Wild' },
+                persona: { title: 'Persona 3 Reload' },
+                rdr2: { title: 'Red Dead Redemption 2' }
             }
         },
         trophy: {

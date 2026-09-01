@@ -466,22 +466,13 @@ export default {
         },
 
         games: {
-            title: 'My shelf',
+            title: 'My favourites',
             now: 'Playing now',
             coverAlt: 'Cover art for {title}',
             items: {
-                zelda: {
-                    title: 'The Legend of Zelda: Breath of the Wild',
-                    note: 'All-time favourite · Nintendo Switch'
-                },
-                persona: {
-                    title: 'Persona 3 Reload',
-                    note: 'What I am playing these days'
-                },
-                rdr2: {
-                    title: 'Red Dead Redemption 2',
-                    note: 'All-time favourite · Rockstar Games'
-                }
+                zelda: { title: 'The Legend of Zelda: Breath of the Wild' },
+                persona: { title: 'Persona 3 Reload' },
+                rdr2: { title: 'Red Dead Redemption 2' }
             }
         },
         trophy: {

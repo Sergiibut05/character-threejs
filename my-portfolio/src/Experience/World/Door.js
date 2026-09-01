@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { seatOwnsInteract } from './seated.js'
 
 // House nodes that make up the door and should light up together.
 const DOOR_NODES = ['door', 'house_door']
@@ -89,6 +90,7 @@ export default class Door {
     _tryInteract() {
         if (!(this.isNear || this.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return // a modal is open
+        if (seatOwnsInteract(this.position)) return  // the seat you are at wins the key
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return // mid-minigame
         this.experience.world?.houseInterior?.enter()

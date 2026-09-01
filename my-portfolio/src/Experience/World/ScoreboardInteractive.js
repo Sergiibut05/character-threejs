@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { seatOwnsInteract } from './seated.js'
 import Modal from './ui/Modal.js'
 import Leaderboard from '../Utils/Leaderboard.js'
 import { t } from '../Utils/gameText.js'
@@ -115,6 +116,7 @@ export default class ScoreboardInteractive {
         if (this._busy) return
         if (!(this.isNear || this.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
+        if (seatOwnsInteract(this.position)) return  // the seat you are at wins the key
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
         // Nor while the beach rally is running (the board sits right by it).

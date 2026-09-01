@@ -4,6 +4,7 @@ import {
     length, mix, instancedArray, instanceIndex, hash, uv, clamp
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { seatOwnsInteract } from './seated.js'
 import { SOCIALS } from './ui/socialData.js'
 import { inputGlyph } from './ui/InputGlyph.js'
 
@@ -516,6 +517,7 @@ export default class SocialArea {
         if (this.state !== 'active') return
         // Don't fight open modals / typing fields.
         if (document.querySelector('.fz-modal-overlay.is-open, .fz-proj.is-open')) return
+        if (seatOwnsInteract()) return  // the seat you are at wins the key
         const tag = document.activeElement?.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA') return
 

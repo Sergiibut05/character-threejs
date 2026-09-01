@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { seatYieldsToRival } from './seated.js'
 
 /**
  * SitPoints — the empties in `sit-points.glb` become places the player can sit.
@@ -440,8 +441,11 @@ export default class SitPoints {
     }
 
     _toggle() {
-        if (this.active) this._stand()
-        else if (this.nearest) this._sit(this.nearest)
+        if (this.active) { this._stand(); return }
+        // Standing at the Switch rather than the sofa? Then this press is not
+        // for the sofa. Standing up above is deliberately NOT guarded: getting
+        // out of a seat must always work (see seated.js).
+        if (this.nearest && !seatYieldsToRival(this.nearest)) this._sit(this.nearest)
     }
 
     /**
@@ -628,6 +632,11 @@ export default class SitPoints {
                 const d = point.position.distanceTo(character.position)
                 if (d < bestDist) { bestDist = d; best = point }
             }
+            // Same rule as the press: a seat that would not take the key does
+            // not offer itself either. `nearest` still holds the geometric
+            // pick, so seatOwnsInteract on the other side keeps comparing
+            // against a real seat rather than nothing.
+            if (best && seatYieldsToRival(best)) best = null
         }
         // Null while seated is correct for `nearest` too: nothing is on offer.
         // _toggle() tests `active` first, so standing up is unaffected.

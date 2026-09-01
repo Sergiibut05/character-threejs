@@ -5,6 +5,7 @@ import StaticPiece from './scene/StaticPiece.js'
 import TrophyModal from './ui/TrophyModal.js'
 import ComputerModal from './ui/ComputerModal.js'
 import GamesModal from './ui/GamesModal.js'
+import { seatOwnsInteract } from './seated.js'
 import { propShadowTint, propCoreLit0, propCoreLit1 } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 
@@ -272,6 +273,7 @@ export default class HouseInterior {
 
     _tryLampToggle() {
         if (!this.isInside || this._busy || !this.lamp) return
+        if (seatOwnsInteract(this.lamp.position)) return
         if (!(this.lamp.isNear || this.lamp.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
         this.lampParams.on = !this.lampParams.on
@@ -281,7 +283,9 @@ export default class HouseInterior {
     _updateLampHighlight() {
         const L = this.lamp
         if (!L) return
+        // Dark while the sofa two steps away holds the key (see seated.js).
         const should = this.isInside && (L.isHovered || L.isNear)
+            && !seatOwnsInteract(L.position)
         if (should === L.isHighlighted) return
         L.isHighlighted = should
         for (const m of L.meshes) {
@@ -506,7 +510,7 @@ export default class HouseInterior {
     }
 
     _tryProp(rec) {
-        if (rec.spent) return
+        if (rec.spent || seatOwnsInteract(rec.position)) return
         if (!this.isInside || this._busy) return
         if (!(rec.isNear || rec.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
@@ -525,9 +529,11 @@ export default class HouseInterior {
 
     _refreshPropHighlight(rec) {
         // `suppressed` drops the outline while a prop is busy doing the thing
-        // you just asked for; `spent` drops it for good (see _makeProp).
+        // you just asked for; `spent` drops it for good (see _makeProp); and a
+        // seat that has taken the key drops it for as long as it holds it — an
+        // outline is an offer, and this one would be refused (see seated.js).
         const should = this.isInside && !rec.spent && !rec.suppressed
-            && (rec.isHovered || rec.isNear)
+            && (rec.isHovered || rec.isNear) && !seatOwnsInteract(rec.position)
         if (should === rec.isHighlighted) return
         rec.isHighlighted = should
         for (const m of rec.meshes) {
@@ -768,7 +774,7 @@ export default class HouseInterior {
     onClick() { this._tryExit() }
 
     _tryExit() {
-        if (!this.isInside || this._busy) return
+        if (!this.isInside || this._busy || seatOwnsInteract(this.position)) return
         if (!(this.isNear || this.isHovered)) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
         this.exit()
@@ -777,6 +783,7 @@ export default class HouseInterior {
     _updateHighlight() {
         // Only relevant while inside — the rug shouldn't glow from the island.
         const should = this.isInside && (this.isHovered || this.isNear)
+            && !seatOwnsInteract(this.position)
         if (should === this.isHighlighted) return
         this.isHighlighted = should
         for (const m of this.meshes) {
@@ -794,17 +801,25 @@ export default class HouseInterior {
 
         const character = this.experience.world?.character
         if (character && this.isInside) {
-            const near = this.position.distanceTo(character.position) < this.proximityRadius
-            if (near !== this.isNear) { this.isNear = near; this._updateHighlight() }
+            // `isNear` stays PURE GEOMETRY — seatYieldsToRival reads it to
+            // decide whether the seat should stand down, so filtering it by the
+            // seat rule here would leave the two halves waiting on each other.
+            // The seat rule belongs on the outline instead, which is why the
+            // highlight is refreshed every frame rather than only on a change:
+            // the sofa can take the key without you having moved at all. Each
+            // of these early-outs when nothing changed.
+            this.isNear = this.position.distanceTo(character.position) < this.proximityRadius
+            this._updateHighlight()
 
             if (this.lamp) {
-                const lampNear = this.lamp.position.distanceTo(character.position) < this.lamp.proximityRadius
-                if (lampNear !== this.lamp.isNear) { this.lamp.isNear = lampNear; this._updateLampHighlight() }
+                this.lamp.isNear = this.lamp.position.distanceTo(character.position)
+                    < this.lamp.proximityRadius
+                this._updateLampHighlight()
             }
 
             for (const rec of this._props) {
-                const near = floorDistance(rec.position, character.position) < rec.proximityRadius
-                if (near !== rec.isNear) { rec.isNear = near; this._refreshPropHighlight(rec) }
+                rec.isNear = floorDistance(rec.position, character.position) < rec.proximityRadius
+                this._refreshPropHighlight(rec)
             }
 
             // Mobile action button + gamepad A (rising edge), like Mailbox.

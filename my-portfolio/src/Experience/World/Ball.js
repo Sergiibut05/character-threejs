@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { positionLocal, mix, smoothstep, vec3, float, max } from 'three/tsl'
 import Experience from '../Experience.js'
+import { seatOwnsInteract } from './seated.js'
 import { dayNightLitTint } from './DayNight.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
@@ -140,6 +141,7 @@ export default class Ball {
         if (!this._spawned || this._kickTimer >= 0) return
         if (!(this.isNear || (this.isHovered && this.isNear))) return
         if (document.querySelector('.fz-modal-overlay.is-open')) return
+        if (seatOwnsInteract(this.position)) return  // the seat you are at wins the key
         const mg = this.experience.world?.frisbeeMinigame
         if (mg && mg.state !== 'idle') return
         const character = this.experience.world?.character

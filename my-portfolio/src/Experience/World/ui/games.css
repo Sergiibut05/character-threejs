@@ -13,16 +13,17 @@
  * about the raise depends on a scale factor that layout cannot see.
  */
 .fz-games {
+    --fz-game-mat: 4px;
     display: grid;
     grid-template-columns: 1fr 1.14fr 1fr;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto;
     align-items: end;
     gap: 12px;
 }
 
 .fz-game {
     display: grid;
-    grid-row: span 3;
+    grid-row: span 2;
     grid-template-rows: subgrid;
     row-gap: 9px;
     min-width: 0;
@@ -55,14 +56,30 @@
     object-fit: cover;
 }
 
+/*
+ * The frame is a MAT the cover sits inside, not a ring drawn outside it.
+ *
+ * The ring was `box-shadow 0 0 0 3px`, which repeats the element's own radius
+ * 3px further out — so the outer curve was tighter than the corner it wrapped
+ * and the whole thing read as slightly wrong without an obvious reason. Real
+ * frames are concentric: outer radius = inner radius + thickness, which is what
+ * padding plus the calc() below gives, and the picture keeps its own corners.
+ */
 .fz-game--now .fz-game-cover {
-    box-shadow: var(--fz-shadow), 0 0 0 3px var(--fz-gold);
+    padding: var(--fz-game-mat);
+    background: var(--fz-green-400);
+    border-radius: calc(var(--fz-radius-sm) + var(--fz-game-mat));
+    box-shadow: var(--fz-shadow);
 }
 
-/* "Playing now" ribbon across the top of the middle cover. */
+.fz-game--now .fz-game-cover img { border-radius: var(--fz-radius-sm); }
+
+/* "Playing now" ribbon across the top of the middle cover, tucked inside the
+   mat so the two read as one frame rather than two stacked bars. */
 .fz-game-badge {
     position: absolute;
-    inset: 0 0 auto 0;
+    inset: var(--fz-game-mat) var(--fz-game-mat) auto;
+    border-radius: var(--fz-radius-sm) var(--fz-radius-sm) 0 0;
     padding: 5px 8px;
     font-family: var(--fz-font-title);
     font-size: 11px;
@@ -70,8 +87,8 @@
     letter-spacing: 0.04em;
     text-align: center;
     text-transform: uppercase;
-    color: #3d2f00;
-    background: var(--fz-gold);
+    color: #fff;
+    background: var(--fz-green-500);
 }
 
 .fz-game-title {
@@ -82,12 +99,6 @@
     color: var(--fz-ink);
 }
 
-.fz-game-meta {
-    font-family: var(--fz-font-body);
-    font-size: 12px;
-    line-height: 1.35;
-    color: var(--fz-ink-soft);
-}
 
 /* Phones: the row would squeeze each cover to ~90px, so stack instead and
    put the one being played first. */
@@ -101,11 +112,10 @@
         grid-template-columns: 84px 1fr;
         align-items: center;
         column-gap: 12px;
-        row-gap: 2px;
     }
     .fz-game:hover { transform: none; }
     .fz-game--now { order: -1; }
-    .fz-game-cover { grid-row: span 2; align-self: center; }
+    .fz-game-cover { align-self: center; }
     .fz-game-badge { font-size: 10px; padding: 3px 6px; }
 }
 
