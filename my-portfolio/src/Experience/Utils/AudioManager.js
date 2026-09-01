@@ -1,4 +1,4 @@
-import { Howl } from 'howler'
+import { Howl, Howler } from 'howler'
 import EventEmitter from './EventEmitter.js'
 import MusicToast from '../World/ui/MusicToast.js'
 
@@ -129,6 +129,14 @@ export default class AudioManager extends EventEmitter {
         super()
         this.experience = experience
 
+        // Howler suspends the shared AudioContext after 30 s with nothing
+        // playing, to save power. On iOS that context frequently never comes
+        // back — the resume has to happen inside a user gesture and Howler's
+        // own retry runs on a timer, so the site went permanently silent for no
+        // reason the player could see. The context this app keeps alive is one
+        // context playing a soundtrack; there is nothing to save.
+        Howler.autoSuspend = false
+
         // Backend per device. Desktop: html5 streaming (low memory, instant
         // start). Mobile/iOS: WEB AUDIO — html5 <audio> on iOS ignores
         // programmatic volume (hardware-only) so proximity fades/mute break,
@@ -192,6 +200,87 @@ export default class AudioManager extends EventEmitter {
         // "Now playing" toast.
         this.toast = new MusicToast()
         this.on('trackchange', (np) => { if (np) this.toast.show(np) })
+
+        this._setupLifecycle()
+    }
+
+    // ─── Page lifecycle ─────────────────────────────────────────
+
+    /**
+     * Bring the audio back after the page loses the foreground.
+     *
+     * Switching apps or tabs is an INTERRUPTION to the Web Audio context, not a
+     * pause: the browser suspends it, and on iOS parks it in Safari's own
+     * `interrupted` state. Nothing resumed it, so one glance at another app
+     * killed the sound for the rest of the session — exactly what it looked
+     * like from the outside.
+     *
+     * Four listeners because no single one fires everywhere:
+     *   - visibilitychange  the tab/app switch itself, everywhere
+     *   - pageshow          returning via the bfcache, which fires no
+     *                       visibilitychange at all on iOS Safari
+     *   - focus             desktop alt-tab back into a still-visible window
+     *   - touchend/click    the guaranteed backstop. iOS only lets a suspended
+     *                       context resume inside a user gesture, so if the
+     *                       three above are refused, the player's next tap on
+     *                       the screen fixes it.
+     *
+     * All of them land on the same idempotent _wake(), which costs nothing when
+     * the context is already running.
+     */
+    _setupLifecycle() {
+        this._onVisibility = () => { if (!document.hidden) this._wake() }
+        this._onPageShow = () => this._wake()
+        this._onWindowFocus = () => this._wake()
+        this._onGesture = () => this._wake()
+
+        document.addEventListener('visibilitychange', this._onVisibility)
+        window.addEventListener('pageshow', this._onPageShow)
+        window.addEventListener('focus', this._onWindowFocus)
+        // Capture phase: this must run even where something else stops the
+        // event, and it never interferes — it only ever resumes a context.
+        document.addEventListener('touchend', this._onGesture, { capture: true, passive: true })
+        document.addEventListener('click', this._onGesture, { capture: true, passive: true })
+    }
+
+    /**
+     * Resume the audio context, and restart whatever the interruption killed.
+     *
+     * Resuming is not always enough. iOS can hand back a running context whose
+     * looping beds have been stopped, so the world comes back visually silent
+     * even though everything reports healthy. Anything that should be playing
+     * and is not gets played again.
+     */
+    _wake() {
+        const ctx = Howler.ctx
+        if (ctx && ctx.state !== 'running') {
+            // 'interrupted' is Safari-only and not in the spec, but resume()
+            // is the cure for it as much as for 'suspended'.
+            try { ctx.resume()?.then?.(() => this._restartStalled(), () => {}) } catch { /* */ }
+        }
+        this._restartStalled()
+    }
+
+    /** Re-play the loops and the music if they died while we were away. */
+    _restartStalled() {
+        if (!this._sfxStarted) return
+
+        for (const id in this.sfx) {
+            const entry = this.sfx[id]
+            try {
+                if (!entry.howl.playing(entry.soundId)) entry.soundId = entry.howl.play()
+            } catch { /* */ }
+        }
+
+        // Only when a track is genuinely mid-play. Between tracks the gap timer
+        // owns the silence and forcing a play here would cut the gap short.
+        if (this.suspended || !this.howl || this.soundId == null) return
+        try {
+            if (!this.howl.playing(this.soundId)) {
+                this.howl.play(this.soundId)
+                this._applyMusicGain()
+            }
+        } catch { /* */ }
     }
 
     // ─── Manifest ────────────────────────────────────────────────────────
@@ -211,6 +300,11 @@ export default class AudioManager extends EventEmitter {
     async startSoundtrack() {
         if (this.started) return
         this.started = true
+        // This call IS the user gesture, and the music only actually starts an
+        // await or two later (manifest fetch, then startDelayMs). If the
+        // context is still locked by then the play is silently refused, which
+        // is the other half of "on mobile it often just never plays".
+        this._wake()
         this.startSfx()
         await this.loadManifest()
         if (!this.tracks.length) return
@@ -546,6 +640,11 @@ export default class AudioManager extends EventEmitter {
         if (this._gapTimer) { clearTimeout(this._gapTimer); this._gapTimer = null }
         if (this._fadeOutTimer) { clearTimeout(this._fadeOutTimer); this._fadeOutTimer = null }
         if (this._resumeTimer) { clearTimeout(this._resumeTimer); this._resumeTimer = null }
+        document.removeEventListener('visibilitychange', this._onVisibility)
+        window.removeEventListener('pageshow', this._onPageShow)
+        window.removeEventListener('focus', this._onWindowFocus)
+        document.removeEventListener('touchend', this._onGesture, { capture: true })
+        document.removeEventListener('click', this._onGesture, { capture: true })
     }
 
     _wait(ms) { return new Promise((r) => setTimeout(r, ms)) }

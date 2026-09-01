@@ -65,13 +65,25 @@
         0 22px 44px -12px rgba(39, 90, 70, 0.26);
 
 
-    position: fixed;
-    inset: 0;
+    /*
+     * In the document flow, NOT a fixed overlay with its own scrollbar.
+     *
+     * Mobile Safari only collapses its address bar and bottom toolbar when the
+     * DOCUMENT scrolls. Scrolling inside a fixed element never counts, so this
+     * page used to keep both bars at full height for its whole length — about
+     * 110 px of an iPhone screen permanently spent on browser chrome. Nothing
+     * in CSS fixes that from inside a fixed overlay; the page has to be the
+     * thing that scrolls.
+     *
+     * It also puts the sticky bar on the document's own sticky path instead of
+     * an overflow container's, which is the one iOS composites cleanly.
+     *
+     * The 3D canvas is position: fixed, so it stays put underneath regardless.
+     */
+    position: relative;
     z-index: 4000;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    min-height: 100dvh;
+    overflow-x: clip;
     scroll-behavior: smooth;
     background: var(--ov-bg);
     color: var(--fz-ink);
@@ -89,6 +101,24 @@
 }
 
 .ov-root.is-open { opacity: 1; }
+
+/*
+ * Hand the document its scrollbar back for as long as the overview is open.
+ * style.css keeps `overflow: hidden` on html/body so dragging the 3D view can
+ * never scroll the page; the class beats it on specificity and Overview.open()
+ * puts it on, close() takes it off.
+ */
+html.ov-page,
+body.ov-page {
+    /* `visible` on BOTH axes, deliberately. An `overflow-x: hidden` here — the
+       reflex for "stop sideways scrolling" — makes the body a scroll container,
+       and the sticky bar then sticks to a box that never scrolls: it just rode
+       off the top of the screen with the rest of the page. The sideways
+       clipping belongs on .ov-root, where `clip` does it without turning the
+       element into a scroller. */
+    overflow: visible;
+    height: auto;
+}
 
 /* Paper tooth. The first attempt at this was invisible and it was arithmetic,
    not taste: coloured noise at 3.5% over a near-white page has nowhere to go.
@@ -155,28 +185,50 @@
     align-items: center;
     gap: 16px;
     padding: 12px var(--ov-pad);
-    /* See-through while the page is at rest at the top, so the hero's drifting
-       motif field runs up behind the bar and straight through it instead of
-       being sliced off by a frosted band. The bar only becomes a surface once
-       there is content under it that has to stay readable. */
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-bottom: 1px solid transparent;
     /* Pulls the page up under the bar so the hero owns that strip. The height
        is measured in JS (--ov-bar-h) because it changes across breakpoints;
        the fallback is the desktop measurement. */
     margin-bottom: calc(-1 * var(--ov-bar-h, 71px));
-    transition: border-color 0.4s var(--ov-ease-soft),
-                background 0.4s var(--ov-ease-soft),
-                backdrop-filter 0.4s var(--ov-ease-soft);
+    /* Its own compositor layer. Without one, Safari re-rasterises a sticky
+       blurred bar against a backdrop it samples a frame late, which is the
+       tearing you see scrolling back UP — the content underneath smears
+       through the bar for a frame or two before it settles. */
+    transform: translateZ(0);
 }
-.ov-root.is-scrolled .ov-bar {
-    border-bottom-color: var(--ov-line);
+
+/*
+ * The bar's SURFACE, as a layer of its own that fades in and out.
+ *
+ * See-through while the page is at rest at the top, so the hero's drifting
+ * motif field runs up behind the bar and straight through it instead of being
+ * sliced off by a frosted band. It only becomes a surface once there is
+ * content under it that has to stay readable.
+ *
+ * The state used to be a transition on `background` and `backdrop-filter`
+ * directly. Animating a backdrop-filter means re-blurring the whole strip
+ * every frame on the main thread, and on a phone that lands right on top of
+ * the scroll it was reacting to — the stutter you get scrolling up. Fading a
+ * layer whose blur never changes is a plain opacity animation, which the
+ * compositor does on its own.
+ */
+.ov-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
     background: rgba(251, 253, 245, 0.94);
     backdrop-filter: blur(14px) saturate(1.3);
     -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    border-bottom: 1px solid var(--ov-line);
+    opacity: 0;
+    transition: opacity 0.35s var(--ov-ease-soft);
+    pointer-events: none;
+    will-change: opacity;
 }
+
+/* Everything real in the bar rides above that surface. */
+.ov-bar > * { position: relative; z-index: 1; }
+.ov-root.is-scrolled .ov-bar::before { opacity: 1; }
 
 /* Reading progress — a hairline that fills as you go. */
 .ov-progress {

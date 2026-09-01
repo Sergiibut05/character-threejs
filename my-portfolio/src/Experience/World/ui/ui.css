@@ -18,8 +18,25 @@
 .fz-modal-overlay {
     position: fixed;
     inset: 0;
+    /* iOS resolves `inset: 0` against the LARGE viewport — the one you get with
+       the browser chrome hidden — so the overlay was taller than the screen
+       actually showing. The panel is capped at 100% of it, so on a phone the
+       panel fitted "perfectly" into a box whose bottom was behind the toolbar:
+       the hint bar and the end of the settings list were unreachable, and the
+       body never overflowed so there was nothing to scroll. dvh is the height
+       that is really on screen right now. */
+    height: 100dvh;
     z-index: var(--fz-z);
     display: grid;
+    /* One row, exactly as tall as the overlay, and allowed to be SHORTER than
+       its content. Without this the row is `auto`: it grew to whatever the
+       panel wanted, so the panel's own `max-height: 100%` measured itself
+       against itself and capped nothing. On a phone the settings panel then
+       stood 856px tall inside a 560px screen — the overflow was simply off the
+       bottom of the display, and because the panel never had to shrink, its
+       body never overflowed and there was nothing to scroll. minmax(0, 1fr) is
+       what lets it shrink and hand the leftover to .fz-modal-body. */
+    grid-template-rows: minmax(0, 1fr);
     place-items: safe center;
     padding: max(20px, env(safe-area-inset-top))
         max(20px, env(safe-area-inset-right))

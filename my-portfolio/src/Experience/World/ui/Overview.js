@@ -182,7 +182,9 @@ export default class Overview {
         this._renderLangToggle()
         this._render()
 
-        this.el.addEventListener('scroll', this._onScroll, { passive: true })
+        // On `window`, not on the element: the page itself is the scroller
+        // now (see .ov-root in overview.css).
+        window.addEventListener('scroll', this._onScroll, { passive: true })
     }
 
     _renderLangToggle() {
@@ -828,7 +830,7 @@ export default class Overview {
     async setLang(locale) {
         if (locale === i18n.locale) return
         const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-        const y = this.el.scrollTop
+        const y = window.scrollY
 
         if (!reduce) {
             this.main.style.transition = 'opacity 0.2s ease'
@@ -838,7 +840,7 @@ export default class Overview {
         await i18n.setLocale(locale)
         this._renderLangToggle()
         this._render()
-        this.el.scrollTop = y
+        window.scrollTo(0, y)
         this.main.style.opacity = '1'
     }
 
@@ -867,9 +869,15 @@ export default class Overview {
         })
     }
 
+    /** A node's top in DOCUMENT space — independent of which ancestor is
+     *  positioned, so it cannot drift if the layout is restructured again. */
+    _docTop(node) {
+        return node.getBoundingClientRect().top + window.scrollY
+    }
+
     _updateScrollState() {
-        const top = this.el.scrollTop
-        const max = this.el.scrollHeight - this.el.clientHeight
+        const top = window.scrollY
+        const max = document.documentElement.scrollHeight - window.innerHeight
         this.progress.style.setProperty('--p', max > 0 ? (top / max).toFixed(4) : 0)
         this.el.classList.toggle('is-scrolled', top > 8)
 
@@ -877,10 +885,10 @@ export default class Overview {
         // a third down the viewport. Sitting it right under the bar switches too
         // late: a heading can be well on screen and still read as the previous
         // section.
-        const line = top + this.bar.offsetHeight + this.el.clientHeight * 0.3
+        const line = top + this.bar.offsetHeight + window.innerHeight * 0.3
         let current = this.sections[0]
         for (const s of this.sections) {
-            if (s.offsetTop <= line) current = s
+            if (this._docTop(s) <= line) current = s
         }
         if (current && current.id !== this._currentId) {
             this._currentId = current.id
@@ -912,8 +920,8 @@ export default class Overview {
         const target = this.main.querySelector(`#${id}`)
         if (!target) return
         const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-        this.el.scrollTo({
-            top: target.offsetTop - this.bar.offsetHeight - 12,
+        window.scrollTo({
+            top: this._docTop(target) - this.bar.offsetHeight - 12,
             behavior: reduce ? 'auto' : 'smooth'
         })
     }
@@ -942,11 +950,13 @@ export default class Overview {
         this.isOpen = true
 
         this._prevFocus = document.activeElement
-        this._prevBodyOverflow = document.body.style.overflow
-        document.body.style.overflow = 'hidden'
+        // Let the DOCUMENT scroll while this is open — that is the only thing
+        // mobile Safari will collapse its toolbars for (see overview.css).
+        document.documentElement.classList.add('ov-page')
+        document.body.classList.add('ov-page')
 
         this.el.hidden = false
-        this.el.scrollTop = 0
+        window.scrollTo(0, 0)
         // Flush layout so the transition has a start value to run from. Doing
         // this with a double rAF instead would stall for seconds whenever the
         // tab is throttled, and the page would sit invisible.
@@ -975,7 +985,9 @@ export default class Overview {
         document.removeEventListener('keydown', this._onKeyDown)
         window.removeEventListener('resize', this._onResize)
         window.removeEventListener('pointermove', this._onPointerMove)
-        document.body.style.overflow = this._prevBodyOverflow || ''
+        document.documentElement.classList.remove('ov-page')
+        document.body.classList.remove('ov-page')
+        window.scrollTo(0, 0)
 
         const hide = () => { this.el.hidden = true }
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) hide()
