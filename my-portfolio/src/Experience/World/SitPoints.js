@@ -78,8 +78,20 @@ const SEAT_NUDGE = {
     Empty011: 0.05
 }
 
-/** How much the outline proxy swells past the real seat. See _makeProxy(). */
-const PROXY_SWELL = 1.015
+/**
+ * How far the outline proxy stands off the real seat, IN METRES. See
+ * _makeProxy() for why it stands off at all.
+ *
+ * A distance, deliberately, not a percentage. It used to be a flat 1.015
+ * scale, which meant the empty band between a seat and its outline grew with
+ * the seat: about 2 mm across a log — invisible — but 10.9 mm across the wide
+ * face of the interior sofa, which is the face you are looking at. The sofas
+ * and the porch shelf were the only seats big enough for it to read as a gap.
+ *
+ * 3 mm is above the ~2 mm the thinnest log has always run at without the depth
+ * flicker coming back, and it now costs the same 3 mm on every seat.
+ */
+const PROXY_SWELL_M = 0.003
 
 /** Meshes that are never a seat — the ground, the water, helper volumes. */
 const NOT_A_SEAT = /grass-floor|ground-floor|Colliders|Grass|agua|river|Field|Fringe|Umbrella|sit-proxy/i
@@ -407,13 +419,37 @@ export default class SitPoints {
         // selected object's depth against the scene's, and two surfaces at
         // identical depth make that comparison a coin toss decided by float
         // noise. The result flickered between a clean rim and a filled halo.
-        // A 1.5% swell puts the proxy unambiguously in front, costs nothing
-        // visually (it draws no pixels), and reads as a rim rather than a seam.
+        // Standing the proxy off a little puts it unambiguously in front, costs
+        // nothing visually (it draws no pixels), and reads as a rim.
+        //
+        // The stand-off is solved PER AXIS from the seat's real world size, so
+        // every seat gets the same few millimetres. Scaling by a flat percentage
+        // instead handed big furniture a big gap — see PROXY_SWELL_M.
         source.geometry.computeBoundingBox()
-        const c = source.geometry.boundingBox.getCenter(new THREE.Vector3())
+        const bounds = source.geometry.boundingBox
+        const c = bounds.getCenter(new THREE.Vector3())
+        const localSize = bounds.getSize(new THREE.Vector3())
+
+        // Decomposed from the proxy's OWN matrix, which already carries the
+        // instance transform for instanced seats (the logs, the deckchairs) —
+        // reading the source's world scale would miss that and under-inflate
+        // every one of them.
+        const worldScale = new THREE.Vector3()
+        proxy.matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), worldScale)
+        const factor = (local, scale) => {
+            const world = Math.abs(local * scale)
+            // A flat face has no thickness to grow; leaving it alone beats
+            // dividing by zero.
+            return world > 1e-4 ? (world + 2 * PROXY_SWELL_M) / world : 1
+        }
+
         proxy.matrix.multiply(
             new THREE.Matrix4().makeTranslation(c.x, c.y, c.z)
-                .multiply(new THREE.Matrix4().makeScale(PROXY_SWELL, PROXY_SWELL, PROXY_SWELL))
+                .multiply(new THREE.Matrix4().makeScale(
+                    factor(localSize.x, worldScale.x),
+                    factor(localSize.y, worldScale.y),
+                    factor(localSize.z, worldScale.z)
+                ))
                 .multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z))
         )
 
