@@ -43,6 +43,26 @@ export function period(text) {
 }
 
 /**
+ * A project's PROSE in the active locale, with everything else left alone.
+ *
+ * Exported because the 3D carts show the same three projects as this page and
+ * were reading projectsData.js raw — which is the Spanish source, so a cart
+ * stayed in Spanish however the rest of the site was set. Images are untouched
+ * on purpose: the overview swaps in a wider crop, the cart wants the pair it
+ * was authored with.
+ */
+export function translateProject(p) {
+    const key = `overview.projects.items.${p.id}`
+    const linkLabels = i18n.opt(`${key}.links`) || []
+    return {
+        ...p,
+        tagline: i18n.opt(`${key}.tagline`) || p.tagline,
+        highlights: i18n.opt(`${key}.highlights`) || p.highlights,
+        links: (p.links || []).map((l, i) => ({ ...l, label: linkLabels[i] || l.label }))
+    }
+}
+
+/**
  * A credential as an English reader should see it: the course NAME translated,
  * the date reformatted, and the issuer and URL left exactly as awarded.
  */
@@ -156,22 +176,19 @@ export function getContent() {
                         tagline: t('projects.upcomingBody')
                     }
                 }
-                const key = `projects.items.${p.id}`
+                const tp = translateProject(p)
                 return {
                     id: p.id,
                     upcoming: false,
                     title: p.title,
                     finalProject: p.finalProject === true,
-                    tagline: opt(`${key}.tagline`) || p.tagline,
+                    tagline: tp.tagline,
                     // The card is one wide image, so a project can name a
                     // better-cropped shot than the one baked onto its 3D stand.
                     image: p.overviewImage || p.image,
-                    highlights: i18n.opt(`overview.${key}.highlights`) || p.highlights,
+                    highlights: tp.highlights,
                     stack: p.stack,
-                    links: p.links.map((l, i) => ({
-                        ...l,
-                        label: (i18n.opt(`overview.${key}.links`) || [])[i] || l.label
-                    }))
+                    links: tp.links
                 }
             })
         },

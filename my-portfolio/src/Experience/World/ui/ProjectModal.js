@@ -1,6 +1,7 @@
 import './project.css'
 import { t, onLocaleChange } from '../../Utils/gameText.js'
 import { PROJECTS } from './projectsData.js'
+import { translateProject } from './overviewContent.js'
 
 /** Escape HTML, then allow ONLY the **bold** marker → <strong>. */
 function _richText(str) {
@@ -58,13 +59,18 @@ export default class ProjectModal {
             this.closeBtn = _el('button', 'fz-modal-close')
             this.closeBtn.type = 'button'
             this.closeBtn.setAttribute('aria-label', t('project.close'))
-            this._unsubLocale = onLocaleChange(() => {
-                this.closeBtn?.setAttribute('aria-label', t('project.close'))
-            })
             this.closeBtn.textContent = '✕'
             this.closeBtn.addEventListener('click', () => this.close())
             this.panel.appendChild(this.closeBtn)
         }
+
+        // OUTSIDE the branch above: on touch there is a drag handle instead of
+        // a close button, and a panel open on a phone has to follow a language
+        // switch just the same.
+        this._unsubLocale = onLocaleChange(() => {
+            this.closeBtn?.setAttribute('aria-label', t('project.close'))
+            this._relabel()
+        })
 
         this.content = _el('div', 'fz-proj-content')
         this.panel.appendChild(this.content)
@@ -158,12 +164,17 @@ export default class ProjectModal {
                 // local const of the same name put the call one line above
                 // inside its temporal dead zone — every cart with a second
                 // capture threw instead of opening.
-                const img = _el('img')
-                img.src = src
-                img.alt = ''
-                img.draggable = false
-                img.loading = 'lazy'
-                b.appendChild(img)
+                // `thumbImg`, NOT `img`: the click handler below swaps the
+                // HERO image declared further up this function, and naming this
+                // one `img` shadowed it — the handler then compared the
+                // thumbnail with its own src, matched, and returned without
+                // doing anything.
+                const thumbImg = _el('img')
+                thumbImg.src = src
+                thumbImg.alt = ''
+                thumbImg.draggable = false
+                thumbImg.loading = 'lazy'
+                b.appendChild(thumbImg)
                 b.addEventListener('click', () => {
                     if (img.getAttribute('src') === src) return
                     img.style.opacity = '0'
@@ -231,11 +242,21 @@ export default class ProjectModal {
     }
 
     // ─── Open / close ────────────────────────────────────────────────────
+    /** Redraw the open panel in the current language. No-op when closed. */
+    _relabel() {
+        if (!this._isOpen || this._index == null) return
+        const project = PROJECTS[this._index]
+        if (project) this._render(translateProject(project))
+    }
+
     open(index) {
         if (this._isOpen) return // duplicated trigger — don't re-capture the lock
         const project = PROJECTS[index]
         if (!project) return
-        this._render(project)
+        // Remembered so a language switch while this panel is open can redraw
+        // it — the text is not re-read any other way.
+        this._index = index
+        this._render(translateProject(project))
 
         const character = this.experience?.world?.character
         if (character && this._prevLocked === undefined) {
