@@ -82,6 +82,22 @@ export default {
                     ],
                     links: ['Visit the site', 'Code on GitHub']
                 },
+                sql3d: {
+                    tagline: 'Type a SQL query and watch it become a 3D entity-relationship diagram',
+                    highlights: [
+                        'The query is parsed and drawn **as you type it**: every table is a ' +
+                        'node and every JOIN a cable routed at right angles between them.',
+                        '**Two parsers, not one**: node-sql-parser handles it in the browser ' +
+                        'and falls back to a Python sqlglot service only when a dialect ' +
+                        'defeats it — so the common case never pays for a round trip.',
+                        'A guided demo that **grows an e-commerce query step by step**, from ' +
+                        'a single table to six JOINs and subqueries, so you can watch the ' +
+                        'diagram react.',
+                        'Particle-lit cables, bloom and vignette from **hand-written GLSL ' +
+                        'shaders** on top of three.js.'
+                    ],
+                    links: ['Visit the site', 'Code on GitHub']
+                },
                 volumine: {
                     tagline: '3D charts you embed anywhere with a link',
                     highlights: [

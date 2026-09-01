@@ -47,15 +47,21 @@ export const PROJECTS = [
         ]
     },
     {
-        id: 'proximamente-3',
-        title: 'Próximamente',
-        tagline: 'Nuevo proyecto en construcción',
+        id: 'sql3d',
+        title: 'SQL → 3D ER',
+        tagline: 'Escribe una consulta SQL y se convierte en un diagrama entidad-relación en 3D',
         image: '/models/carts/page3.webp',
+        image2: '/models/carts/page3b.webp',
         highlights: [
-            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.',
-            'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.'
+            'La consulta se lee y se dibuja **mientras la escribes**: cada tabla es un nodo y cada JOIN un cable enrutado en ángulos rectos entre ellos.',
+            '**Dos parsers, no uno**: node-sql-parser resuelve en el navegador y, cuando un dialecto se le atraganta, cae a un servicio Python con sqlglot — asi el caso comun no paga una ida y vuelta al servidor.',
+            'Modo demo guiado que **hace crecer una consulta de e-commerce paso a paso**, de una sola tabla a seis JOINs y subconsultas, para que se vea el diagrama reaccionar.',
+            'Cables iluminados por particulas, bloom y viñeteado con **shaders GLSL propios** sobre three.js.'
         ],
-        stack: ['Lorem', 'Ipsum', 'Dolor'],
-        links: []
+        stack: ['Angular', 'TypeScript', 'Three.js', 'GLSL', 'd3-force-3d', 'FastAPI', 'Python', 'Vercel'],
+        links: [
+            { label: 'Ver la web', url: 'https://sql-prototype.vercel.app' },
+            { label: 'Código en GitHub', url: 'https://github.com/Sergiibut05/sql-prototype' }
+        ]
     }
 ]
