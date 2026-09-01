@@ -102,8 +102,14 @@ export default class Modal {
         this.hintsEl.innerHTML = ''
         if (device === 'touch') { this.hintsEl.style.display = 'none'; return }
         this.hintsEl.style.display = ''
-        this.hintsEl.appendChild(_hintRow(inputGlyph('confirm', device), 'Seleccionar'))
-        if (this.closable) this.hintsEl.appendChild(_hintRow(inputGlyph('back', device), 'Cerrar'))
+        // Only offer "select" when the panel HAS something selectable. A
+        // read-only panel (the games shelf, a results screen) was promising a
+        // key that does nothing. Rendered on every open, so it also picks up a
+        // language change without needing to subscribe to one.
+        if (this._focusables().length) {
+            this.hintsEl.appendChild(_hintRow(inputGlyph('confirm', device), t('modal.select')))
+        }
+        if (this.closable) this.hintsEl.appendChild(_hintRow(inputGlyph('back', device), t('modal.close')))
     }
 
     setTitle(text) { this.titleEl.textContent = text }

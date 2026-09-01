@@ -1,0 +1,114 @@
+/* ─── Games shelf: the Nintendo Switch on the shelf in the house interior ──
+   Three covers, the one being played in the middle and raised. Uses the
+   shared --fz-* tokens; art comes from gamesArt.js as inline SVG. */
+
+/*
+ * Three rows shared by all three cards (cover / title / meta) via subgrid, so
+ * the covers line up on one shelf edge however many lines a title wraps to.
+ * The first attempt bottom-aligned whole cards instead, which meant the one
+ * two-line title in the set shoved its cover a row-height upward.
+ *
+ * The middle card gets a wider TRACK rather than a transform: its cover is
+ * genuinely taller, so it rises above the shelf line on its own, and nothing
+ * about the raise depends on a scale factor that layout cannot see.
+ */
+.fz-games {
+    display: grid;
+    grid-template-columns: 1fr 1.14fr 1fr;
+    grid-template-rows: auto auto auto;
+    align-items: end;
+    gap: 12px;
+}
+
+.fz-game {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 9px;
+    min-width: 0;
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fz-game:hover { transform: translateY(-4px); }
+
+.fz-game-cover {
+    position: relative;
+    /* Shorter than the (taller) middle cover's row — sit on the shelf line
+       rather than floating in the middle of it. */
+    align-self: end;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--fz-radius-sm);
+    overflow: hidden;
+    box-shadow: var(--fz-shadow-soft);
+    /* Each cover's own dominant colour (set inline by GamesModal), so the card
+       is already the right shade while the image is in flight rather than
+       flashing paper-white and then going dark. */
+    background: var(--fz-game-tint, var(--fz-green-50));
+}
+
+.fz-game-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* The three box arts are 0.71-0.81 wide-to-tall; cover trims a couple of
+       percent off the odd one instead of letterboxing all three. */
+    object-fit: cover;
+}
+
+.fz-game--now .fz-game-cover {
+    box-shadow: var(--fz-shadow), 0 0 0 3px var(--fz-gold);
+}
+
+/* "Playing now" ribbon across the top of the middle cover. */
+.fz-game-badge {
+    position: absolute;
+    inset: 0 0 auto 0;
+    padding: 5px 8px;
+    font-family: var(--fz-font-title);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-transform: uppercase;
+    color: #3d2f00;
+    background: var(--fz-gold);
+}
+
+.fz-game-title {
+    font-family: var(--fz-font-title);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--fz-ink);
+}
+
+.fz-game-meta {
+    font-family: var(--fz-font-body);
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--fz-ink-soft);
+}
+
+/* Phones: the row would squeeze each cover to ~90px, so stack instead and
+   put the one being played first. */
+@media (max-width: 560px) {
+    /* One row per game instead — three covers across a phone would be ~90px
+       each. Subgrid is dropped with it: each card lays itself out now. */
+    .fz-games { grid-template-columns: 1fr; grid-template-rows: none; gap: 16px; }
+    .fz-game {
+        grid-row: auto;
+        grid-template-rows: none;
+        grid-template-columns: 84px 1fr;
+        align-items: center;
+        column-gap: 12px;
+        row-gap: 2px;
+    }
+    .fz-game:hover { transform: none; }
+    .fz-game--now { order: -1; }
+    .fz-game-cover { grid-row: span 2; align-self: center; }
+    .fz-game-badge { font-size: 10px; padding: 3px 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-game { transition: none; }
+}

@@ -7,19 +7,59 @@ import { dayNightTint } from './DayNight.js'
 import ProjectModal from './ui/ProjectModal.js'
 
 /**
- * How a cart's picture reacts to you walking up to it.
+ * How much brighter a cart's picture goes once you are in range of it.
  *
- * NOT a plain multiply. These textures are screenshots of web pages, so most
- * of every one of them is near-white — multiplying just clips the whites and
- * washes the page out instead of lighting it up. Instead the day/night tint is
- * blended toward LIT_TINT, which means the screen "switches on" to its own
- * authored colour: bounded by construction, so it can never blow out, and
- * strongest exactly at dusk and at night when the tint is dimming it most.
- * The small overshoot past 1 is what keeps it visible in broad daylight too.
+ * A ceiling, not a fixed amount — see headroomLift(). Applied to the day/night
+ * tint rather than to the texture, so it grades the picture without ever
+ * touching alpha, and so it reads strongest at dusk and at night when that
+ * tint is what was dimming the page in the first place.
  */
-const LIT_TINT = 1.14
+const LIFT_GAIN = 0.14
+
+/**
+ * Never spend more than this share of a picture's REMAINING headroom.
+ *
+ * The three pages are screenshots of very different websites: page2 averages
+ * 231/255 (an almost entirely white page), page1 189, page3 36. A flat +14% is
+ * comfortable on the first and the last and blows page2 straight past white —
+ * which is exactly what it looked like: one cart flaring while the other two
+ * sat right. Capping by headroom leaves the dark pages untouched and only
+ * bites on the bright ones, so it self-corrects when a screenshot is
+ * re-exported instead of needing a per-cart number kept in sync by hand.
+ */
+const HEADROOM_SHARE = 0.8
+
 /** Approach speed of that lighting-up, per second. */
 const LIFT_LERP = 7
+
+/**
+ * The lift `map` can take without clipping, as a 0..LIFT_GAIN amount.
+ *
+ * Measured from the decoded image itself, once, at 8×8 — 256 pixels is
+ * plenty for a mean and costs a single readback on a texture that has just
+ * been downloaded anyway. Falls back to the full gain if the image cannot be
+ * read back (a tainted canvas, or a compressed format with no decoded pixels),
+ * which is the pre-existing behaviour rather than a new failure mode.
+ */
+function headroomLift(map) {
+    const image = map?.image
+    if (!image || typeof document === 'undefined') return LIFT_GAIN
+    try {
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = 8
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(image, 0, 0, 8, 8)
+        const d = ctx.getImageData(0, 0, 8, 8).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) {
+            sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+        }
+        const mean = sum / (d.length / 4) / 255
+        return Math.min(LIFT_GAIN, HEADROOM_SHARE * (1 - mean))
+    } catch {
+        return LIFT_GAIN
+    }
+}
 
 /**
  * ProjectCarts — the three project stands in the west play area.
@@ -115,11 +155,12 @@ export default class ProjectCarts {
             // `lift` is 0..1 and rides ON the day/night tint, so it never
             // touches alpha — and it stays a uniform, so lighting up costs no
             // shader rebuild and no second material, just one float a frame.
+            // How FAR 1 reaches is per-page, measured from the picture.
             const map = r[PAGE_SOURCES[index]]
             const lift = uniform(0)
             const mat = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide })
             if (map) {
-                const litTint = mix(dayNightTint, vec3(LIT_TINT), lift)
+                const litTint = mix(dayNightTint, vec3(1 + headroomLift(map)), lift)
                 mat.colorNode = texture(map, uv()).mul(vec4(litTint, 1.0))
             } else mat.colorNode = vec4(0.92, 0.94, 0.95, 1.0)
             plane.material?.dispose?.()

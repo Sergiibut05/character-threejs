@@ -300,6 +300,11 @@ export default {
             education: 'Educación'
         },
 
+        modal: {
+            select: 'Seleccionar',
+            close: 'Cerrar'
+        },
+
         project: {
             close: 'Cerrar',
             badge: 'Proyecto',
@@ -308,6 +313,25 @@ export default {
             stack: 'Stack'
         },
 
+        games: {
+            title: 'Mi estantería',
+            now: 'Jugando ahora',
+            coverAlt: 'Carátula de {title}',
+            items: {
+                zelda: {
+                    title: 'The Legend of Zelda: Breath of the Wild',
+                    note: 'Favorito · Nintendo Switch'
+                },
+                persona: {
+                    title: 'Persona 3 Reload',
+                    note: 'Lo que estoy jugando estos días'
+                },
+                rdr2: {
+                    title: 'Red Dead Redemption 2',
+                    note: 'Favorito · Rockstar Games'
+                }
+            }
+        },
         trophy: {
             title: 'Certificados',
             viewCredential: 'Ver certificado: {title}'

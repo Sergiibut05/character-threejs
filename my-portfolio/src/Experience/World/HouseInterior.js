@@ -4,10 +4,27 @@ import Experience from '../Experience.js'
 import StaticPiece from './scene/StaticPiece.js'
 import TrophyModal from './ui/TrophyModal.js'
 import ComputerModal from './ui/ComputerModal.js'
+import GamesModal from './ui/GamesModal.js'
 import { propShadowTint, propCoreLit0, propCoreLit1 } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 
 const _white = new THREE.Vector3(1, 1, 1)
+const _flat = new THREE.Vector3()
+
+/**
+ * How far apart two points are ON THE FLOOR, ignoring height.
+ *
+ * Prop proximity used the full 3D distance, which quietly made every radius
+ * mean something different depending on how high the prop sat: the character's
+ * origin rides about 0.9 above the floor, so a worktop toaster at y=0.88 spent
+ * ~0.1 of its radius on height and the Switch at y=0.45 spent ~0.98 of it —
+ * enough that a 0.9 radius could never trigger at all, however close you stood.
+ * Measuring on the floor plane makes a radius mean "how close you are standing",
+ * which is what it was always being tuned as.
+ */
+function floorDistance(a, b) {
+    return _flat.set(a.x - b.x, 0, a.z - b.z).length()
+}
 
 /**
  * HouseInterior — the Animal-Crossing style house interior.
@@ -86,10 +103,13 @@ export default class HouseInterior {
         this.uLampGlowStrength = uniform(1.4)
         this.lamp = null
 
-        // Profile props (trophy → certificates, computer → about/exp/BTS).
+        // Profile props (trophy → certificates, computer → about/exp/BTS,
+        // Switch → games shelf, toaster → toast pop).
         this._props = []            // generic proximity/hover interactives
         this.trophyModal = null     // lazy
         this.computerModal = null   // lazy
+        this.gamesModal = null      // lazy
+        this.toast = null           // toaster pop state (see _popToast)
 
         // Interior background — pastel-brown radial gradient, lightening toward
         // the screen centre (AC interior look). Built as a viewport-space TSL
@@ -149,6 +169,7 @@ export default class HouseInterior {
             }
 
             this._setupLamp()
+            this._setupInteriorProps()
         }
 
         // Special objects keep their own baked materials (converted to the
@@ -269,6 +290,126 @@ export default class HouseInterior {
         }
     }
 
+    // ─── Interior props: toaster (toast pop) + Switch (games shelf) ─────
+
+    /** Height of the toast pop, in world units. */
+    static POP_HEIGHT = 0.11
+    /** Fall acceleration. Higher = snappier, less floaty. */
+    static POP_GRAVITY = 9.0
+    /** How much of its speed a slice keeps on the one bounce it gets. */
+    static POP_BOUNCE = 0.26
+    /** The second slice lags the first by this, so the pair is not robotic. */
+    static POP_STAGGER = 0.055
+
+    /**
+     * The toaster and the Nintendo Switch, both from interior.glb.
+     *
+     * Radii are small on purpose — these sit on a worktop beside each other
+     * and the lamp, and an over-generous radius means two things glow at once
+     * and Enter fires whichever the loop happens to reach first.
+     */
+    _setupInteriorProps() {
+        const root = this.piece?.root
+        if (!root || this._interiorPropsSetup) return
+        this._interiorPropsSetup = true
+        root.updateMatrixWorld(true)
+
+        const meshesOf = (name) => {
+            const out = []
+            root.getObjectByName(name)?.traverse((c) => { if (c.isMesh) out.push(c) })
+            return out.length ? out : null
+        }
+
+        // Toaster: the two slices are separate top-level nodes, so the pop is
+        // a plain local-Y offset on each — no rig, no animation clip. Their
+        // authored Y is the rest position and every frame returns to exactly
+        // that, so a pop interrupted half way cannot leave them drifting.
+        const toasterMeshes = meshesOf('toaster')
+        const slices = ['toast1', 'toast2']
+            .map((n) => root.getObjectByName(n))
+            .filter(Boolean)
+        if (toasterMeshes && slices.length) {
+            this.toast = {
+                playing: false,
+                slices: slices.map((node, i) => ({
+                    node,
+                    baseY: node.position.y,
+                    v: 0,
+                    t: 0,
+                    delay: i * HouseInterior.POP_STAGGER,
+                    bounced: false
+                }))
+            }
+            this._toasterProp = this._makeProp(toasterMeshes, 1.0, () => this._popToast())
+        } else console.warn('HouseInterior: toaster/toast meshes not found')
+
+        // The console on the shelf is a Nintendo Switch — hence a games panel
+        // rather than the light switch the node name suggests.
+        const switchMeshes = meshesOf('switch')
+        if (switchMeshes) this._makeProp(switchMeshes, 0.9, () => this._openGames())
+        else console.warn('HouseInterior: switch meshes not found')
+    }
+
+    /** Launch both slices. Ignored while a pop is already in the air. */
+    _popToast() {
+        const toast = this.toast
+        if (!toast || toast.playing) return
+        toast.playing = true
+
+        // v0 derived from the height we actually want, so POP_HEIGHT alone
+        // changes how far they go and POP_GRAVITY alone how snappy it feels.
+        const v0 = Math.sqrt(2 * HouseInterior.POP_GRAVITY * HouseInterior.POP_HEIGHT)
+        for (const s of toast.slices) {
+            s.node.position.y = s.baseY
+            s.v = v0
+            s.t = -s.delay
+            s.bounced = false
+        }
+
+        // The outline goes out for the whole pop, as asked: it is the prompt
+        // that says "there is something to do here", and leaving it lit while
+        // the thing is visibly doing it reads as if the press had missed.
+        if (this._toasterProp) {
+            this._toasterProp.suppressed = true
+            this._refreshPropHighlight(this._toasterProp)
+        }
+        this.experience.audio?.playSfx?.('ui')
+    }
+
+    /** Ballistic integration for the slices in flight. No-op when idle. */
+    _updateToast(dt) {
+        const toast = this.toast
+        if (!toast?.playing) return
+
+        let moving = false
+        for (const s of toast.slices) {
+            s.t += dt
+            if (s.t < 0) { moving = true; continue }   // still waiting its turn
+
+            s.v -= HouseInterior.POP_GRAVITY * dt
+            let y = s.node.position.y + s.v * dt
+            if (y <= s.baseY) {
+                y = s.baseY
+                // One bounce, then dead: a real slice rattles once in the slot
+                // and stops, while an endless damped bounce reads as a bug.
+                if (!s.bounced && s.v < 0) {
+                    s.v = -s.v * HouseInterior.POP_BOUNCE
+                    s.bounced = true
+                } else s.v = 0
+            }
+            s.node.position.y = y
+            if (y > s.baseY || s.v > 0) moving = true
+        }
+
+        if (moving) return
+        toast.playing = false
+        for (const s of toast.slices) s.node.position.y = s.baseY
+        if (this._toasterProp) {
+            this._toasterProp.suppressed = false
+            this._refreshPropHighlight(this._toasterProp)
+        }
+    }
+
     // ─── Profile props: trophy (certificates) + computer (about) ─────────
 
     /**
@@ -300,9 +441,12 @@ export default class HouseInterior {
         const trophyMeshes = byName('trophy') || byNodeRegex(/^Plane018/)
         const computerMeshes = byName('computer') || byNodeRegex(/^Mesh001($|_)/)
 
-        if (trophyMeshes) this._makeProp(trophyMeshes, 1.3, () => this._openTrophy())
+        // 1.0 / 1.15 are the 1.3 / 1.4 these had as 3D radii, converted: at
+        // the height each one sits, that is the floor reach they already had,
+        // so switching to floorDistance leaves them feeling identical.
+        if (trophyMeshes) this._makeProp(trophyMeshes, 1.0, () => this._openTrophy())
         else console.warn('HouseInterior: trophy meshes not found')
-        if (computerMeshes) this._makeProp(computerMeshes, 1.4, () => this._openComputer())
+        if (computerMeshes) this._makeProp(computerMeshes, 1.15, () => this._openComputer())
         else console.warn('HouseInterior: computer meshes not found')
     }
 
@@ -358,7 +502,9 @@ export default class HouseInterior {
     }
 
     _refreshPropHighlight(rec) {
-        const should = this.isInside && (rec.isHovered || rec.isNear)
+        // `suppressed` is how a prop drops its own outline while it is busy
+        // doing the thing you just asked it for (see _popToast).
+        const should = this.isInside && !rec.suppressed && (rec.isHovered || rec.isNear)
         if (should === rec.isHighlighted) return
         rec.isHighlighted = should
         for (const m of rec.meshes) {
@@ -374,6 +520,15 @@ export default class HouseInterior {
         }
         this._lockForModal()
         this.trophyModal.open()
+    }
+
+    _openGames() {
+        if (!this.gamesModal) {
+            this.gamesModal = new GamesModal()
+            this.gamesModal.onClose(() => this._onProfileModalClosed())
+        }
+        this._lockForModal()
+        this.gamesModal.open()
     }
 
     _openComputer() {
@@ -610,6 +765,10 @@ export default class HouseInterior {
     update() {
         if (!this.ready) return
 
+        // Outside the isInside branch on purpose: a pop already in the air
+        // still has to land if you walk out of the house mid-toast.
+        this._updateToast(Math.min(0.05, (this.experience.time?.delta || 16) * 0.001))
+
         const character = this.experience.world?.character
         if (character && this.isInside) {
             const near = this.position.distanceTo(character.position) < this.proximityRadius
@@ -621,7 +780,7 @@ export default class HouseInterior {
             }
 
             for (const rec of this._props) {
-                const near = rec.position.distanceTo(character.position) < rec.proximityRadius
+                const near = floorDistance(rec.position, character.position) < rec.proximityRadius
                 if (near !== rec.isNear) { rec.isNear = near; this._refreshPropHighlight(rec) }
             }
 
@@ -687,6 +846,7 @@ export default class HouseInterior {
         if (this._onSourceLoaded) this.resources.off('sourceLoaded', this._onSourceLoaded)
         this.trophyModal?.destroy?.()
         this.computerModal?.destroy?.()
+        this.gamesModal?.destroy?.()
         this.piece?.dispose?.()
         this.specialPiece?.dispose?.()
     }
