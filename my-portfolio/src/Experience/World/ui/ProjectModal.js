@@ -151,12 +151,16 @@ export default class ProjectModal {
                 const b = _el('button', `fz-proj-thumb${i === 0 ? ' is-active' : ''}`)
                 b.type = 'button'
                 b.setAttribute('aria-label', t('project.screenshot', { n: i + 1 }))
-                const t = _el('img')
-                t.src = src
-                t.alt = ''
-                t.draggable = false
-                t.loading = 'lazy'
-                b.appendChild(t)
+                // `img`, not `t`: this file imports t() for translation, and a
+                // local const of the same name put the call one line above
+                // inside its temporal dead zone — every cart with a second
+                // capture threw instead of opening.
+                const img = _el('img')
+                img.src = src
+                img.alt = ''
+                img.draggable = false
+                img.loading = 'lazy'
+                b.appendChild(img)
                 b.addEventListener('click', () => {
                     if (img.getAttribute('src') === src) return
                     img.style.opacity = '0'

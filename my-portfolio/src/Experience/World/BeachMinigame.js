@@ -717,11 +717,14 @@ export default class BeachMinigame {
 
     _hit(dx, character) {
         this.experience.audio?.playSfx?.('ballHit')
-        const t = THREE.MathUtils.clamp(dx / this.hitRadius, -1, 1)
-        const centred = 1 - Math.abs(t)
+        // `offset`, not `t`: this file imports t() for translation, and the
+        // call-out below is in this same scope — a local `t` holding a number
+        // turned it into "t is not a function" on every well-centred touch.
+        const offset = THREE.MathUtils.clamp(dx / this.hitRadius, -1, 1)
+        const centred = 1 - Math.abs(offset)
 
         this._ballVel.y = this.bounceSpeed
-        this._ballVel.x = t * this.lateralSpeed * this._spreadMul
+        this._ballVel.x = offset * this.lateralSpeed * this._spreadMul
         this._cooldown = this.hitCooldown
 
         this.touches++
