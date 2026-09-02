@@ -71,6 +71,28 @@ export default class Camera {
         this._returnT = 0
         this._returnDur = 1
 
+        // ── Free-roam zoom (wheel / pinch) ──
+        //
+        // A SCALE on cameraOffset, not a separate distance: the camera dollies
+        // along the line it already sits on, so the framing angle never
+        // changes and there is no second pose to keep in sync with the first.
+        //
+        // 1 is the shipped framing and also the CEILING — the world is
+        // composed at that distance, and letting players pull further out
+        // shows the edges of it. So the wheel only ever brings you closer, and
+        // not by much: minZoom 0.72 is about a quarter of the way in, enough to
+        // get a proper look at the character without leaving the shot the game
+        // was built around.
+        this.zoom = 1
+        this.zoomTarget = 1
+        this.minZoom = 0.72
+        this.zoomLerp = 0.14
+        this.wheelZoomStep = 0.0012   // per unit of wheel deltaY (~0.12 a notch)
+        this.pinchZoomGain = 0.9
+        this._pinchStart = 0
+        this._pinchZoom = 1
+        this._setupZoomInput()
+
         if (this.debug.active) {
             this.setDebug()
         }
@@ -103,6 +125,52 @@ export default class Camera {
      * smoothing speed is identical at 30, 60 or 120 fps (fixed per-frame
      * factors smooth twice as hard at 120 Hz and half at 30 → jitter).
      */
+    /**
+     * Wheel on desktop, two fingers on a phone. Bound to the CANVAS rather than
+     * the window on purpose: a wheel over an open modal has to scroll that
+     * modal, and a canvas listener simply never sees those events.
+     */
+    _setupZoomInput() {
+        const canvas = this.canvas
+        if (!canvas) return
+
+        // Follow mode only. Every other mode is a composed shot — an aim view,
+        // a cinematic, the beach framing — and none of them are the player's to
+        // reframe.
+        const canZoom = () => this.mode === 'follow'
+        const clampZoom = (v) => THREE.MathUtils.clamp(v, this.minZoom, 1)
+        const spread = (t) => Math.hypot(
+            t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+
+        this._onWheel = (e) => {
+            if (!canZoom()) return
+            e.preventDefault()
+            // deltaY < 0 is a scroll up, which everywhere else means "closer".
+            this.zoomTarget = clampZoom(this.zoomTarget + e.deltaY * this.wheelZoomStep)
+        }
+        canvas.addEventListener('wheel', this._onWheel, { passive: false })
+
+        this._onTouchStart = (e) => {
+            if (e.touches.length !== 2 || !canZoom()) { this._pinchStart = 0; return }
+            this._pinchStart = spread(e.touches)
+            this._pinchZoom = this.zoomTarget
+        }
+        this._onTouchMove = (e) => {
+            if (!this._pinchStart || e.touches.length !== 2 || !canZoom()) return
+            e.preventDefault()
+            // Fingers apart = ratio above 1 = the camera comes in, which is why
+            // the ratio DIVIDES: zoom is a distance scale, not a magnification.
+            const ratio = spread(e.touches) / this._pinchStart
+            this.zoomTarget = clampZoom(this._pinchZoom / Math.pow(ratio, this.pinchZoomGain))
+        }
+        this._onTouchEnd = (e) => { if (e.touches.length < 2) this._pinchStart = 0 }
+
+        canvas.addEventListener('touchstart', this._onTouchStart, { passive: true })
+        canvas.addEventListener('touchmove', this._onTouchMove, { passive: false })
+        canvas.addEventListener('touchend', this._onTouchEnd, { passive: true })
+        canvas.addEventListener('touchcancel', this._onTouchEnd, { passive: true })
+    }
+
     _alpha(f) {
         const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
         return 1 - Math.pow(1 - f, dt * 60)
@@ -158,9 +226,12 @@ export default class Camera {
 
         if (this.experience.world.character) {
             const characterPosition = this.experience.world.character.position
+            // Ease the zoom here rather than on input, so a wheel notch glides
+            // in instead of stepping.
+            this.zoom += (this.zoomTarget - this.zoom) * this._alpha(this.zoomLerp)
             const desiredPosition = this._scratchPos
                 .copy(characterPosition)
-                .add(this.cameraOffset)
+                .addScaledVector(this.cameraOffset, this.zoom)
 
             // Handing back from a focused view: ease in from a gentle factor to
             // the normal one. Follow is deliberately snappy (0.78 on mobile) so
@@ -388,11 +459,15 @@ export default class Camera {
         const target = c.position.clone()
         const dog = world.frisbeeMinigame?.dog
         if (dog?.container?.visible) target.lerp(dog.position, 0.4)
-        target.y += 0.8
+        target.y += 0.66   // look at the pair's chests, not over their heads
 
-        const frontDist = 5.5
-        const height = 1.0 // low, near eye level
-        const side = 3.8
+        // Closer and lower than the first pass: at 5.5 back and 1.0 up the
+        // shot read as "here is a field", and the pair it is actually
+        // introducing sat small in the middle of it. Down at eye level and in
+        // close, the same move reads as "here are you and your dog".
+        const frontDist = 4.2
+        const height = 0.6 // just under eye level
+        const side = 2.9
         const startPos = target.clone().addScaledVector(fwd, frontDist).addScaledVector(right, side)
         startPos.y += height
         const endPos = target.clone().addScaledVector(fwd, frontDist).addScaledVector(right, -side)
@@ -469,7 +544,10 @@ export default class Camera {
             if (this.experience.world?.character) {
                 const cp = this.experience.world.character.position
                 this.smoothLookAt.copy(cp)
-                this.smoothPosition.copy(cp).add(this.cameraOffset)
+                // Land on the zoom the player chose, not on the eased value
+                // left over from wherever the camera was before.
+                this.zoom = this.zoomTarget
+                this.smoothPosition.copy(cp).addScaledVector(this.cameraOffset, this.zoom)
             }
         }
 
