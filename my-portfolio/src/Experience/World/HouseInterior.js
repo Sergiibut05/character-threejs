@@ -650,10 +650,9 @@ export default class HouseInterior {
 
             await this._irisClose()
 
-            this._setInsideMode(false)
             const s = this._outsideSpawn
-            character.teleportTo(s.x, s.y, s.z, s.yaw)
-            this._applyInteriorLighting(false)
+            this.leaveInteriorAround(
+                () => character.teleportTo(s.x, s.y, s.z, s.yaw))
             this.experience.camera.setMode('follow')
 
             await this.experience.waitMs(200)
@@ -664,6 +663,39 @@ export default class HouseInterior {
             return true
         }
         return false
+    }
+
+    /**
+     * Take the world back out of interior mode, around a move of your choosing.
+     *
+     * Everything entering the house changes lives here rather than in exit():
+     * the sky sphere and the brown background, the instanced grass/flowers/
+     * fireflies, the frozen day-night cycle and its warm grade, the outlines,
+     * and `isInside` itself — which the audio also reads. exit() is only that
+     * list plus an iris wipe and a walk back to the door.
+     *
+     * Anything else that moves you out of the house has to run the same list,
+     * and the map's fast travel did not: travelling to the beach from inside
+     * left you on the sand under a brown sky, with no grass, no fireflies, the
+     * interior's warm light frozen on the world and the day/night cycle stopped
+     * for the rest of the session. It could not have known — nothing said so.
+     *
+     * The move is a CALLBACK because the order is not free: the lighting
+     * restore recenters the shadow camera on wherever the character now is, so
+     * it has to run after the move, while the mode flip has to run before it.
+     * Taking the move as an argument is what stops the next caller getting that
+     * wrong; passing it a move while already outside just runs the move.
+     *
+     * @param {() => void} move  puts the character wherever it is going
+     * @returns {boolean} whether we were actually inside
+     */
+    leaveInteriorAround(move) {
+        if (!this.isInside) { move?.(); return false }
+        this._setInsideMode(false)
+        move?.()
+        this._applyInteriorLighting(false)
+        this._outsideSpawn = null
+        return true
     }
 
     async _irisClose() {

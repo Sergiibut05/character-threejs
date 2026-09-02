@@ -535,6 +535,27 @@ export default class SitPoints {
     }
 
     /**
+     * Leave the seat immediately, with none of the standing-up move.
+     *
+     * _stand() eases you off the seat over EXIT_TIME by writing the character's
+     * position every frame — which would fight, and win against, anything that
+     * teleports you somewhere else in the meantime. Fast travel is exactly that
+     * case: taking the map from the sofa used to drop you on the beach still
+     * sat down, with `active` pointing at a seat 800 units away, and a seat
+     * still held is a seat that owns the interact key (see seated.js), so
+     * nothing in the world would answer until you pressed Enter.
+     *
+     * @returns {boolean} whether we were actually sat on something
+     */
+    forceStand() {
+        if (!this.active) return false
+        this.active = null
+        this._exit = null   // cancel any slide already in flight
+        this.experience.world?.character?.setSitting(false)
+        return true
+    }
+
+    /**
      * Get up — as a short move, not a jump cut.
      *
      * Standing used to write the exit position in one frame, which teleported the

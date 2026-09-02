@@ -224,7 +224,21 @@ export default class WorldMap {
             await this.experience.animateValue(1.35, 0.0, 600,
                 (value) => renderer.setIrisTransitionSize(value))
 
-            character.teleportTo(dest.x, dest.y, dest.z, dest.yaw)
+            // Get out of whatever you are in FIRST. Fast travel is a second
+            // way out of the house and off a seat, and both of those are
+            // states with their own teardown — skipping it left the world
+            // wearing the interior's sky and light, or left you sitting on
+            // nothing. Both no-op when they do not apply.
+            const world = this.experience.world
+            world?.sitPoints?.forceStand?.()
+
+            // leaveInteriorAround runs the move itself either way, so this is
+            // NOT `if (!leave(move)) move()` — that teleports twice outdoors.
+            const move = () => character.teleportTo(dest.x, dest.y, dest.z, dest.yaw)
+            const house = world?.houseInterior
+            if (house) house.leaveInteriorAround(move)
+            else move()
+
             // Snap rather than let the follow camera lerp: without this it
             // sails across the whole world to catch up once the iris opens.
             this.experience.camera.setMode('follow')
