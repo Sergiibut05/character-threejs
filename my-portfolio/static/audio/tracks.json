@@ -1,15 +1,5 @@
 [
   {
-    "id": "a-quiet-day-in-the-mushroom",
-    "title": "A Quiet Day in the Mushroom",
-    "src": [
-      "/audio/tracks/a-quiet-day-in-the-mushroom.webm",
-      "/audio/tracks/a-quiet-day-in-the-mushroom.m4a"
-    ],
-    "cover": "/audio/covers/a-quiet-day-in-the-mushroom.jpg",
-    "duration": 207
-  },
-  {
     "id": "mossy-market-walk",
     "title": "Mossy Market Walk",
     "src": [
@@ -18,6 +8,16 @@
     ],
     "cover": "/audio/covers/mossy-market-walk.jpg",
     "duration": 220
+  },
+  {
+    "id": "a-quiet-day-in-the-mushroom",
+    "title": "A Quiet Day in the Mushroom",
+    "src": [
+      "/audio/tracks/a-quiet-day-in-the-mushroom.webm",
+      "/audio/tracks/a-quiet-day-in-the-mushroom.m4a"
+    ],
+    "cover": "/audio/covers/a-quiet-day-in-the-mushroom.jpg",
+    "duration": 207
   },
   {
     "id": "pinecone-hour",
