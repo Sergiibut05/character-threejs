@@ -1,6 +1,16 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 
+/**
+ * Opening spawn, on the dirt in front of the house.
+ *
+ * Nudged right of the world origin rather than sitting on it — a small
+ * framing choice, and one line to re-tune.
+ */
+const SPAWN_X = 1.2
+const SPAWN_Z = 0
+
+
 // Seated leg pose, in radians, added on top of the idle clip.
 //
 // Measured against the rig rather than guessed, because this character is chibi
@@ -43,8 +53,14 @@ export default class Character {
         // Small lift above the capsule bottom so feet aren’t clipped by the terrain shader.
         this.spawnOffsetY = 0.32
 
-        // Position & velocity
-        this.position = new THREE.Vector3(0, this.capsuleCenterY + this.spawnOffsetY, 0)
+        // Where you are standing when the world opens.
+        //
+        // Screen-right is +X here: the follow camera sits at character + (0,
+        // 2.5, 7) looking back down −Z with +Y up, so its right vector is +X —
+        // which is also why the joystick's own mapping a few hundred lines down
+        // reads `dir.x += stick.x` with no camera basis to rotate through.
+        this.position = new THREE.Vector3(
+            SPAWN_X, this.capsuleCenterY + this.spawnOffsetY, SPAWN_Z)
         this.previousPosition = this.position.clone()
         this.gravity = -9.81
         this.verticalVelocity = 0

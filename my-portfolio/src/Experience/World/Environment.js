@@ -103,9 +103,19 @@ export default class Environment {
         this.scene = this.experience.scene
         this.debug = this.experience.debug
 
-        // Day/night cycle state
+        // Day/night cycle state.
+        //
+        // 47 s for a whole day AND night meant every phase went by in seconds:
+        // sunset is about 0.17 of the cycle, so the golden hour lasted eight of
+        // them. Six minutes gives each phase a minute or two to sit in, while
+        // still being short enough that someone who only wanders around for two
+        // minutes watches the light move.
+        //
+        // Everything downstream keys off `timeOfDay` (0..1), not off seconds,
+        // so changing this stretches the whole cycle evenly — lamps, tints and
+        // the sky all keep the points they were tuned at.
         this.timeOfDay = 0.5
-        this.cycle = { enabled: true, durationSec: 47 }
+        this.cycle = { enabled: true, durationSec: 360 }
 
         // Tunable params (exposed in the GUI)
         this.params = {
