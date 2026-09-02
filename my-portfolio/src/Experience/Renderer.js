@@ -8,6 +8,28 @@ import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import Experience from './Experience.js'
 
+/**
+ * Layer for additive effects that must NOT act as outline occluders.
+ *
+ * OutlineNode works out which parts of an outlined object are hidden by
+ * rendering the rest of the scene into a depth buffer — with
+ * `scene.overrideMaterial`, which REPLACES every object's material. An
+ * override ignores the per-object flags that make an effect an effect, so a
+ * transparent additive billboard with depthWrite: false comes out of that pass
+ * as a solid, depth-writing disc.
+ *
+ * That is what ate the standing lamp's outline: its halo is a 0.70-wide circle
+ * over a 0.48-wide lamp, so with the light on the "occluder" covered the lamp's
+ * own silhouette and the pass erased the edge underneath it. With the light off
+ * the halo is not visible and the outline was perfect — which is exactly how it
+ * looked from the outside.
+ *
+ * Anything put on this layer is drawn by the scene as usual and skipped by the
+ * outline camera, so it can never be mistaken for something solid in front.
+ */
+export const FX_NO_OCCLUDE_LAYER = 1
+
+
 export default class Renderer {
     constructor() {
         this.experience = new Experience()
@@ -19,7 +41,8 @@ export default class Renderer {
 
         this.selectedObjects = []
 
-        // Outline tuning (see _buildPostProcessingPipeline). Uniform-driven so
+        
+// Outline tuning (see _buildPostProcessingPipeline). Uniform-driven so
         // the debug GUI adjusts them live without rebuilding the pipeline.
         this.uEdgeThickness = uniform(2.4)
         this.uEdgeSuppress = uniform(1.6)
@@ -93,7 +116,14 @@ export default class Renderer {
         const visibleEdgeColor = uniform(new THREE.Color('#ffffff'))
         const edgeStrength = float(2.0)
 
-        const outlinePass = outline(this.scene, this.camera.instance, {
+        // A stand-in camera that tracks the real one but cannot see
+        // FX_NO_OCCLUDE_LAYER. The outline pass gets this one; every other pass
+        // keeps the real camera, so the effects still render normally.
+        this.camera.instance.layers.enable(FX_NO_OCCLUDE_LAYER)
+        this._outlineCamera = this.camera.instance.clone()
+        this._syncOutlineCamera()
+
+        const outlinePass = outline(this.scene, this._outlineCamera, {
             selectedObjects: this.selectedObjects,
             edgeThickness: this.uEdgeThickness,
             edgeGlow: float(0.15)
@@ -140,6 +170,32 @@ export default class Renderer {
         this.renderPipeline.outputNode = finalOutput
     }
 
+    /**
+     * Keep the outline's stand-in camera on top of the real one.
+     *
+     * Cheap enough to do unconditionally: a handful of copies and one matrix
+     * per frame. Doing it lazily on camera movement would need change tracking
+     * for something that moves nearly every frame anyway.
+     */
+    _syncOutlineCamera() {
+        const src = this.camera.instance
+        const oc = this._outlineCamera
+        if (!oc) return
+        oc.position.copy(src.position)
+        oc.quaternion.copy(src.quaternion)
+        oc.scale.copy(src.scale)
+        oc.fov = src.fov
+        oc.aspect = src.aspect
+        oc.near = src.near
+        oc.far = src.far
+        oc.zoom = src.zoom
+        // Follow whatever the real camera can see, minus the effects layer.
+        oc.layers.mask = src.layers.mask
+        oc.layers.disable(FX_NO_OCCLUDE_LAYER)
+        oc.updateProjectionMatrix()
+        oc.updateMatrixWorld(true)
+    }
+
     setIrisTransitionEnabled(enabled) {
         if (this.irisEnabled) this.irisEnabled.value = enabled ? 1.0 : 0.0
     }
@@ -171,6 +227,7 @@ export default class Renderer {
     }
 
     update() {
+        this._syncOutlineCamera()
         if (this.renderPipeline) {
             this.renderPipeline.render()
         }

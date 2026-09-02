@@ -770,7 +770,8 @@ export default class Overview {
             this._dogIo = new IntersectionObserver((entries) => {
                 this._dogVisible = entries.some((e) => e.isIntersecting)
                 this._syncDog()
-            }, { root: this.el, rootMargin: '120px' })
+                // Viewport root, for the same reason as _observeReveals().
+            }, { rootMargin: '120px' })
         } else {
             this._dogIo.disconnect()
         }
@@ -853,7 +854,16 @@ export default class Overview {
                 e.target.classList.add('is-in')
                 this._io.unobserve(e.target)
             }
-        }, { root: this.el, rootMargin: '0px 0px -12% 0px', threshold: 0.08 })
+            // Viewport root (`root: null`), NOT .ov-root. This used to name the
+            // element because the element WAS the scroller; now that the page
+            // scrolls, .ov-root's box spans the whole document and never moves,
+            // so the root rectangle never moves either. Everything above the
+            // bottom margin counted as visible the instant it was observed —
+            // the whole page revealed at once instead of as you scrolled — and
+            // the -12% cut off the last ~1080px of a 9000px phone layout, which
+            // is exactly where the closing section lives: it could never
+            // intersect, so it sat at opacity 0 for good.
+        }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 })
 
         this.main.querySelectorAll('.ov-section, .ov-reveal').forEach((n) => {
             if (!n.classList.contains('is-in')) this._io.observe(n)

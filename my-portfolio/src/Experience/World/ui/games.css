@@ -27,6 +27,8 @@
     grid-template-rows: subgrid;
     row-gap: 9px;
     min-width: 0;
+    /* The badge is positioned against the card (see GamesModal). */
+    position: relative;
     transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -75,7 +77,9 @@
 .fz-game--now .fz-game-cover img { border-radius: var(--fz-radius-sm); }
 
 /* "Playing now" ribbon across the top of the middle cover, tucked inside the
-   mat so the two read as one frame rather than two stacked bars. */
+   mat so the two read as one frame rather than two stacked bars. The cover is
+   the card's first row and starts at its top edge, so insetting by the mat
+   from the CARD lands it exactly inside the frame. */
 .fz-game-badge {
     position: absolute;
     inset: var(--fz-game-mat) var(--fz-game-mat) auto;
@@ -102,21 +106,56 @@
 
 /* Phones: the row would squeeze each cover to ~90px, so stack instead and
    put the one being played first. */
+/*
+ * Phone: one row per game. Three covers across a 350px panel would be ~100px
+ * each, too small to read as box art — and a shelf of three is a wide-screen
+ * idea anyway. A list is the phone's own shape, so it separates its rows the
+ * way the certificate list does rather than inventing a second style.
+ *
+ * Subgrid goes with the shelf: each card lays itself out from here.
+ */
 @media (max-width: 560px) {
-    /* One row per game instead — three covers across a phone would be ~90px
-       each. Subgrid is dropped with it: each card lays itself out now. */
-    .fz-games { grid-template-columns: 1fr; grid-template-rows: none; gap: 16px; }
+    .fz-games { grid-template-columns: 1fr; grid-template-rows: none; gap: 14px; }
+
     .fz-game {
         grid-row: auto;
-        grid-template-rows: none;
-        grid-template-columns: 84px 1fr;
-        align-items: center;
-        column-gap: 12px;
+        grid-template-columns: 78px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-content: center;
+        column-gap: 14px;
+        row-gap: 7px;
     }
+
+    .fz-game + .fz-game {
+        border-top: 1.5px dashed var(--fz-green-100);
+        padding-top: 14px;
+    }
+
     .fz-game:hover { transform: none; }
     .fz-game--now { order: -1; }
-    .fz-game-cover { align-self: center; }
-    .fz-game-badge { font-size: 10px; padding: 3px 6px; }
+
+    .fz-game-cover { grid-row: 1 / span 2; align-self: center; }
+
+    /* With no badge under it the title has the whole column, so centre it
+       against the cover instead of leaving it hanging at the top. */
+    .fz-game-title { align-self: end; }
+    .fz-game:not(.fz-game--now) .fz-game-title {
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    /* Not a ribbon here: a pill under the title. Across a 78px cover the text
+       wrapped to two lines and buried a third of the artwork. */
+    .fz-game-badge {
+        position: static;
+        grid-column: 2;
+        justify-self: start;
+        align-self: start;
+        border-radius: var(--fz-radius-pill);
+        padding: 3px 10px;
+        font-size: 10px;
+        letter-spacing: 0.03em;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

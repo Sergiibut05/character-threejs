@@ -8,6 +8,7 @@ import GamesModal from './ui/GamesModal.js'
 import { seatOwnsInteract } from './seated.js'
 import { propShadowTint, propCoreLit0, propCoreLit1 } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
+import { FX_NO_OCCLUDE_LAYER } from '../Renderer.js'
 
 const _white = new THREE.Vector3(1, 1, 1)
 const _flat = new THREE.Vector3()
@@ -250,6 +251,10 @@ export default class HouseInterior {
         mat.depthWrite = false
         this.lampGlow = new THREE.Mesh(new THREE.CircleGeometry(1, 16), mat)
         this.lampGlow.renderOrder = 5
+        // The halo is wider than the lamp it surrounds, and the outline pass's
+        // depth pre-pass would otherwise treat it as something solid standing
+        // in front — erasing the lamp's own outline whenever the light was on.
+        this.lampGlow.layers.set(FX_NO_OCCLUDE_LAYER)
         this.scene.add(this.lampGlow)
 
         this._applyLampState()

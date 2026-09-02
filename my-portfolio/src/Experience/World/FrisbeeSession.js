@@ -329,43 +329,56 @@ export default class FrisbeeSession {
 
         // 1. Entry pan — very slow, skippable from the start.
         this.hint?.show('saltar', 'continue')
-        await this._runSkippable(camera.playEntryPan?.(8000))
+        const skipped = await this._runSkippable(camera.playEntryPan?.(8000))
         this.hint?.hide()
         if (!this.active) return
 
-        // 2. Hold on the pan's end pose and wait to be let go. No push-in on
-        // the dog: the pan has already introduced it, and a second camera move
-        // for the same beat only made the player wait twice before playing.
+        // 2. Hold on the pan's end pose and wait to be let go — but only if the
+        // pan was allowed to finish. Skipping it IS the player saying "get on
+        // with it", and following that with a second "press to continue" made
+        // them press Enter twice to start playing: the first press bought them
+        // nothing but a different thing to press through.
+        if (skipped) return
         await this._waitForContinue()
     }
 
-    /** Resolve when `animPromise` finishes OR the player presses to skip. */
+    /**
+     * Resolve when `animPromise` finishes OR the player presses to skip.
+     *
+     * @returns {Promise<boolean>} true when a PRESS ended it, false when the
+     *   animation ran out on its own. The caller needs to tell the two apart:
+     *   a player who skipped has already asked to start.
+     */
     _runSkippable(animPromise) {
         return new Promise((resolve) => {
             let done = false
-            const finish = () => {
+            const finish = (skipped) => {
                 if (done) return
                 done = true
                 window.removeEventListener('keydown', onKey, true)
                 window.removeEventListener('pointerdown', onPointer, true)
                 this._continueResolve = null
-                resolve()
+                resolve(skipped === true)
             }
             const onKey = (e) => {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                     e.preventDefault()
                     e.stopPropagation()
-                    finish()
+                    finish(true)
                 }
             }
-            const onPointer = () => finish()
-            this._continueResolve = finish
+            const onPointer = () => finish(true)
+            // Gamepad A and the leave-the-activity path both call this; the pad
+            // is a skip, so wrap rather than pass `finish` bare (it would
+            // receive the caller's argument, or none, and read as "not
+            // skipped").
+            this._continueResolve = () => finish(true)
             setTimeout(() => {
                 if (done) return
                 window.addEventListener('keydown', onKey, true)
                 window.addEventListener('pointerdown', onPointer, true)
             }, 200)
-            Promise.resolve(animPromise).then(() => finish())
+            Promise.resolve(animPromise).then(() => finish(false))
         })
     }
 

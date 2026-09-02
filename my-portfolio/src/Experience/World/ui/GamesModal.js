@@ -71,18 +71,24 @@ export default class GamesModal {
             img.alt = t('games.coverAlt', { title: name })
             cover.appendChild(img)
 
-            if (entry.now) {
-                const badge = document.createElement('div')
-                badge.className = 'fz-game-badge'
-                badge.textContent = t('games.now')
-                cover.appendChild(badge)
-            }
-
             const title = document.createElement('div')
             title.className = 'fz-game-title'
             title.textContent = name
 
             card.append(cover, title)
+
+            // A child of the CARD rather than of the cover, so the two layouts
+            // can put it in different places: a ribbon across the top of the
+            // cover on a wide screen, a pill under the title in the phone's
+            // row. Inside the cover it could only ever be the ribbon, and at
+            // 84px wide "Jugando ahora" wrapped to two lines across a third of
+            // the artwork.
+            if (entry.now) {
+                const badge = document.createElement('div')
+                badge.className = 'fz-game-badge'
+                badge.textContent = t('games.now')
+                card.appendChild(badge)
+            }
             this.shelf.appendChild(card)
         }
     }
