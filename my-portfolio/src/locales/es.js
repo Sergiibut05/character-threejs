@@ -29,10 +29,10 @@ export default {
 
         hero: {
             role: 'Desarrollador web y móvil · Málaga',
-            lede: 'Titulado en Desarrollo de Aplicaciones Multiplataforma, con dos ' +
-                'estancias en empresa desarrollando web y móvil. Trabajo con ' +
-                'Angular, TypeScript y Kotlin, y busco mi primer puesto a ' +
-                'jornada completa.',
+            lede: 'Titulado en Desarrollo de Aplicaciones Multiplataforma, con 2 ' +
+                'estancias de prácticas en empresa desarrollando web y móvil. ' +
+                'Trabajo con Angular, TypeScript y Kotlin, y busco mi primer ' +
+                'puesto a jornada completa.',
             enter: 'Entrar al mundo',
             enterLoading: 'Preparando el mundo',
             cv: 'Descargar CV',

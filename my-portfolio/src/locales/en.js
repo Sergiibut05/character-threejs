@@ -24,8 +24,8 @@ export default {
 
         hero: {
             role: 'Web & mobile developer · Málaga, Spain',
-            lede: 'Qualified in Multiplatform App Development, with two company ' +
-                'placements building web and mobile. I work with Angular, ' +
+            lede: 'Qualified in Multiplatform App Development, with 2 company ' +
+                'internships building web and mobile. I work with Angular, ' +
                 'TypeScript and Kotlin, and I am looking for my first full-time ' +
                 'role.',
             enter: 'Enter the world',
