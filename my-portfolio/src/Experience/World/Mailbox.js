@@ -103,7 +103,11 @@ export default class Mailbox {
 
         if (!this._badge) {
             this._badge = new InteractBadge()
-            this._badgeAnchor = anchorAbove(this.meshes)
+            // A tighter gap than the default: the mailbox is only 0.8 tall,
+            // so the 0.22 every other prop uses is a quarter of its height and
+            // the glyph floated away from it. Sitting on the lid reads as
+            // belonging to it.
+            this._badgeAnchor = anchorAbove(this.meshes, 0.06)
         }
         this._badge.update(this._badgeAnchor, this.isHighlighted)
 

@@ -290,6 +290,11 @@ export default class HouseInterior {
     _updateBadge() {
         if (!this._badge) this._badge = new InteractBadge()
 
+        // Every highlight below is already gated on isInside, so this is
+        // belt-and-braces — but it is the cheap half, and it is the half that
+        // cannot be undone by someone adding a new prop later.
+        if (!this.isInside) { this._badge.update(null, false); return }
+
         let target = null
         for (const rec of this._props) {
             if (rec.isHighlighted) { target = rec; break }
@@ -852,6 +857,13 @@ export default class HouseInterior {
         // still has to land if you walk out of the house mid-toast.
         this._updateToast(Math.min(0.05, (this.experience.time?.delta || 16) * 0.001))
 
+        // Outside it for the same kind of reason. Inside the branch, leaving
+        // the house by any route that is not the door — the map's fast travel —
+        // simply stopped calling this, and the glyph stayed burned onto the
+        // screen for the rest of the session. Out here it is asked every frame
+        // and answers "nothing is lit" on its own, whichever way you left.
+        this._updateBadge()
+
         const character = this.experience.world?.character
         if (character && this.isInside) {
             // `isNear` stays PURE GEOMETRY — seatYieldsToRival reads it to
@@ -875,11 +887,6 @@ export default class HouseInterior {
                 this._refreshPropHighlight(rec)
             }
 
-            // One badge for the whole room. The radii are small enough that
-            // only one thing is lit at a time, and taking the FIRST lit one
-            // keeps it that way even if two ever overlap — two glyphs floating
-            // side by side would read as one control, not two.
-            this._updateBadge()
 
             // Mobile action button + gamepad A (rising edge), like Mailbox.
             // Each action self-guards by its own proximity.

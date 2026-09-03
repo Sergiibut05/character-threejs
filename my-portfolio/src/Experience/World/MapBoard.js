@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 
 /**
  * MapBoard — the park sign that shows the world map, and opens it.
@@ -118,6 +119,12 @@ export default class MapBoard {
         const character = this.experience.world?.character
         if (!character) return
 
+        if (!this._badge && this.frame) {
+            this._badge = new InteractBadge()
+            this._badgeAnchor = anchorAbove(this.frame)
+        }
+        this._badge?.update(this._badgeAnchor, this.isHighlighted)
+
         const near = this.position.distanceTo(character.position) <= this.proximityRadius
         if (near !== this.isNear) {
             this.isNear = near
@@ -135,6 +142,7 @@ export default class MapBoard {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         if (this.frame) this.renderer?.removeOutlinedObject?.(this.frame)
         if (this._onSourceLoaded) this.resources.off('sourceLoaded', this._onSourceLoaded)
     }
