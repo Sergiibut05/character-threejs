@@ -45,7 +45,11 @@ export function inputGlyph(action, device) {
     }
 
     if (device === 'touch') {
-        // Touch is tap-driven — a hand/tap glyph (consumers may omit it entirely).
+        // Moving, aiming and tilting on a phone are the on-screen JOYSTICK, not
+        // a tap. Showing the tap hand for those said the wrong thing: it is the
+        // same stick the pad has, drawn on glass. Everything else really is a
+        // tap, and keeps the hand.
+        if (STICK_ACTIONS.has(action)) return _el('fz-glyph fz-glyph--touch', SVG_STICK, true)
         return _el('fz-glyph fz-glyph--touch', SVG_TOUCH, true)
     }
 

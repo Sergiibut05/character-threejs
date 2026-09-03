@@ -188,7 +188,10 @@ export default class ScoreboardInteractive {
 
         if (!this._badge) {
             this._badge = new InteractBadge()
-            this._badgeAnchor = anchorAbove(this.meshes)
+            // The sign already stands 2.27 tall, so the default gap put the
+            // glyph well over head height and away from the panel it belongs
+            // to. Resting on the top edge keeps it attached to the sign.
+            this._badgeAnchor = anchorAbove(this.meshes, 0.05)
         }
         this._badge.update(this._badgeAnchor, this.isHighlighted)
 
