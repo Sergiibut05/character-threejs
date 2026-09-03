@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
 import { seatYieldsToRival } from './seated.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 
 /**
  * SitPoints — the empties in `sit-points.glb` become places the player can sit.
@@ -700,6 +701,14 @@ export default class SitPoints {
         this.nearest = best
         for (const point of this.points) this._setHighlight(point, point === best)
 
+        // One badge for twelve seats: only ever one is on offer, and none at
+        // all while you are sat on one — `best` is already null in both cases,
+        // so the badge follows the same rule as the outline with no second
+        // condition to keep in step.
+        if (!this._badge) this._badge = new InteractBadge()
+        if (best && !best.badgeAnchor) best.badgeAnchor = anchorAbove(best.proxy)
+        this._badge.update(best?.badgeAnchor, !!best)
+
         const mb = this.experience.mobileControls?.getActions?.().button2 === true
         if (mb && !this._prevMobileB) this._toggle()
         this._prevMobileB = mb
@@ -711,6 +720,7 @@ export default class SitPoints {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         for (const point of this.points) {
             this.renderer?.removeOutlinedObject?.(point.proxy)
             this.scene.remove(point.proxy)

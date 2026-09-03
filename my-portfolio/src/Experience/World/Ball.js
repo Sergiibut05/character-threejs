@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { positionLocal, mix, smoothstep, vec3, float, max } from 'three/tsl'
 import Experience from '../Experience.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 import { seatOwnsInteract } from './seated.js'
 import { dayNightLitTint } from './DayNight.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
@@ -287,6 +288,19 @@ export default class Ball {
             if (near !== this.isNear) { this.isNear = near; this._refreshHighlight() }
         }
 
+        // The only badge whose anchor is recomputed every frame — this one
+        // rolls. `_badgeAnchor` is reused rather than reallocated, because a
+        // fresh Vector3 per frame is exactly the GC churn the rest of this
+        // file goes out of its way to avoid.
+        if (this.isHighlighted) {
+            if (!this._badge) {
+                this._badge = new InteractBadge()
+                this._badgeAnchor = new THREE.Vector3()
+            }
+            anchorAbove(this.mesh, 0.22, this._badgeAnchor)
+            this._badge.update(this._badgeAnchor, true)
+        } else this._badge?.update(null, false)
+
         const goal = this.experience.world?.goalPost
         if (goal?.ready) {
             const inside = goal.containsPoint(this.position)
@@ -332,6 +346,7 @@ export default class Ball {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         this.renderer?.removeOutlinedObject?.(this.mesh)
         if (this.body && this.physics?.world) this.physics.world.removeRigidBody(this.body)
         if (this.mesh) {

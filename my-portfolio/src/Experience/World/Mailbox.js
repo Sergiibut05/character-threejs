@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 import { seatOwnsInteract } from './seated.js'
 import ContactModal from './ui/ContactModal.js'
 
@@ -100,6 +101,12 @@ export default class Mailbox {
             if (near !== this.isNear) { this.isNear = near; this._updateHighlight() }
         }
 
+        if (!this._badge) {
+            this._badge = new InteractBadge()
+            this._badgeAnchor = anchorAbove(this.meshes)
+        }
+        this._badge.update(this._badgeAnchor, this.isHighlighted)
+
         // Mobile action button + gamepad A (rising edge) when near/hovered.
         const mb = this.experience.mobileControls?.getActions?.().button2 === true
         if (mb && !this._prevMobileB) this._tryInteract()
@@ -112,6 +119,7 @@ export default class Mailbox {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         this.experience.world?.raycaster?.removeInteractiveObject?.(this)
         this.contact?.destroy?.()

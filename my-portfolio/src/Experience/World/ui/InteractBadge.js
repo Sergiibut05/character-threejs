@@ -37,8 +37,10 @@ const _box = new THREE.Box3()
  *
  * @param {THREE.Object3D|THREE.Object3D[]} target
  * @param {number} [gap]  metres of air between the object and the badge
+ * @param {THREE.Vector3} [out]  reuse this instead of allocating — for the
+ *   one anchor that has to be recomputed every frame (the ball rolls)
  */
-export function anchorAbove(target, gap = 0.22) {
+export function anchorAbove(target, gap = 0.22, out) {
     const list = Array.isArray(target) ? target : [target]
     _box.makeEmpty()
     for (const o of list) {
@@ -46,8 +48,9 @@ export function anchorAbove(target, gap = 0.22) {
         o.updateWorldMatrix(true, false)
         _box.expandByObject(o)
     }
-    if (_box.isEmpty()) return new THREE.Vector3()
-    const c = _box.getCenter(new THREE.Vector3())
+    const c = out || new THREE.Vector3()
+    if (_box.isEmpty()) return c.set(0, 0, 0)
+    _box.getCenter(c)
     c.y = _box.max.y + gap
     return c
 }

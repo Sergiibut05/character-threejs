@@ -6,6 +6,7 @@ import TrophyModal from './ui/TrophyModal.js'
 import ComputerModal from './ui/ComputerModal.js'
 import GamesModal from './ui/GamesModal.js'
 import { seatOwnsInteract } from './seated.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 import { propShadowTint, propCoreLit0, propCoreLit1 } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 import { FX_NO_OCCLUDE_LAYER } from '../Renderer.js'
@@ -283,6 +284,21 @@ export default class HouseInterior {
         if (document.querySelector('.fz-modal-overlay.is-open')) return
         this.lampParams.on = !this.lampParams.on
         this._applyLampState()
+    }
+
+    /** Point the room's single badge at whatever is currently outlined. */
+    _updateBadge() {
+        if (!this._badge) this._badge = new InteractBadge()
+
+        let target = null
+        for (const rec of this._props) {
+            if (rec.isHighlighted) { target = rec; break }
+        }
+        if (!target && this.lamp?.isHighlighted) target = this.lamp
+        if (!target && this.isHighlighted) target = this
+
+        if (target && !target.badgeAnchor) target.badgeAnchor = anchorAbove(target.meshes)
+        this._badge.update(target?.badgeAnchor, !!target)
     }
 
     _updateLampHighlight() {
@@ -859,6 +875,12 @@ export default class HouseInterior {
                 this._refreshPropHighlight(rec)
             }
 
+            // One badge for the whole room. The radii are small enough that
+            // only one thing is lit at a time, and taking the FIRST lit one
+            // keeps it that way even if two ever overlap — two glyphs floating
+            // side by side would read as one control, not two.
+            this._updateBadge()
+
             // Mobile action button + gamepad A (rising edge), like Mailbox.
             // Each action self-guards by its own proximity.
             const interactAll = () => {
@@ -913,6 +935,7 @@ export default class HouseInterior {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         for (const rec of this._props) {
             for (const m of rec.meshes) this.renderer?.removeOutlinedObject?.(m)
