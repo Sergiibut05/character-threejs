@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import InteractBadge from './ui/InteractBadge.js'
 import { seatOwnsInteract } from './seated.js'
 
 // House nodes that make up the door and should light up together.
@@ -115,6 +116,10 @@ export default class Door {
             if (near !== this.isNear) { this.isNear = near; this._updateHighlight() }
         }
 
+        // The outline says "this is a thing"; the badge says a key opens it.
+        if (!this._badge) this._badge = new InteractBadge({ lift: 1.0 })
+        this._badge.update(this.position, this.isHighlighted)
+
         // Mobile action button + gamepad A (rising edge) when near/hovered.
         const mb = this.experience.mobileControls?.getActions?.().button2 === true
         if (mb && !this._prevMobileB) this._tryInteract()
@@ -127,6 +132,7 @@ export default class Door {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        this._badge?.destroy()
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         this.experience.world?.raycaster?.removeInteractiveObject?.(this)
     }

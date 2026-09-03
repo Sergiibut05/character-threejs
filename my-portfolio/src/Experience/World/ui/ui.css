@@ -1516,3 +1516,34 @@
 
     .fz-contact { max-width: 100%; }
 }
+
+/* ─── InteractBadge: just the button, floating over what it opens ────────
+   Deliberately plain — no pill, no label, no backdrop. The glyph already looks
+   like a key or a pad button, and anything drawn around it would start
+   competing with the activity emblems, which ARE meant to be noticed. */
+.fz-ibadge {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: calc(var(--fz-z) - 40);
+    pointer-events: none;
+    opacity: 0;
+    scale: 0.82;
+    transition: opacity 0.18s ease, scale 0.18s cubic-bezier(0.22, 1.2, 0.36, 1);
+    /* A soft drop so a pale key chip still reads against grass or sand. */
+    filter: drop-shadow(0 2px 5px rgba(30, 60, 45, 0.35));
+    will-change: transform, opacity;
+}
+
+/* The projected point is the CENTRE of the badge. Centring the child rather
+   than the badge keeps the JS transform to nothing but the screen position. */
+.fz-ibadge > * { transform: translate(-50%, -50%); }
+
+.fz-ibadge.is-on {
+    opacity: 1;
+    scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fz-ibadge { transition: opacity 0.18s ease; scale: 1; }
+}
