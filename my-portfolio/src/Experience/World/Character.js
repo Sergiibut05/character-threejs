@@ -67,7 +67,10 @@ export default class Character {
         this.isGrounded = false
 
         // Movement tuning
-        this.walkSpeed = 1.3
+        // 1.3 read as a stroll to more than one player — slower than it
+        // looks in the video of it. Sprint is still there for crossing the
+        // island; this is about the default pace not feeling like wading.
+        this.walkSpeed = 1.65
         this.runSpeed = 2.8
         this.rotationSpeed = 12.0
         // Playback speed of the locomotion clips (they read a touch slow at 1).

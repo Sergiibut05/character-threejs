@@ -1280,3 +1280,27 @@ body:has(.fz-hud-leave.is-visible) .map-fab
         grid-template-columns: 1fr;
     }
 }
+
+
+/*
+ * Readable, not visible.
+ *
+ * `display: none` would take this out of the accessibility tree as well as off
+ * the screen, which defeats half the point of writing it. The clip pattern
+ * leaves it in the document for anything that reads the page — crawlers,
+ * screen readers, reader modes — while taking up no space and catching no
+ * clicks. `white-space: nowrap` stops the 1px box wrapping every word onto its
+ * own line, which some screen readers then announce one word at a time.
+ */
+.static-copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}

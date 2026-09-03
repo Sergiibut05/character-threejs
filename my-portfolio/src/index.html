@@ -124,16 +124,68 @@
 
     <!-- Quality settings now live in the central SettingsModal (World/ui). -->
 
-    <!-- Modal Overlay -->
-    <div class="modal-overlay">
-        <div class="modal-container">
-            <button class="modal-close">&times;</button>
-            <h2 class="modal-title">Title</h2>
-            <div class="modal-body">
-                <p>Content goes here...</p>
-            </div>
-        </div>
+    <!--
+      The page a crawler sees.
+
+      Everything else on this page is a <canvas> and a few buttons: fetched
+      without a browser, the document had no <a> at all and nothing to read.
+      Google renders JavaScript, but it does so on its own schedule and with no
+      promise, and anyone fetching without a browser got a title and a stray
+      "Content goes here..." left over from a modal that no longer exists.
+
+      So the short version of the portfolio ships in the HTML: who this is,
+      what the projects are, and where to reach me — with real links out.
+
+      Hidden with the clip pattern rather than display:none, because
+      display:none also removes it from the accessibility tree. This stays
+      readable to anything that reads rather than looks.
+
+      It is a SUMMARY, not the site: the full text lives in src/locales and is
+      built by the Quick Overview. Keep this to the handful of facts that
+      rarely change, and it will not drift.
+    -->
+    <div class="static-copy">
+        <h2>Sergii Butrii — web &amp; mobile developer</h2>
+        <p>
+            Based in Málaga, Spain. Qualified in Multiplatform App Development,
+            with two company internships building web and mobile. I work with
+            Angular, TypeScript, Kotlin and Three.js.
+        </p>
+
+        <h3>Projects</h3>
+        <ul>
+            <li>
+                <a href="https://bookmatch.club">BookMatch</a> — a marketplace
+                for buying, selling and swapping books, web and Android.
+                <a href="https://github.com/Sergiibut05/BookMatch-Proyecto-Intermodular">Source</a>
+            </li>
+            <li>
+                <a href="https://volumine.app">Volumine</a> — 3D charts you can
+                embed anywhere with a link.
+            </li>
+            <li>
+                <a href="https://sql-prototype.vercel.app">SQL → 3D ER</a> — type
+                a SQL query and watch it become a 3D entity-relationship diagram.
+                <a href="https://github.com/Sergiibut05/sql-prototype">Source</a>
+            </li>
+        </ul>
+
+        <h3>Contact</h3>
+        <ul>
+            <li><a href="mailto:sergiibutrii5@gmail.com">sergiibutrii5@gmail.com</a></li>
+            <li><a href="https://github.com/Sergiibut05">GitHub</a></li>
+            <li><a href="https://www.linkedin.com/in/sergii-butrii-4b0729346/">LinkedIn</a></li>
+            <li><a href="/cv.pdf">Download CV (PDF)</a></li>
+        </ul>
     </div>
+
+    <noscript>
+        <p style="font: 16px/1.5 system-ui; max-width: 40rem; margin: 2rem auto; padding: 0 1rem;">
+            This portfolio is an interactive 3D island and needs JavaScript to
+            run. The written version of it is above, and the CV is at
+            <a href="/cv.pdf">/cv.pdf</a>.
+        </p>
+    </noscript>
     
     <script type="module" src="./script.js"></script>
 </body>
