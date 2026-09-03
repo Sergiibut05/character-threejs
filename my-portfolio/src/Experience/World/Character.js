@@ -71,7 +71,10 @@ export default class Character {
         // looks in the video of it. Sprint is still there for crossing the
         // island; this is about the default pace not feeling like wading.
         this.walkSpeed = 1.65
-        this.runSpeed = 2.8
+        // Up with the walk, not just because. At 1.3/2.8 sprinting was 2.15x
+        // walking; leaving it at 2.8 while walking went to 1.65 would have cut
+        // that to 1.70 and made holding shift feel like it barely did anything.
+        this.runSpeed = 3.1
         this.rotationSpeed = 12.0
         // Playback speed of the locomotion clips (they read a touch slow at 1).
         this.walkAnimSpeed = 1.15
