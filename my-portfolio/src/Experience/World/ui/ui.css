@@ -1520,7 +1520,14 @@
 /* ─── InteractBadge: just the button, floating over what it opens ────────
    Deliberately plain — no pill, no label, no backdrop. The glyph already looks
    like a key or a pad button, and anything drawn around it would start
-   competing with the activity emblems, which ARE meant to be noticed. */
+   competing with the activity emblems, which ARE meant to be noticed.
+
+   The badge is placed by a `transform` written from JS, so NOTHING else here
+   may touch the parent's transform — not even the individual `scale` property.
+   CSS composes the individual properties BEFORE `transform`, which means a
+   `scale: 0.82` scales the translation too: the badge landed at 82% of the way
+   to its point, dragged toward the top-left corner of the screen. The pop-in
+   therefore lives on the CHILD, where it cannot reach the position. */
 .fz-ibadge {
     position: fixed;
     top: 0;
@@ -1528,22 +1535,23 @@
     z-index: calc(var(--fz-z) - 40);
     pointer-events: none;
     opacity: 0;
-    scale: 0.82;
-    transition: opacity 0.18s ease, scale 0.18s cubic-bezier(0.22, 1.2, 0.36, 1);
+    transition: opacity 0.18s ease;
     /* A soft drop so a pale key chip still reads against grass or sand. */
     filter: drop-shadow(0 2px 5px rgba(30, 60, 45, 0.35));
     will-change: transform, opacity;
 }
 
-/* The projected point is the CENTRE of the badge. Centring the child rather
-   than the badge keeps the JS transform to nothing but the screen position. */
-.fz-ibadge > * { transform: translate(-50%, -50%); }
-
-.fz-ibadge.is-on {
-    opacity: 1;
-    scale: 1;
+/* The projected point is the CENTRE of the badge, and the little pop rides
+   along here for the reason above. */
+.fz-ibadge > * {
+    transform: translate(-50%, -50%) scale(0.82);
+    transition: transform 0.18s cubic-bezier(0.22, 1.2, 0.36, 1);
 }
 
+.fz-ibadge.is-on { opacity: 1; }
+.fz-ibadge.is-on > * { transform: translate(-50%, -50%) scale(1); }
+
 @media (prefers-reduced-motion: reduce) {
-    .fz-ibadge { transition: opacity 0.18s ease; scale: 1; }
+    .fz-ibadge > *,
+    .fz-ibadge.is-on > * { transform: translate(-50%, -50%); transition: none; }
 }

@@ -22,16 +22,43 @@ import * as THREE from 'three'
  */
 
 const _v = new THREE.Vector3()
+const _box = new THREE.Box3()
+
+/**
+ * The point just above the TOP of some meshes, in world space.
+ *
+ * Anchoring to an object's origin does not work here: where Blender left that
+ * origin is different for every model — a board plane's sits at its centre,
+ * about a metre and a half up, so a badge lifted from it floated well over the
+ * top of the sign. Measuring the object means "just above it" means the same
+ * thing for a board, a door and anything added later.
+ *
+ * Static props, so callers should compute this ONCE and keep it.
+ *
+ * @param {THREE.Object3D|THREE.Object3D[]} target
+ * @param {number} [gap]  metres of air between the object and the badge
+ */
+export function anchorAbove(target, gap = 0.22) {
+    const list = Array.isArray(target) ? target : [target]
+    _box.makeEmpty()
+    for (const o of list) {
+        if (!o) continue
+        o.updateWorldMatrix(true, false)
+        _box.expandByObject(o)
+    }
+    if (_box.isEmpty()) return new THREE.Vector3()
+    const c = _box.getCenter(new THREE.Vector3())
+    c.y = _box.max.y + gap
+    return c
+}
 
 export default class InteractBadge {
     /**
      * @param {object} [o]
      * @param {string} [o.action]  input action to draw (default 'interact')
-     * @param {number} [o.lift]    metres above the anchor to float
      */
     constructor(o = {}) {
         this.action = o.action || 'interact'
-        this.lift = o.lift ?? 0.55
 
         this.el = document.createElement('div')
         this.el.className = 'fz-ibadge'
@@ -59,7 +86,8 @@ export default class InteractBadge {
      * Called every frame by the owner, so it early-outs hard: while hidden it
      * does no projection at all, which is most frames for most badges.
      *
-     * @param {THREE.Vector3} worldPos  the thing being pointed at
+     * @param {THREE.Vector3} worldPos  where to draw it — usually from
+     *   anchorAbove(), which already includes the gap
      * @param {boolean} on              whether it should be showing
      */
     update(worldPos, on) {
@@ -73,9 +101,8 @@ export default class InteractBadge {
         const sizes = experience?.sizes
         if (!camera || !sizes) return
 
-        _v.copy(worldPos)
-        _v.y += this.lift
-        _v.project(camera)
+        if (!worldPos) return
+        _v.copy(worldPos).project(camera)
 
         // Behind the camera or off the edges: no badge. Without the z test a
         // point behind you projects to a mirrored position in front of you.

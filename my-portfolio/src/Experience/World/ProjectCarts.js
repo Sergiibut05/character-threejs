@@ -6,7 +6,7 @@ import { blenderTransformToMatrix } from './scene/SceneUtils.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 import { dayNightTint } from './DayNight.js'
 import ProjectModal from './ui/ProjectModal.js'
-import InteractBadge from './ui/InteractBadge.js'
+import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 
 /**
  * How much brighter a cart's picture goes once you are in range of it.
@@ -273,7 +273,7 @@ export default class ProjectCarts {
 
         // ONE badge for all three boards, not one each: only ever a single
         // board is highlighted, so a second badge could never be on screen.
-        if (!this._badge) this._badge = new InteractBadge({ lift: 1.15 })
+        if (!this._badge) this._badge = new InteractBadge()
 
         // Nearest cart within radius — ONLY that one highlights by proximity.
         let best = -1
@@ -300,9 +300,12 @@ export default class ProjectCarts {
             cart.lift.value += (target - cart.lift.value) * k
         }
 
-        // Follow whichever board is lit, and go out with it.
+        // Follow whichever board is lit, and go out with it. The anchor is
+        // measured off the sign itself the first time it is needed — the
+        // boards never move, so once is enough.
         const lit = this.carts.find((c) => c.isHighlighted)
-        this._badge.update(lit?.position, !!lit)
+        if (lit && !lit.badgeAnchor) lit.badgeAnchor = anchorAbove(lit.plane)
+        this._badge.update(lit?.badgeAnchor, !!lit)
 
         // Mobile action button + gamepad A (rising edge).
         const mb = this.experience.mobileControls?.getActions?.().button2 === true
