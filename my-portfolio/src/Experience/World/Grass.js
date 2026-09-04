@@ -9,6 +9,7 @@ import {
 import Experience from '../Experience.js'
 import { fbm, colorRamp } from './TSL/NoiseNodes.js'
 import { dayNightTint } from './DayNight.js'
+import { withAOMask } from './aoMask.js'
 
 export default class Grass {
     constructor(options = {}) {
@@ -275,7 +276,7 @@ export default class Grass {
             alphaTest: 0.01
         })
         this.material.positionNode = posNode
-        this.material.fragmentNode = colorNode
+        this.material.fragmentNode = withAOMask(colorNode)
 
         this.material.blending = THREE.CustomBlending
         this.material.blendSrc = THREE.SrcAlphaFactor

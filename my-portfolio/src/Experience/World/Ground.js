@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { uniform, vec2, color } from 'three/tsl'
 import Experience from '../Experience.js'
 import { createGridColorNode } from './Ground/GridShader.js'
+import { withAOMask } from './aoMask.js'
 
 export default class Ground {
     constructor() {
@@ -69,7 +70,7 @@ export default class Ground {
 
         // MeshBasicNodeMaterial (unlit grid)
         this.material = new THREE.MeshBasicNodeMaterial()
-        this.material.fragmentNode = gridColorNode
+        this.material.fragmentNode = withAOMask(gridColorNode)
     }
 
     setMesh() {

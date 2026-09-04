@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Fn, uniform, vec3, vec4, positionWorld, vertexStage } from 'three/tsl'
 import Experience from '../Experience.js'
 import { fbm, colorRamp } from './TSL/NoiseNodes.js'
+import { withAOMask } from './aoMask.js'
 
 export default class GroundPerlin {
     constructor() {
@@ -61,7 +62,7 @@ export default class GroundPerlin {
             side: THREE.DoubleSide,
             depthWrite: true
         })
-        this.material.fragmentNode = colorNode
+        this.material.fragmentNode = withAOMask(colorNode)
     }
 
     setMesh() {

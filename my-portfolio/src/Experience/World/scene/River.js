@@ -9,6 +9,7 @@ import { uniform, vec4 } from 'three/tsl'
 import Experience from '../../Experience.js'
 import { createStylizedWaterNode, createStylizedWaterDefaults } from '../TSL/StylizedWaterShader.js'
 import { dayNightTint } from '../DayNight.js'
+import { withAOMask } from '../aoMask.js'
 
 // Lift of the whole water plane: separates it from near-coplanar ground
 // (less z-precision stress at the seam) and reads better against the banks.
@@ -50,7 +51,8 @@ export default class River {
             transparent: true,
             depthWrite: false
         })
-        mat.fragmentNode = createStylizedWaterNode(this.uniforms).mul(vec4(dayNightTint, 1.0))
+        mat.fragmentNode = withAOMask(
+            createStylizedWaterNode(this.uniforms).mul(vec4(dayNightTint, 1.0)))
 
         mesh.material?.dispose?.()
         mesh.material = mat
