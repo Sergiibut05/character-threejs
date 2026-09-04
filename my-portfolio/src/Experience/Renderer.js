@@ -8,6 +8,7 @@ import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
+import { denoise } from 'three/examples/jsm/tsl/display/DenoiseNode.js'
 import Experience from './Experience.js'
 
 /**
@@ -76,6 +77,19 @@ export default class Renderer {
         this.uAoScale = uniform(0.8)
         this.uAoThickness = uniform(1.0)
 
+        // GTAO rotates its sample pattern with a noise texture, so what comes
+        // out is a NOISE FIELD, not a smooth one — its own docs say a denoise
+        // pass "might be required". It is not optional here: without it the
+        // shading reads as grain rather than shadow, worst across the leaf
+        // cards where every alpha edge is a cliff in the depth buffer.
+        //
+        // The filter is edge-aware: it blurs the occlusion while refusing to
+        // blur ACROSS a change in depth, so contacts stay crisp. depthPhi is
+        // how strict that refusal is.
+        this.uAoDenoiseRadius = uniform(6)
+        this.uAoDepthPhi = uniform(3)
+        this.uAoLumaPhi = uniform(8)
+
         if (this.experience.debug?.active) {
             const f = this.experience.debug.ui.addFolder('Outline')
             f.close()
@@ -94,6 +108,9 @@ export default class Renderer {
             a.add(this.uAoRadius, 'value', 0.05, 3, 0.05).name('Radio')
             a.add(this.uAoScale, 'value', 0, 2, 0.05).name('Intensidad')
             a.add(this.uAoThickness, 'value', 0.1, 4, 0.05).name('Grosor')
+            a.add(this.uAoDenoiseRadius, 'value', 1, 16, 0.5).name('Suavizado · radio')
+            a.add(this.uAoDepthPhi, 'value', 0.5, 15, 0.5).name('Suavizado · bordes')
+            a.add(this.uAoLumaPhi, 'value', 0.5, 20, 0.5).name('Suavizado · luma')
         }
 
         this.setInstance()
@@ -182,18 +199,33 @@ export default class Renderer {
             aoPass.radius = this.uAoRadius
             aoPass.scale = this.uAoScale
             aoPass.thickness = this.uAoThickness
-            // Half resolution. AO is a low-frequency field — broad soft
-            // darkening, no fine detail — so it survives the downscale almost
-            // untouched and costs a quarter of the samples.
-            aoPass.resolutionScale = 0.5
+            // Full resolution. Half res plus its upsample was adding blocky
+            // edges on top of the sampling noise, and this tier exists to look
+            // right. If the frame budget ever needs it back, 0.5 here is the
+            // cheapest quality there is to give up.
+            aoPass.resolutionScale = 1
             this._aoPass = aoPass
+
+            // Edge-aware smoothing of the raw occlusion. Normals from depth
+            // again, for the same reason as the AO itself.
+            const cleaned = denoise(
+                aoPass.getTextureNode(),
+                scenePass.getTextureNode('depth'),
+                null,
+                this.camera.instance
+            )
+            cleaned.normalNode = null
+            cleaned.radius = this.uAoDenoiseRadius
+            cleaned.depthPhi = this.uAoDepthPhi
+            cleaned.lumaPhi = this.uAoLumaPhi
+            this._aoDenoise = cleaned
 
             // `.r`, not the whole texel. The AO target is single-channel
             // (RedFormat), so a bare multiply drives green and blue to zero and
             // the whole island comes out scarlet -- which is exactly what it
             // did. The occlusion is a scalar; treat it as one.
-            sceneShaded = sceneColor.mul(aoPass.getTextureNode().r)
-        } else this._aoPass = null
+            sceneShaded = sceneColor.mul(cleaned.r)
+        } else { this._aoPass = null; this._aoDenoise = null }
 
         // 1. Outline Pass. The node's composite already clips the edge INSIDE
         // the object's own footprint (mask.r), but knows nothing about outside
