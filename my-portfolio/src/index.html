@@ -80,7 +80,10 @@
             </svg>
         </div>
         <div class="cloud-transition-content">
-            <h1 class="cloud-title">Sergii's Portfolio</h1>
+            <!-- Not an <h1>: the page's one h1 is in .static-copy below, where it can
+                 carry the name and the role instead of the word "Portfolio".
+                 Styling is by class, so the tag makes no visual difference. -->
+            <p class="cloud-title">Sergii's Portfolio</p>
             <div class="cloud-actions">
                 <button class="cloud-btn" id="loading-enter-btn" disabled>
                     <span class="cloud-btn-fill" id="progress-fill"></span>
@@ -144,38 +147,55 @@
       built by the Quick Overview. Keep this to the handful of facts that
       rarely change, and it will not drift.
     -->
+    <!--
+      tabindex="-1" on every link in here.
+
+      The clip pattern hides this block visually while keeping it in the
+      accessibility tree, which is the point of it — but "in the tree" also
+      meant "in the tab order". A keyboard user pressing Tab was walking
+      through nine links they could not see, with the focus ring clipped
+      inside a 1px box, before reaching anything real.
+
+      tabindex="-1" removes them from that sequence without removing them
+      from the document: crawlers still read them, and a screen reader still
+      lists and follows them, because its link list does not go through the
+      tab order. The alternative — unclipping the block on :focus-within —
+      keeps Tab access but drops a wall of text over the island the moment
+      someone tabs, which is a worse trade for a page whose real controls
+      are the buttons and the canvas.
+    -->
     <div class="static-copy">
-        <h2>Sergii Butrii — web &amp; mobile developer</h2>
+        <h1>Sergii Butrii — web &amp; mobile developer</h1>
         <p>
             Based in Málaga, Spain. Qualified in Multiplatform App Development,
             with two company internships building web and mobile. I work with
             Angular, TypeScript, Kotlin and Three.js.
         </p>
 
-        <h3>Projects</h3>
+        <h2>Projects</h2>
         <ul>
             <li>
-                <a href="https://bookmatch.club">BookMatch</a> — a marketplace
+                <a tabindex="-1" href="https://bookmatch.club">BookMatch</a> — a marketplace
                 for buying, selling and swapping books, web and Android.
-                <a href="https://github.com/Sergiibut05/BookMatch-Proyecto-Intermodular">Source</a>
+                <a tabindex="-1" href="https://github.com/Sergiibut05/BookMatch-Proyecto-Intermodular">Source</a>
             </li>
             <li>
-                <a href="https://volumine.app">Volumine</a> — 3D charts you can
+                <a tabindex="-1" href="https://volumine.app">Volumine</a> — 3D charts you can
                 embed anywhere with a link.
             </li>
             <li>
-                <a href="https://sql-prototype.vercel.app">SQL → 3D ER</a> — type
+                <a tabindex="-1" href="https://sql-prototype.vercel.app">SQL → 3D ER</a> — type
                 a SQL query and watch it become a 3D entity-relationship diagram.
-                <a href="https://github.com/Sergiibut05/sql-prototype">Source</a>
+                <a tabindex="-1" href="https://github.com/Sergiibut05/sql-prototype">Source</a>
             </li>
         </ul>
 
-        <h3>Contact</h3>
+        <h2>Contact</h2>
         <ul>
-            <li><a href="mailto:sergiibutrii5@gmail.com">sergiibutrii5@gmail.com</a></li>
-            <li><a href="https://github.com/Sergiibut05">GitHub</a></li>
-            <li><a href="https://www.linkedin.com/in/sergii-butrii-4b0729346/">LinkedIn</a></li>
-            <li><a href="/cv.pdf">Download CV (PDF)</a></li>
+            <li><a tabindex="-1" href="mailto:sergiibutrii5@gmail.com">sergiibutrii5@gmail.com</a></li>
+            <li><a tabindex="-1" href="https://github.com/Sergiibut05">GitHub</a></li>
+            <li><a tabindex="-1" href="https://www.linkedin.com/in/sergii-butrii-4b0729346/">LinkedIn</a></li>
+            <li><a tabindex="-1" href="/cv.pdf">Download CV (PDF)</a></li>
         </ul>
     </div>
 
