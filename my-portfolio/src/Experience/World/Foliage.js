@@ -12,6 +12,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { propSunDirection } from './scene/StylizedPropMaterial.js'
 import { dayNightLitTint } from './DayNight.js'
 import { REAL_SHADOWS_SUPPORTED } from '../Utils/DeviceCaps.js'
+import { excludeFromAO } from './aoMask.js'
 
 function createRng(seed) {
     let s = seed | 0
@@ -201,6 +202,11 @@ export default class Foliage {
         this.material.instance.transparent = false
         this.material.instance.depthWrite = true
         this.material.instance.alphaTest = 0.5
+
+        // Leaf cards and screen-space ambient occlusion do not mix; this opts
+        // the foliage out of RECEIVING it while it keeps casting. Set once and
+        // never changed — see aoMask.js for why that matters.
+        excludeFromAO(this.material.instance)
 
         if (REAL_SHADOWS_SUPPORTED) {
             this.material.instance.receivedShadowPositionNode = positionLocal.add(lightDir.mul(this.material.shadowOffset))
