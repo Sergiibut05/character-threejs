@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import {
     pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs,
-    vec2, vec4, max, length
+    vec2, vec3, vec4, max, length, luminance, renderOutput
 } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
+import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import Experience from './Experience.js'
 
 /**
@@ -47,11 +48,31 @@ export default class Renderer {
         this.uEdgeThickness = uniform(2.4)
         this.uEdgeSuppress = uniform(1.6)
 
+        // -- Final grade --
+        //
+        // The render was clean and a little flat: correct colours, no shaping.
+        // These do what a colourist does last and cost almost nothing -- no
+        // extra pass, just arithmetic on a pixel that is already fetched.
+        //
+        // Kept DELIBERATELY small. A vignette you can point at is too strong;
+        // this one only has to stop the corners competing with the middle.
+        this.uVignette = uniform(0.30)      // how dark the corners get
+        this.uVignetteStart = uniform(0.55) // where it begins, in screen radii
+        this.uSaturation = uniform(1.07)    // pastel palette, so barely any
+        this.uContrast = uniform(1.05)
+
         if (this.experience.debug?.active) {
             const f = this.experience.debug.ui.addFolder('Outline')
             f.close()
             f.add(this.uEdgeThickness, 'value', 0.5, 5, 0.1).name('Grosor')
             f.add(this.uEdgeSuppress, 'value', 0, 4, 0.1).name('Recorte oclusión')
+
+            const g = this.experience.debug.ui.addFolder('Grade')
+            g.close()
+            g.add(this.uVignette, 'value', 0, 1, 0.01).name('Viñeta')
+            g.add(this.uVignetteStart, 'value', 0.1, 1.2, 0.01).name('Viñeta · inicio')
+            g.add(this.uSaturation, 'value', 0.5, 1.6, 0.01).name('Saturación')
+            g.add(this.uContrast, 'value', 0.7, 1.4, 0.01).name('Contraste')
         }
 
         this.setInstance()
@@ -165,9 +186,47 @@ export default class Renderer {
             irisDist
         ).mul(this.irisEnabled)
 
-        finalOutput = mix(finalOutput, vec4(0.0, 0.0, 0.0, 1.0), irisAlpha)
-        
-        this.renderPipeline.outputNode = finalOutput
+        // 4. Tone mapping and sRGB HERE, rather than at the output.
+        //
+        // Everything after this point wants perceptual pixels, not linear HDR
+        // ones: FXAA weighs edges by luminance, and a contrast pivot at 0.5
+        // only means "middle grey" once the image is in sRGB. This is exactly
+        // what RenderOutputNode is for -- and it is why outputColorTransform
+        // has to be turned off, or the renderer would do it a second time.
+        this.renderPipeline.outputColorTransform = false
+        let graded = renderOutput(finalOutput)
+
+        // 5. The grade. Cheap enough for both quality levels: arithmetic on a
+        // pixel that has already been fetched, not another pass.
+        const rgb = graded.rgb
+        const sat = mix(vec3(luminance(rgb)), rgb, this.uSaturation)
+        const con = sat.sub(0.5).mul(this.uContrast).add(0.5)
+
+        // Elliptical on purpose -- uncorrected screenUV follows the frame,
+        // which is what a real lens does. Correcting for aspect would leave a
+        // circle inside a wide screen with bright bands left and right.
+        const vigT = smoothstep(this.uVignetteStart, float(1.05),
+            length(screenUV.sub(vec2(0.5, 0.5))))
+        graded = vec4(con.mul(vigT.mul(this.uVignette).oneMinus()).clamp(0.0, 1.0), 1.0)
+
+        // 6. Antialiasing -- HIGH ONLY.
+        //
+        // There was none at all. MSAA is off on the renderer (it hands the
+        // outline pass a multisampled depth texture it cannot read) under a
+        // comment promising post-processing would handle it, and nothing ever
+        // did: on a 1x monitor every low-poly silhouette and every white
+        // outline was stepped. Retina hid it by supersampling, which is
+        // probably how it survived this long.
+        //
+        // FXAA rather than SMAA: this art is big clean silhouettes with almost
+        // no high-frequency detail, which is the case FXAA handles well and
+        // the one where SMAA's extra cost buys least.
+        if (this.quality.isHigh) graded = fxaa(graded)
+
+        // 7. Iris last: a curtain over the finished frame, not something the
+        // grade or the AA should be looking at.
+        this.renderPipeline.outputNode =
+            mix(graded, vec4(0.0, 0.0, 0.0, 1.0), irisAlpha)
     }
 
     /**
