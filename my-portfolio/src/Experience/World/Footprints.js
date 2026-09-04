@@ -5,6 +5,7 @@ import {
     sin, cos, length, smoothstep, min
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * Footprints — Animal-Crossing style prints the character leaves on dirt/sand.
@@ -70,6 +71,9 @@ export default class Footprints {
             transparent: true,
             depthWrite: false
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(material)
         material.positionNode = vec3(d.x.add(wx), d.y, d.z.add(wz))
 
         // ── Shape: sole + heel ellipses (SDF union) in quad UV space ──

@@ -22,6 +22,7 @@ import { createStylizedPropNodeMaterial } from './StylizedPropMaterial.js'
 import { dequantizeGeometry } from './SceneUtils.js'
 import { snoise } from '../TSL/NoiseNodes.js'
 import { dayNightTint } from '../DayNight.js'
+import { ignoreAO } from '../aoMask.js'
 
 // Vertical lift so the flat field clears the grass floor it sits on. The grass
 // is only ~0.01 above the authored field height, so a hair is enough; the
@@ -150,6 +151,9 @@ export default class BaseballPitch {
             depthWrite: false,
             side: THREE.DoubleSide
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
         mat.outputNode = vec4(rgb, fade.mul(this.uFringeOpacity))
         // Sits between the grass floor and the field decal (field uses -1).
         mat.polygonOffset = true

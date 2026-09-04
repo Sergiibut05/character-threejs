@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { ignoreAO } from './aoMask.js'
 
 function createShadowTexture(size = 64) {
     const canvas = document.createElement('canvas')
@@ -42,6 +43,9 @@ export default class FakeShadow {
             transparent: true,
             depthWrite: false
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
 
         this.characterMesh = new THREE.Mesh(geo, mat)
         this.characterMesh.renderOrder = -1
@@ -60,6 +64,9 @@ export default class FakeShadow {
             depthWrite: false,
             opacity: 0.7
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
 
         const mesh = new THREE.InstancedMesh(geo, mat, treeRefs.length)
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)

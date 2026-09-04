@@ -4,6 +4,7 @@ import {
     normalize, dot, pow, clamp, mix, sub, max as tslMax
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 const BALLOON_RADIUS = 0.65
 const KNOT_HEIGHT = 0.12
@@ -38,6 +39,9 @@ export default class Balloon {
             depthWrite: false,
             side: THREE.FrontSide
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
 
         mat.colorNode = _balloonColor()
         mat.opacityNode = _balloonOpacity()

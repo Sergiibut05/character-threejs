@@ -5,6 +5,7 @@ import {
     smoothstep
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * WindLines — cartoon "gust" ribbons drifting through the air.
@@ -80,6 +81,9 @@ class Ribbon {
             depthWrite: false,
             side: THREE.DoubleSide
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(material)
 
         material.vertexNode = Fn(() => {
             const world = modelWorldMatrix.mul(vec4(positionGeometry, 1)).toVar()

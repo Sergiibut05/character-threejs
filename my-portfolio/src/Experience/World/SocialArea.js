@@ -7,6 +7,7 @@ import Experience from '../Experience.js'
 import { seatOwnsInteract } from './seated.js'
 import { SOCIALS } from './ui/socialData.js'
 import { inputGlyph } from './ui/InputGlyph.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * SocialArea — the social-statues plaza (social-area.glb).
@@ -188,6 +189,9 @@ export default class SocialArea {
             depthWrite: false,
             side: THREE.DoubleSide
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(material)
         material.colorNode = Fn(() => {
             // Crisp thin ring + a soft halo fading OUTWARD from it. The pulse
             // only modulates opacity — the radius never moves.

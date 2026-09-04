@@ -5,6 +5,7 @@ import {
     uv, length, time, clamp, smoothstep
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * Fireflies — Bruno Simon pattern, extended with view-distance culling
@@ -111,6 +112,9 @@ export default class Fireflies {
         material.blending = THREE.AdditiveBlending
         material.transparent = true
         material.depthWrite = false
+        // No depth write means no say over ambient occlusion -- these drift
+        // through the tree crowns, which have opted out. See aoMask.js.
+        ignoreAO(material)
 
         // ── Mesh: WebGPU multi-instance via mesh.count ──
         const geometry = new THREE.CircleGeometry(1, 8)

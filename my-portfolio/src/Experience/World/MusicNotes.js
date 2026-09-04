@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * MusicNotes — floating ♪ ♫ that drift up from the character's head while idle
@@ -114,6 +115,9 @@ export default class MusicNotes {
                 depthWrite: false,
                 opacity: 0,
             })
+            // No depth write means no say over ambient occlusion -- it abstains
+            // rather than overriding what is behind it. See aoMask.js.
+            ignoreAO(material)
             const sprite = new THREE.Sprite(material)
             sprite.visible = false
             sprite.scale.setScalar(this.noteScale)

@@ -4,6 +4,7 @@ import {
     smoothstep, fract, abs, length, max, sin
 } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 /**
  * CourtBounds — the two side walls of the beach court, drawn as a soft
@@ -58,6 +59,9 @@ export default class CourtBounds {
             side: THREE.DoubleSide,
             blending: THREE.AdditiveBlending
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(material)
 
         material.colorNode = Fn(() => {
             const p = uv()

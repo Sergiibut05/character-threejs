@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Fn, float, vec2, vec3, uv, smoothstep, mix, length, abs } from 'three/tsl'
 import Experience from '../Experience.js'
+import { ignoreAO } from './aoMask.js'
 
 // Resting height of the aiming arrow — the low end of its old bob (0.9 − 0.12).
 const ARROW_Y = 0.78
@@ -37,6 +38,9 @@ export default class ObjectiveMarker {
             transparent: true,
             depthWrite: false
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
         this.arrowSprite = new THREE.Sprite(mat)
         this.arrowSprite.scale.set(0.5, 0.6, 1)
         this.arrowSprite.visible = false
@@ -72,6 +76,9 @@ export default class ObjectiveMarker {
             transparent: true,
             depthWrite: false
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
         this.checkSprite = new THREE.Sprite(mat)
         this.checkSprite.scale.set(0.6, 0.6, 1)
         this.checkSprite.visible = false
@@ -103,6 +110,9 @@ export default class ObjectiveMarker {
             depthWrite: false,
             side: THREE.DoubleSide
         })
+        // No depth write means no say over ambient occlusion -- it abstains
+        // rather than overriding what is behind it. See aoMask.js.
+        ignoreAO(mat)
 
         mat.colorNode = _bullseyeColor()
         mat.opacityNode = _bullseyeOpacity()
