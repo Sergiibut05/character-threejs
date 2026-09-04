@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {
     pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs,
-    vec2, vec3, vec4, max, length, luminance, renderOutput, mrt, output
+    vec2, vec3, vec4, max, length, luminance, renderOutput
 } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
@@ -9,7 +9,6 @@ import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
 import { denoise } from 'three/examples/jsm/tsl/display/DenoiseNode.js'
-import { AO_MASK } from './World/aoMask.js'
 import Experience from './Experience.js'
 
 /**
@@ -169,17 +168,7 @@ export default class Renderer {
     _buildPostProcessingPipeline() {
         const scenePass = pass(this.scene, this.camera.instance)
 
-        // The pass carries a second, single-value attachment: 1 means "this
-        // pixel may be shaded by ambient occlusion". Everything writes 1 unless
-        // its material says otherwise — see World/aoMask.js.
-        //
-        // Written on BOTH quality levels even though only high reads it. Making
-        // it conditional means the foliage materials have to gain and lose
-        // their override as the setting changes, and rebuilding a live material
-        // around a different output shape is what turned every tree into a bare
-        // trunk. One ignored channel is the cheaper of the two problems.
-        scenePass.setMRT(mrt({ output, [AO_MASK]: float(1) }))
-        const sceneColor = scenePass.getTextureNode('output')
+        const sceneColor = scenePass.getTextureNode()
 
         // 0. Ambient occlusion (high only) — contact shadow where things meet.
         let sceneShaded = sceneColor
@@ -235,10 +224,7 @@ export default class Renderer {
             // (RedFormat), so a bare multiply drives green and blue to zero and
             // the whole island comes out scarlet -- which is exactly what it
             // did. The occlusion is a scalar; treat it as one.
-            // Blend the occlusion toward "none" wherever the mask says so, so
-            // the foliage keeps casting AO without receiving any.
-            const mask = scenePass.getTextureNode(AO_MASK).r
-            sceneShaded = sceneColor.mul(mix(float(1), cleaned.r, mask))
+            sceneShaded = sceneColor.mul(cleaned.r)
         } else { this._aoPass = null; this._aoDenoise = null }
 
         // 1. Outline Pass. The node's composite already clips the edge INSIDE
