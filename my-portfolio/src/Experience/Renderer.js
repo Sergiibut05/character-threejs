@@ -7,6 +7,7 @@ import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
+import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
 import Experience from './Experience.js'
 
 /**
@@ -61,6 +62,20 @@ export default class Renderer {
         this.uSaturation = uniform(1.07)    // pastel palette, so barely any
         this.uContrast = uniform(1.05)
 
+        // -- Ambient occlusion (high only) --
+        //
+        // Contact shadow where things meet: under the house, in the eaves,
+        // where the fence enters the dirt, in the corners of the room. The
+        // scene is pastel and lit flat, which is exactly what reads as "clean
+        // but weightless"; AO is what sits everything ON the island instead of
+        // hovering a millimetre above it.
+        //
+        // Radius is in WORLD units, so it is tied to how big things are here:
+        // 0.5 is about a fence post, which is the scale of contact we want.
+        this.uAoRadius = uniform(0.4)
+        this.uAoScale = uniform(0.8)
+        this.uAoThickness = uniform(1.0)
+
         if (this.experience.debug?.active) {
             const f = this.experience.debug.ui.addFolder('Outline')
             f.close()
@@ -73,6 +88,12 @@ export default class Renderer {
             g.add(this.uVignetteStart, 'value', 0.1, 1.2, 0.01).name('Viñeta · inicio')
             g.add(this.uSaturation, 'value', 0.5, 1.6, 0.01).name('Saturación')
             g.add(this.uContrast, 'value', 0.7, 1.4, 0.01).name('Contraste')
+
+            const a = this.experience.debug.ui.addFolder('Oclusion ambiental')
+            a.close()
+            a.add(this.uAoRadius, 'value', 0.05, 3, 0.05).name('Radio')
+            a.add(this.uAoScale, 'value', 0, 2, 0.05).name('Intensidad')
+            a.add(this.uAoThickness, 'value', 0.1, 4, 0.05).name('Grosor')
         }
 
         this.setInstance()
@@ -119,12 +140,60 @@ export default class Renderer {
 
         // React to live quality changes
         this.quality.on('change', () => {
+            // The high tier now renders above the device pixel ratio (see
+            // Quality.pixelRatio), so switching tiers has to resize as well as
+            // rebuild — otherwise the change only lands on the next resize.
+            this.instance.setPixelRatio(this.quality.pixelRatio)
             this._buildPostProcessingPipeline()
         })
     }
 
     _buildPostProcessingPipeline() {
         const scenePass = pass(this.scene, this.camera.instance)
+
+        const sceneColor = scenePass.getTextureNode()
+
+        // 0. Ambient occlusion (high only) — contact shadow where things meet.
+        let sceneShaded = sceneColor
+        if (this.quality.isHigh) {
+            // Normals RECONSTRUCTED FROM DEPTH, not written to an MRT buffer.
+            //
+            // The MRT route is what the docs show and it produced scattered
+            // dark specks all over the ground. The reason: every transparent
+            // effect here — music notes, fireflies, confetti, the water — draws
+            // with depthWrite off, so it writes a NORMAL at those pixels while
+            // leaving the DEPTH of the ground behind it. GTAO then compared a
+            // sprite's normal against the floor's depth and shaded a little
+            // rectangle under each one.
+            //
+            // Reconstructing from depth cannot go wrong that way: the things
+            // that caused it are exactly the things absent from the depth
+            // buffer. It also drops the whole normal attachment, so the scene
+            // pass goes back to being a plain colour node and everything
+            // downstream is untouched.
+            const aoPass = ao(
+                scenePass.getTextureNode('depth'),
+                null,
+                this.camera.instance
+            )
+            // Belt and braces: the fallback is chosen by `normalNode !== null`,
+            // and this is not the place to find out what nodeObject(null) does.
+            aoPass.normalNode = null
+            aoPass.radius = this.uAoRadius
+            aoPass.scale = this.uAoScale
+            aoPass.thickness = this.uAoThickness
+            // Half resolution. AO is a low-frequency field — broad soft
+            // darkening, no fine detail — so it survives the downscale almost
+            // untouched and costs a quarter of the samples.
+            aoPass.resolutionScale = 0.5
+            this._aoPass = aoPass
+
+            // `.r`, not the whole texel. The AO target is single-channel
+            // (RedFormat), so a bare multiply drives green and blue to zero and
+            // the whole island comes out scarlet -- which is exactly what it
+            // did. The occlusion is a scalar; treat it as one.
+            sceneShaded = sceneColor.mul(aoPass.getTextureNode().r)
+        } else this._aoPass = null
 
         // 1. Outline Pass. The node's composite already clips the edge INSIDE
         // the object's own footprint (mask.r), but knows nothing about outside
@@ -154,11 +223,16 @@ export default class Renderer {
         const occluderCut = hiddenEdge.mul(this.uEdgeSuppress).oneMinus().clamp(0.0, 1.0)
         const outlineColor = visibleEdge.mul(occluderCut).mul(visibleEdgeColor).mul(edgeStrength)
 
-        let composited = outlineColor.add(scenePass)
+        // The outline is UI drawn over the world, so it is added after the
+        // occlusion rather than being dimmed by it.
+        let composited = outlineColor.add(sceneShaded)
 
         // 1b. Bloom (threshold 1.0) — only HDR surfaces above 1.0 glow: fire
         // core/embers and the lamp glass. Pastel scene untouched.
-        const bloomPass = bloom(scenePass.getTextureNode(), 0.5, 0.6, 1.0)
+        // Bloom off the RAW colour: it exists for the fire core and the lamp
+        // glass, which are emissive and above 1.0 — things ambient occlusion
+        // has no business dimming.
+        const bloomPass = bloom(sceneColor, 0.5, 0.6, 1.0)
         composited = composited.add(bloomPass)
 
         // 2. Tilt-Shift Blur (Both Qualities)

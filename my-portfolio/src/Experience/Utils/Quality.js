@@ -23,6 +23,9 @@ import { REAL_SHADOWS_SUPPORTED } from './DeviceCaps.js'
 const STORAGE_KEY = 'portfolio.quality'
 const MOBILE_REGEX = /Mobi|Android|iPhone|iPad|iPod/i
 
+/** Floor for the device pixel ratio on high quality. See `pixelRatio`. */
+const HIGH_MIN_DPR = 1.5
+
 export default class Quality extends EventEmitter {
     constructor() {
         super()
@@ -76,7 +79,19 @@ export default class Quality extends EventEmitter {
      * cost is paid once per resize, not per frame.
      */
     get pixelRatio() {
-        return Math.min(window.devicePixelRatio || 1, 2)
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        // On HIGH, never render below 1.5x.
+        //
+        // A retina screen supersamples for free at dpr 2; a plain 1x monitor
+        // -- which is most desktops, and most people looking at this -- gets
+        // no supersampling at all, and that is the single most visible
+        // difference between the two. Rendering at 1.5 and letting the browser
+        // downscale is the oldest and best antialiasing there is.
+        //
+        // It costs 2.25x the pixels, which is why it is the high tier only and
+        // why HIGH_MIN_DPR is a knob: drop it to 1.25 (1.56x) if the frame
+        // budget gets tight.
+        return this.isHigh ? Math.max(dpr, HIGH_MIN_DPR) : dpr
     }
 
     /**
