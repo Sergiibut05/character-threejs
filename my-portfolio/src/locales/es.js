@@ -144,7 +144,7 @@ export default {
             pressTouch: 'toca el botón'
         },
 
-        hint: { touchTo: 'Toca para {verb}' },
+        hint: { touchTo: 'Toca para {verb}', move: 'WASD o flechas para moverte' },
 
         frisbee: {
             title: 'Frisbee',

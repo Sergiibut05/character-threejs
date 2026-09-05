@@ -16,6 +16,7 @@ import WorldMap from './World/ui/WorldMap.js'
 import sources from './sources.js'
 import i18n from './Utils/i18n.js'
 import { t } from './Utils/gameText.js'
+import MoveHint from './World/ui/MoveHint.js'
 
 let instance = null
 
@@ -281,6 +282,12 @@ export default class Experience {
         await this.animateValue(holeSize, shrinkSize, 150, (v) => this.renderer.setIrisTransitionSize(v))
         await this.animateValue(shrinkSize, 1.35, 1650, (v) => this.renderer.setIrisTransitionSize(v))
         this.renderer.setIrisTransitionEnabled(false)
+
+        // Only now, with the iris out of the way and the island fully visible,
+        // is there room to say anything -- and the one thing worth saying is
+        // how to walk. It leaves on the first keypress. See ui/MoveHint.js.
+        this.moveHint = new MoveHint()
+        this.moveHint.show()
     }
 
     waitMs(ms) {

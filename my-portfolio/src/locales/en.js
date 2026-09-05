@@ -296,7 +296,7 @@ export default {
             pressTouch: 'tap the button'
         },
 
-        hint: { touchTo: 'Tap to {verb}' },
+        hint: { touchTo: 'Tap to {verb}', move: 'WASD or arrow keys to move' },
 
         frisbee: {
             title: 'Frisbee',

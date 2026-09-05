@@ -1555,3 +1555,45 @@
     .fz-ibadge > *,
     .fz-ibadge.is-on > * { transform: translate(-50%, -50%); transition: none; }
 }
+
+/*
+ * MoveHint — deliberately quieter than .fz-hint above.
+ *
+ * That one is a white pill that bobs, which is right for "press A to continue"
+ * inside a minigame you already chose to play. This one greets someone who has
+ * not asked for anything yet, so it stays out of the way: no bob, no border,
+ * low weight, and dark rather than white because it has to stay legible over
+ * pale sand at noon and over grass at night without ever becoming the brightest
+ * thing on screen.
+ */
+.fz-movehint {
+    position: fixed;
+    left: 50%;
+    bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+    transform: translate(-50%, 6px);
+    z-index: 2400;
+    padding: 8px 16px;
+    border-radius: var(--fz-radius-pill);
+    font-family: var(--fz-font-title);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.94);
+    background: rgba(28, 36, 32, 0.42);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fz-movehint.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* Someone who asked for less motion gets the tip without the drift. */
+@media (prefers-reduced-motion: reduce) {
+    .fz-movehint { transition: opacity 0.45s ease; transform: translate(-50%, 0); }
+}
