@@ -99,18 +99,45 @@ export default class Confetti {
         this.mesh.count = COUNT
         this.mesh.frustumCulled = false
         this.mesh.renderOrder = 6
+
+        // OFF until something is actually celebrated.
+        //
+        // The header above calls the idle cost "zero CPU, degenerate draw
+        // (alpha 0)", and the CPU half is true. The draw is not free though,
+        // and it was not harmless: 90 quads were being rasterised every frame
+        // of the entire session, and the ambient occlusion picked them up as a
+        // scatter of faint squares over the dirt around spawn -- the ones that
+        // took a day to find, precisely because the thing casting them is
+        // invisible and nobody thinks to suspect a particle system that is not
+        // playing.
+        //
+        // Alpha 0 hides a fragment from the picture. It does not take it out of
+        // the frame. The only reliable way to contribute nothing is to not be
+        // drawn, so: hidden on creation, shown by trigger(), hidden again by
+        // update() once the burst has run its LIFE.
+        this.mesh.visible = false
+        this._burstEndsAt = -Infinity
+
         this.scene.add(this.mesh)
     }
 
     /** Fire a burst at a world position. */
     trigger(position, strength = 1.0) {
+        const now = this.experience.time.elapsed * 0.001
         this.uOrigin.value.copy(position)
         this.uStrength.value = strength
-        this.uBurstTime.value = this.experience.time.elapsed * 0.001
+        this.uBurstTime.value = now
+
+        if (this.mesh) this.mesh.visible = true
+        // A little past LIFE, so the last frame of the fade is never clipped.
+        this._burstEndsAt = now + LIFE + 0.1
     }
 
     update() {
-        this.uTime.value = this.experience.time.elapsed * 0.001
+        const now = this.experience.time.elapsed * 0.001
+        this.uTime.value = now
+
+        if (this.mesh?.visible && now > this._burstEndsAt) this.mesh.visible = false
     }
 
     dispose() {
