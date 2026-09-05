@@ -74,9 +74,25 @@ export default class Renderer {
         // but weightless"; AO is what sits everything ON the island instead of
         // hovering a millimetre above it.
         //
-        // Radius is in WORLD units, so it is tied to how big things are here:
-        // 0.5 is about a fence post, which is the scale of contact we want.
-        this.uAoRadius = uniform(0.4)
+        // Radius is in WORLD units, and it was FAR too big -- this one number
+        // is what produced the halo people kept reporting.
+        //
+        // Dumping the raw occlusion buffer to the screen settled it in one
+        // look, which is what should have been done days ago: at 0.4 every
+        // fence post, sign and character sat inside a fat white glow spreading
+        // roughly 0.4 m across the ground -- not a bug, just the radius doing
+        // exactly what it says. At 0.12 the same buffer shows thin lines
+        // tucked under each object, which is what contact occlusion is meant
+        // to look like.
+        //
+        // A fence post here is a few centimetres across. Sizing the radius to
+        // "about a fence post" was the mistake: what wants measuring is the
+        // GAP the shadow should fill, not the object casting it.
+        //
+        // It also took the scattered dark squares on the dirt with it. Those
+        // were never a separate bug -- same radius, reaching far enough to
+        // catch things it had no business catching.
+        this.uAoRadius = uniform(0.12)
         this.uAoScale = uniform(0.3)
         this.uAoThickness = uniform(0.6)
 
@@ -113,7 +129,7 @@ export default class Renderer {
         // 'gtao' por defecto: SSAO esta aqui para poder compararlos en vivo,
         // pero no arreglo el artefacto que motivo traerlo y todos los valores
         // ajustados del panel se refieren a GTAO.
-        this._aoOptions = { halfRes: false, node: 'gtao' }
+        this._aoOptions = { halfRes: false, node: 'gtao', view: 'off' }
 
         // -- SSAO --
         //
@@ -160,6 +176,12 @@ export default class Renderer {
             a.add(this.uAoDenoiseRadius, 'value', 1, 16, 0.5).name('Suavizado · radio')
             a.add(this.uAoDepthPhi, 'value', 0.5, 15, 0.5).name('Suavizado · bordes')
             a.add(this.uAoLumaPhi, 'value', 0.5, 20, 0.5).name('Suavizado · luma')
+            a.add(this._aoOptions, 'view',
+                { Normal: 'off', 'Ver normales': 'normal', 'Ver mascara': 'mask',
+                  'Ver AO crudo': 'ao', 'Ver AO x8': 'aoX8',
+                  'Ver mascara inv': 'maskX', 'Ver profundidad': 'depth' })
+                .name('Volcar bufer')
+                .onChange(() => this._buildPostProcessingPipeline())
             a.add(this._aoOptions, 'node', { GTAO: 'gtao', SSAO: 'ssao' })
                 .name('Algoritmo')
                 .onChange(() => this._buildPostProcessingPipeline())
@@ -374,6 +396,21 @@ export default class Renderer {
             // the foliage keeps casting AO without receiving any.
             const mask = scenePass.getTextureNode(AO_MASK).r
             sceneShaded = sceneColor.mul(mix(float(1), occlusion.r, mask))
+
+            // Guardados para poder VOLCARLOS A PANTALLA. Toda la caza de
+            // artefactos de hoy se ha hecho deduciendo desde el frame final,
+            // que es adivinar; esto permite mirar la entrada.
+            this._debugBuffers = {
+                normal: vec4(normalTexture.rgb.mul(0.5).add(0.5), 1.0),
+                mask: vec4(vec3(mask), 1.0),
+                ao: vec4(vec3(occlusion.r), 1.0),
+                // Invertido y multiplicado: la oclusion real aqui es sutil
+                // (0.97 sobre 1.0) y se pierde entera en el blanco. Asi lo
+                // debil se ve.
+                aoX8: vec4(vec3(occlusion.r.oneMinus().mul(8.0).clamp(0, 1)), 1.0),
+                maskX: vec4(vec3(mask.oneMinus()), 1.0),
+                depth: vec4(vec3(depthTexture.r.oneMinus().mul(40.0).clamp(0, 1)), 1.0),
+            }
         } else { this._aoPass = null; this._aoDenoise = null; this._normalCache = null }
 
         // 1. Outline Pass. The node's composite already clips the edge INSIDE
@@ -448,6 +485,14 @@ export default class Renderer {
         // only means "middle grey" once the image is in sRGB. This is exactly
         // what RenderOutputNode is for -- and it is why outputColorTransform
         // has to be turned off, or the renderer would do it a second time.
+        // Volcado de buferes: sale ANTES del grade y del iris, en crudo.
+        const view = this._aoOptions.view
+        if (view && view !== 'off' && this._debugBuffers?.[view]) {
+            this.renderPipeline.outputColorTransform = false
+            this.renderPipeline.outputNode = this._debugBuffers[view]
+            return
+        }
+
         this.renderPipeline.outputColorTransform = false
         let graded = renderOutput(finalOutput)
 
