@@ -24,20 +24,26 @@ import { snoise } from '../TSL/NoiseNodes.js'
 import { dayNightTint } from '../DayNight.js'
 import { ignoreAO } from '../aoMask.js'
 
-// Vertical lift so the flat field clears the grass floor it sits on. The grass
-// is only ~0.01 above the authored field height, so a hair is enough; the
-// material's polygonOffset handles any residual z-fighting at the edges.
+// Where the field's surface goes, in WORLD units -- set absolutely, not added
+// to whatever height the model happens to carry.
 //
-// Was 0.02, which read as the field hovering. Nobody could see a 2 cm gap until
-// the ambient occlusion arrived and drew a contact shadow into it, all the way
-// around the edge -- occlusion is very good at announcing exactly the kind of
-// small gap that is invisible on its own.
+// It used to be `position.y += 0.02`, and that is why the field floated. The
+// .glb's own node sits at y = 0.2168 while the grass underneath is at 0.2036,
+// so the model was already 1.3 cm too high before any lift was added on top.
+// Nudging a relative offset could never fix that: the number to change was one
+// nobody had measured.
 //
-// 0.004 because that is what the fringe already uses a few lines down and it
-// has never z-fought. The real protection was always the polygonOffset, which
-// biases the depth test rather than moving the geometry; this lift is only
-// there so the two surfaces are not mathematically coplanar.
-const GROUND_LIFT = 0.004
+// Both figures come from sampling the actual meshes: the grass under the whole
+// field footprint is dead flat at 0.2036 -- nine points across 28 x 28 metres,
+// zero variation -- so a single height is not an approximation here, it is
+// exact. Assigning it outright also survives a re-export at a different
+// authored height, which adding never would.
+//
+// The 2 mm is only so the two surfaces are not mathematically coplanar. What
+// actually prevents z-fighting is the material's polygonOffset below, which
+// biases the depth test rather than moving anything.
+const GRASS_TOP_Y = 0.2036
+const CLEARANCE = 0.002
 
 export default class BaseballPitch {
     constructor(gltf) {
@@ -51,7 +57,6 @@ export default class BaseballPitch {
 
         this.root = gltf.scene
         this.root.name = 'BaseballPitch'
-        this.root.position.y += GROUND_LIFT
 
         this.root.traverse((child) => {
             if (!child.isMesh) return
@@ -79,6 +84,21 @@ export default class BaseballPitch {
 
         this.root.updateMatrixWorld(true)
         this.bbox = new THREE.Box3().setFromObject(this.root)
+
+        // Land the surface on the grass by MEASURING it, not by trusting a
+        // number. The .glb wraps its mesh in a node carrying its own y, so
+        // nudging root.position was always adjusting the wrong end of a sum --
+        // which is how the field ended up 1.7 cm in the air with nobody able to
+        // point at the offending value. Reading the loaded height and closing
+        // the gap works whatever the model was authored at, and cannot drift
+        // when it is re-exported.
+        //
+        // It has to happen here: the positions arrive quantized (see the file
+        // header) and only mean anything after the traverse above has
+        // de-quantized them.
+        this.root.position.y += (GRASS_TOP_Y + CLEARANCE) - this.bbox.max.y
+        this.root.updateMatrixWorld(true)
+        this.bbox.setFromObject(this.root)
 
         this._buildFringe()
 
