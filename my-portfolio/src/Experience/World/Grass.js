@@ -111,21 +111,15 @@ export default class Grass {
 
         // Blade rendering
         this.uEmissionStrength = uniform(1.15)
-        // Cero: la hierba no recibe oclusion, igual que las copas de los
-        // arboles. 0.35 fue un intento intermedio y no bastaba.
+        // Fraccion de la oclusion que reciben las briznas -- se le pasa a
+        // withAOMask mas abajo. Son diez mil cartas finas de pie, asi que la
+        // oclusion que sale de ahi es mucho mas rotunda de lo que un cesped
+        // estilizado quiere.
         //
-        // Son diez mil cartas finas de pie, asi que cada mata genera su propio
-        // halo de oclusion y hay cientos a la vista. El efecto no se lee como
-        // sombra sino como que TODO el cesped se oscurece -- y como el cesped
-        // cubre la isla entera menos los claros de tierra, esos claros quedan
-        // recortados en claro dentro de un campo oscurecido. Eso es lo que se
-        // percibia como un aura alrededor de la hoguera: no era un anillo en
-        // torno al fuego, era el claro entero recortado.
-        //
-        // Costo cero cambiarlo: el canal lo escribe cada material igual y el
-        // pase de AO recorre la pantalla diga lo que diga. Solo cambia la
-        // imagen. Uniform de todas formas, por si quieres devolverle un poco.
-        this.uAoAmount = uniform(0.0)
+        // Estuvo un rato en 0 porque llegue a creer que era la causa del aura
+        // del claro de la hoguera. No lo era (era el halo del fuego), asi que
+        // vuelve al 0.35 que se pidio. Uniform, con deslizador en el panel.
+        this.uAoAmount = uniform(0.35)
         this.uAlphaCutoff = uniform(0.6)
         this.uAlphaSoftness = uniform(0.02)
 

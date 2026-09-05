@@ -415,6 +415,18 @@ export default class Fire {
         // del fuego y pisarlo lo perderia.
         const lightNight = night === undefined ? 1 : night
 
+        // Y el halo se DEJA DE DIBUJAR, no solo se pone a cero.
+        //
+        // Bajarle el color a cero deja el quad rasterizandose igual, y eso
+        // basta para ensuciar: sobre la tierra del claro aparecia una mancha
+        // oscura con la forma del sprite, visible de dia, de noche, y mas
+        // cuanto mas se subia la intensidad del AO. Con el color ya a cero.
+        //
+        // Es la misma leccion que el confeti: alpha 0 esconde un fragmento de
+        // la imagen, no lo saca del frame. Lo unico que garantiza no aportar
+        // nada es no estar.
+        if (this.glowMesh) this.glowMesh.visible = lightNight > 0.01
+
         // Smooth campfire flicker: three sines at non-harmonic frequencies.
         // Only CPU cost of the whole system (a few Math.sin per frame).
         const t = this.experience.time.elapsed * 0.001
