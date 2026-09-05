@@ -6,6 +6,7 @@ import {
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { snoise } from './TSL/NoiseNodes.js'
+import { excludeFromAO } from './aoMask.js'
 
 /**
  * Fire — stylized volumetric TSL fire
@@ -179,6 +180,20 @@ export default class Fire {
         this.flameMesh.count = 1
         this.flameMesh.visible = false             // until the first addFire()
         this.flameMesh.frustumCulled = false       // positions live in instance data
+        // A fire does not receive shade. It is the light.
+        //
+        // The flame takes the OPAQUE path on purpose -- alphaTest instead of
+        // transparency, so it needs no sorting -- which is right for the
+        // renderer and wrong for the ambient occlusion, because that path also
+        // means "solid surface, shade me like a rock". It was coming out
+        // blotched with grey inside the flame body: dirt on the one thing in
+        // the scene that should never have any.
+        //
+        // excludeFromAO and not ignoreAO: the flame DOES write depth, so it
+        // still states its normal and still occludes whatever is behind it,
+        // like any solid. It just stops receiving.
+        excludeFromAO(material)
+
         this.scene.add(this.flameMesh)
         this.flameMaterial = material
     }
