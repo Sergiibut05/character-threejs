@@ -145,7 +145,7 @@ export function excludeFromAO(material) {
  *
  * @param {Node} colorNode  what the material would have assigned directly
  */
-export function withAOMask(colorNode, { writesDepth = true } = {}) {
+export function withAOMask(colorNode, { writesDepth = true, receivesAO = 1 } = {}) {
     // All THREE attachments, not just the two that concern this file.
     //
     // An MRTNode is an output struct, so three uses it as the fragment output
@@ -156,7 +156,14 @@ export function withAOMask(colorNode, { writesDepth = true } = {}) {
     // attachment, it has to be added here on the same day.
     return mrt({
         output: colorNode,
-        [AO_MASK]: float(1),
+        // Not a switch. The renderer composites with
+        // `mix(1, occlusion, mask)`, so this channel is a BLEND FACTOR: 1 takes
+        // the full occlusion, 0 takes none, and everything between is a valid
+        // "how much of it does this surface want". Partial costs exactly the
+        // same as full -- it is the same write to the same attachment -- which
+        // makes it the right knob for a surface like grass, where the occlusion
+        // is not wrong, just too assertive for what the blades are.
+        [AO_MASK]: float(receivesAO),
         // The normal follows the same rule as everything else: only a surface
         // that contributes DEPTH may state one. The river is the exception here
         // -- it draws with depthWrite off, so stating its normal would stamp

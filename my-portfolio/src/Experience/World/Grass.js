@@ -111,6 +111,9 @@ export default class Grass {
 
         // Blade rendering
         this.uEmissionStrength = uniform(1.15)
+        // Fraction of the ambient occlusion the blades receive -- see where it
+        // is handed to withAOMask below. Uniform so it can be dialled live.
+        this.uAoAmount = uniform(0.35)
         this.uAlphaCutoff = uniform(0.6)
         this.uAlphaSoftness = uniform(0.02)
 
@@ -276,7 +279,19 @@ export default class Grass {
             alphaTest: 0.01
         })
         this.material.positionNode = posNode
-        this.material.fragmentNode = withAOMask(colorNode)
+        // Grass takes a fraction of the ambient occlusion, not all of it.
+        //
+        // The blades are thousands of thin cards standing in a field: the
+        // occlusion computed across them is not wrong, it is just far more
+        // assertive than a stylised lawn wants, and it reads as dirt rather
+        // than shade. The tree crowns opt out of AO entirely for the same
+        // reason (see aoMask.js); grass sits between the two, so it takes a
+        // share instead.
+        //
+        // Costs nothing either way: the channel is written by every material
+        // regardless, and the AO pass runs over the whole screen whatever this
+        // says. It changes the picture, not the frame time.
+        this.material.fragmentNode = withAOMask(colorNode, { receivesAO: this.uAoAmount })
 
         this.material.blending = THREE.CustomBlending
         this.material.blendSrc = THREE.SrcAlphaFactor
@@ -396,6 +411,7 @@ export default class Grass {
             .onChange(() => { this.setGeometry(); this.setMesh() })
 
         this.debugFolder.add(this.uEmissionStrength, 'value', 0.1, 3.0, 0.01).name('Brightness')
+        this.debugFolder.add(this.uAoAmount, 'value', 0, 1, 0.05).name('Oclusión recibida')
         this.debugFolder.add(this.uAlphaCutoff, 'value', 0.01, 0.6, 0.01).name('Alpha Cutoff')
         this.debugFolder.add(this.uAlphaSoftness, 'value', 0.02, 0.5, 0.01).name('Alpha Softness')
         this.debugFolder.add(this.uAOMix, 'value', 0.0, 1.0, 0.01).name('Root Darkness (AO)')
