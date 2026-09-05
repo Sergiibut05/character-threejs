@@ -398,12 +398,29 @@ export default class Fire {
         const night = this.experience.world?.environment?.skyNightFactor?.value
         if (night !== undefined) this.uGlowNight.value = night
 
+        // La MISMA curva para la luz real de la hoguera, y por el mismo motivo.
+        //
+        // Es una PointLight con distance finita, asi que ilumina una esfera y
+        // cae a cero de golpe en su radio: sobre suelo plano eso es un CIRCULO
+        // de diez metros. De noche es justo lo que se quiere. De dia estaba
+        // encendida a plena potencia sumando luz calida sobre tierra que ya
+        // esta clara -- satura, y tras el tone mapping ACES sale un disco
+        // apagado con un borde circular visible alrededor de la fogata.
+        //
+        // Aislado apagando solo estas luces sin tocar nada mas: el arco
+        // desaparece y el suelo queda uniforme de lado a lado.
+        //
+        // Se multiplica aqui, sobre el valor que ya calcula el parpadeo, y no
+        // sobre baseIntensity: eso lo escribe addFire() a partir de la escala
+        // del fuego y pisarlo lo perderia.
+        const lightNight = night === undefined ? 1 : night
+
         // Smooth campfire flicker: three sines at non-harmonic frequencies.
         // Only CPU cost of the whole system (a few Math.sin per frame).
         const t = this.experience.time.elapsed * 0.001
         for (const light of this.lights) {
             const s = light.userData.seed
-            light.intensity = light.userData.baseIntensity * (
+            light.intensity = light.userData.baseIntensity * lightNight * (
                 1.0
                 + this.lightFlicker1 * Math.sin(t * 7.3  + s)
                 + this.lightFlicker2 * Math.sin(t * 13.1 + s * 2.0)
