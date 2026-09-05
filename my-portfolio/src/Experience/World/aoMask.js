@@ -145,7 +145,7 @@ export function excludeFromAO(material) {
  *
  * @param {Node} colorNode  what the material would have assigned directly
  */
-export function withAOMask(colorNode) {
+export function withAOMask(colorNode, { writesDepth = true } = {}) {
     // All THREE attachments, not just the two that concern this file.
     //
     // An MRTNode is an output struct, so three uses it as the fragment output
@@ -157,7 +157,16 @@ export function withAOMask(colorNode) {
     return mrt({
         output: colorNode,
         [AO_MASK]: float(1),
-        [AO_NORMAL]: vec4(transformedNormalView, 1),
+        // The normal follows the same rule as everything else: only a surface
+        // that contributes DEPTH may state one. The river is the exception here
+        // -- it draws with depthWrite off, so stating its normal would stamp
+        // the water surface over the normals of the bed underneath while GTAO
+        // still reads the bed's depth, and occlusion computed from a depth and
+        // a normal belonging to different surfaces is exactly the artefact this
+        // file exists to prevent.
+        [AO_NORMAL]: writesDepth
+            ? vec4(transformedNormalView, 1)
+            : vec4(0, 0, 0, 0),
     })
 }
 

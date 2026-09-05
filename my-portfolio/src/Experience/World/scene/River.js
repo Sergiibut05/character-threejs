@@ -51,8 +51,11 @@ export default class River {
             transparent: true,
             depthWrite: false
         })
+        // writesDepth: false -- the water has depthWrite off just above, so it
+        // must not state a normal either. See aoMask.js.
         mat.fragmentNode = withAOMask(
-            createStylizedWaterNode(this.uniforms).mul(vec4(dayNightTint, 1.0)))
+            createStylizedWaterNode(this.uniforms).mul(vec4(dayNightTint, 1.0)),
+            { writesDepth: false })
 
         mesh.material?.dispose?.()
         mesh.material = mat
