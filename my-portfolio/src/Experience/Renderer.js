@@ -10,6 +10,7 @@ import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
 import { denoise } from 'three/examples/jsm/tsl/display/DenoiseNode.js'
+import { ssao } from './World/TSL/vendor/SSAONode.js'
 import { AO_MASK, AO_NORMAL, sweepDepthlessFromAO } from './World/aoMask.js'
 import Experience from './Experience.js'
 
@@ -109,7 +110,30 @@ export default class Renderer {
         //
         // It is a real saving and it stays one switch away, but the default
         // belongs on the side of the picture.
-        this._aoOptions = { halfRes: false }
+        // 'gtao' por defecto: SSAO esta aqui para poder compararlos en vivo,
+        // pero no arreglo el artefacto que motivo traerlo y todos los valores
+        // ajustados del panel se refieren a GTAO.
+        this._aoOptions = { halfRes: false, node: 'gtao' }
+
+        // -- SSAO --
+        //
+        // The alternative to GTAO, and the reason it is here: GTAO has no
+        // answer for depth discontinuities, so it draws a band of wrong
+        // occlusion along every silhouette -- the halo. This one rejects
+        // samples across a depth edge inside its own blur, which is the same
+        // idea the DenoiseNode was bolted on to provide, except done as part of
+        // the algorithm rather than after it.
+        //
+        // It also denoises itself, so on this path there is no DenoiseNode at
+        // all: one pass instead of two.
+        this.uSsaoRadius = uniform(0.5)
+        this.uSsaoIntensity = uniform(1.0)
+        // Depth offset that stops a surface shading itself. Too low is acne,
+        // too high eats the contact shadow that is the point of the effect.
+        this.uSsaoBias = uniform(0.025)
+        // How hard the blur refuses to cross a depth edge. Higher keeps edges
+        // crisper -- this is the halo knob.
+        this.uSsaoSharpness = uniform(2.0)
 
         this.uAoDenoiseRadius = uniform(4)
         this.uAoDepthPhi = uniform(0.5)
@@ -136,6 +160,13 @@ export default class Renderer {
             a.add(this.uAoDenoiseRadius, 'value', 1, 16, 0.5).name('Suavizado · radio')
             a.add(this.uAoDepthPhi, 'value', 0.5, 15, 0.5).name('Suavizado · bordes')
             a.add(this.uAoLumaPhi, 'value', 0.5, 20, 0.5).name('Suavizado · luma')
+            a.add(this._aoOptions, 'node', { GTAO: 'gtao', SSAO: 'ssao' })
+                .name('Algoritmo')
+                .onChange(() => this._buildPostProcessingPipeline())
+            a.add(this.uSsaoRadius, 'value', 0.05, 3, 0.05).name('SSAO · radio')
+            a.add(this.uSsaoIntensity, 'value', 0, 3, 0.05).name('SSAO · intensidad')
+            a.add(this.uSsaoBias, 'value', 0, 0.2, 0.005).name('SSAO · bias')
+            a.add(this.uSsaoSharpness, 'value', 0.1, 8, 0.1).name('SSAO · nitidez bordes')
             a.add(this._aoOptions, 'halfRes').name('Media resolución')
                 .onChange((v) => {
                     if (!this._aoPass) return
@@ -287,31 +318,53 @@ export default class Renderer {
             const normalTexture = scenePass.getTextureNode(AO_NORMAL)
             this._normalCache = normalTexture
 
-            const aoPass = ao(
-                depthTexture,
-                normalTexture,
-                this.camera.instance
-            )
-            aoPass.radius = this.uAoRadius
-            aoPass.scale = this.uAoScale
-            aoPass.thickness = this.uAoThickness
-            // Full resolution by default -- see the note on _aoOptions for why
-            // the cheaper setting is available but not chosen.
-            aoPass.resolutionScale = this._aoOptions.halfRes ? 0.5 : 1
-            this._aoPass = aoPass
+            // Two algorithms, one switch. Kept side by side rather than
+            // swapped outright because the only way to judge which is better
+            // here is to flip between them on the same frame, and because GTAO
+            // is what every tuned value in the debug panel refers to.
+            let occlusion
+            if (this._aoOptions.node === 'ssao') {
+                const aoPass = ssao(depthTexture, normalTexture, this.camera.instance)
+                aoPass.radius = this.uSsaoRadius
+                aoPass.intensity = this.uSsaoIntensity
+                aoPass.bias = this.uSsaoBias
+                aoPass.blurSharpness = this.uSsaoSharpness
+                aoPass.resolutionScale = this._aoOptions.halfRes ? 0.5 : 1
+                this._aoPass = aoPass
 
-            // Edge-aware smoothing of the raw occlusion, off the same real
-            // normals -- this is the call that was paying for 144 guesses.
-            const cleaned = denoise(
-                aoPass.getTextureNode(),
-                depthTexture,
-                normalTexture,
-                this.camera.instance
-            )
-            cleaned.radius = this.uAoDenoiseRadius
-            cleaned.depthPhi = this.uAoDepthPhi
-            cleaned.lumaPhi = this.uAoLumaPhi
-            this._aoDenoise = cleaned
+                // No DenoiseNode on this path: the blur is inside the node,
+                // and running a second one over it would only re-blur across
+                // the depth edges it just took care to respect.
+                this._aoDenoise = null
+                occlusion = aoPass.getTextureNode()
+            } else {
+                const aoPass = ao(
+                    depthTexture,
+                    normalTexture,
+                    this.camera.instance
+                )
+                aoPass.radius = this.uAoRadius
+                aoPass.scale = this.uAoScale
+                aoPass.thickness = this.uAoThickness
+                // Full resolution by default -- see the note on _aoOptions for
+                // why the cheaper setting is available but not chosen.
+                aoPass.resolutionScale = this._aoOptions.halfRes ? 0.5 : 1
+                this._aoPass = aoPass
+
+                // Edge-aware smoothing of the raw occlusion, off the same real
+                // normals -- this is the call that was paying for 144 guesses.
+                const cleaned = denoise(
+                    aoPass.getTextureNode(),
+                    depthTexture,
+                    normalTexture,
+                    this.camera.instance
+                )
+                cleaned.radius = this.uAoDenoiseRadius
+                cleaned.depthPhi = this.uAoDepthPhi
+                cleaned.lumaPhi = this.uAoLumaPhi
+                this._aoDenoise = cleaned
+                occlusion = cleaned
+            }
 
             // `.r`, not the whole texel. The AO target is single-channel
             // (RedFormat), so a bare multiply drives green and blue to zero and
@@ -320,7 +373,7 @@ export default class Renderer {
             // Blend the occlusion toward "none" wherever the mask says so, so
             // the foliage keeps casting AO without receiving any.
             const mask = scenePass.getTextureNode(AO_MASK).r
-            sceneShaded = sceneColor.mul(mix(float(1), cleaned.r, mask))
+            sceneShaded = sceneColor.mul(mix(float(1), occlusion.r, mask))
         } else { this._aoPass = null; this._aoDenoise = null; this._normalCache = null }
 
         // 1. Outline Pass. The node's composite already clips the edge INSIDE
