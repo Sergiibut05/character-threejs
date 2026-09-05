@@ -2,6 +2,20 @@ import * as THREE from 'three'
 import Experience from '../Experience.js'
 
 /**
+ * Physical key positions that drive the character, mapped to the four
+ * directions the movement code already speaks. Keyed by KeyboardEvent.code, so
+ * it is the same key under the same finger on every layout.
+ */
+const MOVEMENT_KEYS = {
+    KeyW: 'w', ArrowUp: 'w',
+    KeyS: 's', ArrowDown: 's',
+    KeyA: 'a', ArrowLeft: 'a',
+    KeyD: 'd', ArrowRight: 'd',
+    ShiftLeft: 'shift', ShiftRight: 'shift',
+}
+
+
+/**
  * Opening spawn, on the dirt in front of the house.
  *
  * Nudged right of the world origin rather than sitting on it — a small
@@ -117,7 +131,7 @@ export default class Character {
         this._uvSingOpen = new THREE.Vector2(0, 0.5)    // bottom-left: singing, eyes open
         this._uvSingClosed = new THREE.Vector2(0.5, 0.5)// bottom-right:singing, eyes closed (blink)
 
-        // Input
+        // Input -- see _onKeyChange for why this is keyed by physical position
         this.keys = { w: false, a: false, s: false, d: false, shift: false }
 
         // Beach minigame: restrict movement to a single world axis. When set to
@@ -282,8 +296,33 @@ export default class Character {
     }
 
     _onKeyChange(event, pressed) {
-        const key = event.key.toLowerCase()
-        if (key in this.keys) this.keys[key] = pressed
+        // event.code first, and this is not a detail: it reports the PHYSICAL
+        // key, while event.key reports the letter the layout produces. On
+        // AZERTY the key where W sits produces 'z', on Dvorak it produces ','
+        // -- so matching on the letter meant that anyone not on QWERTY pressed
+        // the key under their finger and the character did not move. They had
+        // no way of knowing the site was not simply broken.
+        //
+        // Arrows are in the same table because they cost nothing and they are
+        // the first thing a lot of people try.
+        const mapped = MOVEMENT_KEYS[event.code]
+        if (mapped) {
+            this.keys[mapped] = pressed
+
+            // Arrows scroll the page as well as walking. Suppress that -- but
+            // never while someone is typing, or entering a name into the
+            // leaderboard would stop working.
+            const el = event.target
+            const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
+                || el.isContentEditable)
+            if (!typing && event.code.startsWith('Arrow')) event.preventDefault()
+            return
+        }
+
+        // Fallback for anything that reports no code -- some virtual keyboards
+        // and remote-desktop clients send key only. QWERTY letters still work.
+        const key = event.key?.toLowerCase()
+        if (key && key in this.keys) this.keys[key] = pressed
     }
 
     // ─── Physics ────────────────────────────────────────────────────────
