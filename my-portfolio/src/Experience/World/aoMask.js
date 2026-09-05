@@ -222,6 +222,18 @@ function _applyIfDepthless(material) {
     // ones this skips.
     if (material.depthWrite !== false || material.colorWrite === false) return
     material.mrtNode = NEUTRAL
+    // WITHOUT THIS THE SWEEP DOES NOTHING AT ALL.
+    //
+    // mrtNode is read while the shader is being built, and by the time this
+    // runs the material has been compiled for many frames -- so the assignment
+    // lands on the object and never reaches a shader. Every material this net
+    // ever caught kept writing the attachments it was supposed to abstain
+    // from, which is why the campfire embers still drew an aura with the net
+    // sitting right on top of them.
+    //
+    // Only ever paid once per material: the guard above sees mrtNode on the
+    // next pass and returns before reaching here.
+    material.needsUpdate = true
 }
 
 /**

@@ -6,7 +6,7 @@ import {
 } from 'three/tsl'
 import Experience from '../Experience.js'
 import { snoise } from './TSL/NoiseNodes.js'
-import { excludeFromAO } from './aoMask.js'
+import { excludeFromAO, ignoreAO } from './aoMask.js'
 
 /**
  * Fire — stylized volumetric TSL fire
@@ -248,6 +248,12 @@ export default class Fire {
         material.blending = THREE.AdditiveBlending
         material.transparent = true
         material.depthWrite = false
+        // Las ascuas no opinan sobre la oclusion: no escriben profundidad, asi
+        // que su normal es la de un cuadrado orientado a camara sobre un suelo
+        // del que no saben nada. Sin esto estampan esa normal por TODO su quad
+        // y el AO calcula la oclusion del claro contra ella -- el aura oscura
+        // alrededor de la hoguera, otra vez, ahora en naranja. Ver aoMask.js.
+        ignoreAO(material)
 
         this.emberMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 8), material)
         this.emberMesh.count = 1
@@ -300,6 +306,10 @@ export default class Fire {
         material.blending = THREE.AdditiveBlending
         material.transparent = true
         material.depthWrite = false
+        // Igual que las ascuas. Ocultarlo de dia quito el disco apagado, pero
+        // de noche sigue dibujandose y su normal seguia entrando: la mitad del
+        // aura que quedaba era esta. Ver aoMask.js.
+        ignoreAO(material)
 
         this.glowMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 16), material)
         this.glowMesh.count = 1
