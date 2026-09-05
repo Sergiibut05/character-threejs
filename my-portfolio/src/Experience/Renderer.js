@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {
     pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs,
     vec2, vec3, vec4, max, length, luminance, renderOutput, mrt, output,
-    rtt, uv, getNormalFromDepth, cameraProjectionMatrixInverse
+    transformedNormalView
 } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
@@ -10,7 +10,7 @@ import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
 import { denoise } from 'three/examples/jsm/tsl/display/DenoiseNode.js'
-import { AO_MASK, sweepDepthlessFromAO } from './World/aoMask.js'
+import { AO_MASK, AO_NORMAL, sweepDepthlessFromAO } from './World/aoMask.js'
 import Experience from './Experience.js'
 
 /**
@@ -211,7 +211,7 @@ export default class Renderer {
         // finished by then (so the shadows are always settled first, whatever
         // the registration order), and update() runs between frames rather
         // than inside one.
-        this.quality.on('change', () => { this._qualityDirty = true; this._qualityWaited = 0 })
+        this.quality.on('change', () => { this._qualityDirty = true })
     }
 
     _buildPostProcessingPipeline() {
@@ -240,8 +240,15 @@ export default class Renderer {
         // while transparent ones blend by their output alpha. So a sprite
         // writing alpha 0 into this channel contributes exactly nothing and the
         // value underneath survives. See World/aoMask.js.
-        const sceneMRT = mrt({ output, [AO_MASK]: float(1) })
+        const sceneMRT = mrt({
+            output,
+            [AO_MASK]: float(1),
+            // Alpha 1 so an opaque surface actually writes it; the depth-less
+            // ones override with alpha 0 and leave the surface behind intact.
+            [AO_NORMAL]: vec4(transformedNormalView, 1),
+        })
         sceneMRT.setBlendMode(AO_MASK, { blending: THREE.MaterialBlending })
+        sceneMRT.setBlendMode(AO_NORMAL, { blending: THREE.MaterialBlending })
         scenePass.setMRT(sceneMRT)
         const sceneColor = scenePass.getTextureNode('output')
 
@@ -263,39 +270,26 @@ export default class Renderer {
             // buffer. It also drops the whole normal attachment, so the scene
             // pass goes back to being a plain colour node and everything
             // downstream is untouched.
+            // Real geometric normals, straight off the scene pass.
             //
-            // Reconstructed ONCE, into a texture, instead of on demand.
+            // These were reconstructed from the depth buffer until today, and
+            // that reconstruction is the reason objects wore a halo: it is
+            // sound across a flat surface and meaningless at a silhouette,
+            // which is precisely where GTAO then went wrong. See aoMask.js.
             //
-            // `normalNode = null` is what asks both nodes to rebuild the normal
-            // from depth, and getNormalFromDepth is not cheap: it reads the
-            // depth buffer NINE times (a five-tap cross on each axis, to pick
-            // the side of an edge that is not a cliff) plus two view-space
-            // unprojections. GTAO calls it once per pixel, which is fine.
-            //
-            // DenoiseNode calls it inside its 16-sample loop. That is 16 x 9 =
-            // 144 depth reads per pixel on top of everything else, and the
-            // denoise is not even a pass of its own -- it is inlined into the
-            // final composite, so it runs at full screen size at whatever pixel
-            // ratio the high tier is using. It was by far the most expensive
-            // thing in the frame.
-            //
-            // Every one of those 144 reads recomputes a value that depends only
-            // on the pixel, so it is pure repeated work. Doing it once into a
-            // half-float target and sampling that gives the SAME normals for
-            // ~1/17th of the reads. Nothing about the look is meant to change.
-            //
-            // Note this is not the MRT normal buffer that had to be abandoned:
-            // the source is still the depth buffer, which the transparent
-            // effects are absent from. It is the same reconstruction, cached.
+            // Cheaper as well as better. The reconstruction cost NINE depth
+            // reads every time it ran, and the denoise ran it inside a
+            // 16-sample loop; caching it into a texture cut that to one read
+            // but still paid for a full-screen pass to fill the cache. The
+            // rasteriser already knows every normal it draws, so writing them
+            // to an attachment costs nothing extra and that pass disappears.
             const depthTexture = scenePass.getTextureNode('depth')
-            const viewNormal = rtt(vec4(getNormalFromDepth(
-                uv(), depthTexture.value, cameraProjectionMatrixInverse
-            ), 1.0))
-            this._normalCache = viewNormal
+            const normalTexture = scenePass.getTextureNode(AO_NORMAL)
+            this._normalCache = normalTexture
 
             const aoPass = ao(
                 depthTexture,
-                viewNormal,
+                normalTexture,
                 this.camera.instance
             )
             aoPass.radius = this.uAoRadius
@@ -306,12 +300,12 @@ export default class Renderer {
             aoPass.resolutionScale = this._aoOptions.halfRes ? 0.5 : 1
             this._aoPass = aoPass
 
-            // Edge-aware smoothing of the raw occlusion, off the same cached
-            // normals -- this is the call that was paying for 144 of them.
+            // Edge-aware smoothing of the raw occlusion, off the same real
+            // normals -- this is the call that was paying for 144 guesses.
             const cleaned = denoise(
                 aoPass.getTextureNode(),
                 depthTexture,
-                viewNormal,
+                normalTexture,
                 this.camera.instance
             )
             cleaned.radius = this.uAoDenoiseRadius
@@ -494,51 +488,54 @@ export default class Renderer {
     }
 
     /**
-     * Whether the sun's shadow map exists if it is supposed to.
+     * Rebuild the pipeline, with the sun's shadow parked for one frame.
      *
-     * Rebuilding the pipeline is safe on its own, and turning the sun's shadow
-     * back on is safe on its own -- both were bisected. Doing BOTH inside the
-     * same frame is what breaks, and only in that direction:
+     * Bisected: rebuilding on its own is fine, and switching the sun's shadow
+     * back on is fine. Only doing BOTH inside one frame breaks, and only in
+     * that direction.
      *
      * three creates a light's shadow map inside ShadowNode.setup(), which runs
      * while a material compiles. A rebuild throws every shader away, so on the
      * first frame afterwards the shadow node's updateBefore() runs before
-     * anything has re-entered setup() -- and reads `this.shadowMap.depthTexture`
-     * off a null. The exception escapes through the middle of _renderObjects(),
-     * so the renderer never gets to restore its own state; the next pipeline is
-     * then compiled believing there is no MRT, comes out with one output
-     * against a two-attachment target, and is rejected. That is the pair of
-     * errors -- "Cannot read properties of null (reading 'depthTexture')" and
-     * "targets[1] framebuffer output" -- and the black screen after them.
+     * anything has re-entered setup() and reads `this.shadowMap.depthTexture`
+     * off a null. That exception escapes through the middle of
+     * _renderObjects(), so the renderer never restores its own state, and the
+     * next pipeline is compiled believing there is no MRT -- one output against
+     * a multi-attachment target, rejected. Hence the pair of errors, and the
+     * black screen after them.
      *
-     * So: wait. The frame that would have crashed instead renders with the
-     * pipeline that is already up, which is exactly the frame during which
-     * three sets the shadow map up. By the next one the dependency is real and
-     * the rebuild is safe. Costs one frame at the old quality level, on an
-     * action that already redraws everything.
+     * Waiting for the shadow map to appear was the first attempt and it held
+     * until the pass grew another attachment, which moved the timing enough to
+     * break it again. Guessing at the timing is the wrong game. This does not
+     * guess: it takes the two operations that are each safe alone and puts a
+     * frame between them.
      */
-    _shadowsSettled() {
+    _applyQualityChange() {
         const sun = this.experience.world?.environment?.sunLight
-        if (!sun || !sun.castShadow) return true
-        return sun.shadow.map !== null
+
+        // Park it. Restored on the next update(), by which point the shaders
+        // have been rebuilt and the shadow node has been through setup() again.
+        this._shadowToRestore = (sun && sun.castShadow) ? sun : null
+        if (this._shadowToRestore) sun.castShadow = false
+
+        // The high tier renders above the device pixel ratio (see
+        // Quality.pixelRatio), so switching tiers has to resize as well as
+        // rebuild -- otherwise the change only lands on the next resize.
+        this.instance.setPixelRatio(this.quality.pixelRatio)
+        this._buildPostProcessingPipeline()
     }
 
     update() {
         // Deferred from the quality listener -- see the comment there. Must
         // stay ahead of render() and behind every 'change' listener, which is
         // exactly where it is: Experience ticks camera, then world, then this.
-        // The wait is bounded. If the shadow map never turns up -- a device
-        // where the shadow pass is off entirely, or some future change that
-        // stops anything receiving shadows -- the setting must still land.
-        // Giving up after half a second is no worse than the old behaviour;
-        // hanging on the old quality level forever would be.
-        if (this._qualityDirty && (this._shadowsSettled() || ++this._qualityWaited > 30)) {
+        if (this._qualityDirty) {
             this._qualityDirty = false
-            // The high tier renders above the device pixel ratio (see
-            // Quality.pixelRatio), so switching tiers has to resize as well as
-            // rebuild -- otherwise the change only lands on the next resize.
-            this.instance.setPixelRatio(this.quality.pixelRatio)
-            this._buildPostProcessingPipeline()
+            this._applyQualityChange()
+        } else if (this._shadowToRestore) {
+            // A whole frame has been drawn with the new pipeline. Safe now.
+            this._shadowToRestore.castShadow = this.quality.sunShadows
+            this._shadowToRestore = null
         }
 
         // Safety net for the no-depth-write rule -- see aoMask.js. Cheap,

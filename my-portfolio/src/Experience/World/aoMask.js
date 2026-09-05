@@ -1,4 +1,4 @@
-import { mrt, float, vec4 } from 'three/tsl'
+import { mrt, float, vec4, transformedNormalView } from 'three/tsl'
 
 /**
  * Letting a surface opt OUT of ambient occlusion.
@@ -59,6 +59,29 @@ import { mrt, float, vec4 } from 'three/tsl'
 export const AO_MASK = 'aoMask'
 
 /**
+ * The MRT attachment carrying view-space surface normals.
+ *
+ * GTAO sweeps horizons around each pixel RELATIVE TO ITS NORMAL, so the normal
+ * is not a refinement -- it is half the input. It used to be rebuilt from the
+ * depth buffer, and that is fine in the middle of a surface and worthless at
+ * the edge of one: a reconstruction straddling a silhouette is differencing two
+ * surfaces metres apart, and `cross(dpdx, dpdy)` on that is noise. Noise in the
+ * normal at exactly the silhouette is a band of wrong occlusion tracing the
+ * outline -- the halo.
+ *
+ * The real normals were available all along and could not be used, because a
+ * plain MRT attachment is overwritten by every draw: the transparent effects,
+ * which contribute no depth, were stamping their own normals over the surfaces
+ * behind them and leaving dark rectangles on the ground. That is what sent this
+ * file down the depth-reconstruction road in the first place.
+ *
+ * Abstention fixes it for this attachment exactly as it fixed the mask, and for
+ * the same reason -- see the rule above. Now that a material can decline to
+ * write, only real geometry does.
+ */
+export const AO_NORMAL = 'normal'
+
+/**
  * "I opt out of occlusion." Alpha 1, so it lands.
  *
  * The alpha of an MRT output is its BLEND FACTOR, not data -- see the note on
@@ -73,7 +96,10 @@ const EXCLUDED = mrt({ [AO_MASK]: vec4(0, 0, 0, 1) })
  * "I have no opinion." Alpha 0, so it contributes nothing and the value
  * underneath survives untouched.
  */
-const NEUTRAL = mrt({ [AO_MASK]: vec4(0, 0, 0, 0) })
+const NEUTRAL = mrt({
+    [AO_MASK]: vec4(0, 0, 0, 0),
+    [AO_NORMAL]: vec4(0, 0, 0, 0),
+})
 
 /**
  * Set ONCE, at material creation, and never touched again — which is why the
@@ -120,7 +146,19 @@ export function excludeFromAO(material) {
  * @param {Node} colorNode  what the material would have assigned directly
  */
 export function withAOMask(colorNode) {
-    return mrt({ output: colorNode, [AO_MASK]: float(1) })
+    // All THREE attachments, not just the two that concern this file.
+    //
+    // An MRTNode is an output struct, so three uses it as the fragment output
+    // VERBATIM rather than merging it with the pass -- which means anything
+    // missing here is simply not written, and a shader with fewer outputs than
+    // the target has attachments is rejected outright. That is how the grass
+    // and the river vanished twice. If the scene pass ever grows a fourth
+    // attachment, it has to be added here on the same day.
+    return mrt({
+        output: colorNode,
+        [AO_MASK]: float(1),
+        [AO_NORMAL]: vec4(transformedNormalView, 1),
+    })
 }
 
 /**
