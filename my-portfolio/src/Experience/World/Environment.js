@@ -24,7 +24,7 @@ const TWO_PI = Math.PI * 2
 const SHADOW_DEPTH_MARGIN = 12
 
 // Shadow bias expressed in WORLD units; converted to the camera's NDC bias in
-// _applyShadowQuality. Matches what the old hardcoded -0.0001 worked out to
+// applyShadowQuality. Matches what the old hardcoded -0.0001 worked out to
 // around noon, which is where it was tuned.
 const SHADOW_BIAS_WORLD = 0.0035
 
@@ -180,9 +180,9 @@ export default class Environment {
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 1.6)
         this.sunLight.shadow.camera.near = 0.5
         this.sunLight.shadow.normalBias = 0.04
-        // castShadow and bias are both quality-derived — see _applyShadowQuality.
+        // castShadow and bias are both quality-derived — see applyShadowQuality.
 
-        this._applyShadowQuality()
+        this.applyShadowQuality()
 
         this.sunLight.position.set(4, 5, -3)
         this.sunLight.target.position.set(0, 0, 0)
@@ -192,10 +192,17 @@ export default class Environment {
         this.skyLight = new THREE.HemisphereLight('#dbeafe', '#fef3c7', 0.7)
         this.scene.add(this.skyLight)
 
-        // React to live quality changes
-        quality.on('change', () => {
-            this._applyShadowQuality()
-        })
+        // Deliberately NOT subscribed to quality 'change'.
+        //
+        // Flipping castShadow creates or destroys the sun's shadow map, and
+        // three's ShadowNode.updateBefore() reads `this.shadowMap.depthTexture`
+        // with no null check while _reset() is free to leave shadowMap null.
+        // So every castShadow transition is a window for that crash, and the
+        // way to survive is to have as few of them as possible, at a moment
+        // chosen between frames rather than inside the click handler.
+        //
+        // Renderer owns that moment and calls applyShadowQuality() from it.
+        // See Renderer._applyQualityChange().
     }
 
     /**
@@ -232,7 +239,7 @@ export default class Environment {
      * re-run on every quality change — so switching level at runtime lands in
      * the same state a reload at that level would.
      */
-    _applyShadowQuality() {
+    applyShadowQuality() {
         const quality = this.experience.quality
         const sc = quality.shadowCameraSize
         const cam = this.sunLight.shadow.camera

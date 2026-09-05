@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {
     pass, uniform, float, screenUV, screenSize, mix, smoothstep, abs,
     vec2, vec3, vec4, max, length, luminance, renderOutput, mrt, output,
-    transformedNormalView
+    normalView
 } from 'three/tsl'
 import { outline } from 'three/examples/jsm/tsl/display/OutlineNode.js'
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js'
@@ -255,21 +255,17 @@ export default class Renderer {
         // "Destroyed texture [Texture "aoMask"] used in a submit" and the
         // invalid-pipeline errors that follow it.
         //
-        // The second reason is ORDER. Two other listeners hang off this event:
-        // the settings modal, and Environment, which flips the sun's castShadow
-        // and so creates or destroys the shadow map. They run in registration
-        // order, and that order is decided by a race -- Renderer subscribes
-        // once `renderer.init()` resolves, Environment once the resources are
-        // ready, and either can win on any given load. Rebuild before
-        // Environment has moved the shadows and the new pass is wired to a
-        // shadow map that is about to be disposed; the next frame then walks
-        // into `Cannot read properties of null (reading 'depthTexture')`.
+        // The second reason is ORDER, and it is why this class now owns the
+        // shadow flip as well. Environment used to move castShadow from its own
+        // listener, synchronously inside the click, while this one deferred --
+        // so a single click moved castShadow THREE times: Environment set it,
+        // the deferred handler parked it back, and the frame after restored it.
+        // Every one of those transitions is a chance at the null shadow map
+        // described on _applyQualityChange, and the parking that was meant to
+        // help had doubled the number of chances to hit it.
         //
-        // Deferring to update() fixes both: every synchronous listener has
-        // finished by then (so the shadows are always settled first, whatever
-        // the registration order), and update() runs between frames rather
-        // than inside one.
-        this.quality.on('change', () => { this._qualityDirty = true })
+        // One user action is now one transition, at a moment this class picks.
+        this.quality.on('change', () => { this._qualityStep = 1 })
     }
 
     _buildPostProcessingPipeline() {
@@ -303,7 +299,7 @@ export default class Renderer {
             [AO_MASK]: float(1),
             // Alpha 1 so an opaque surface actually writes it; the depth-less
             // ones override with alpha 0 and leave the surface behind intact.
-            [AO_NORMAL]: vec4(transformedNormalView, 1),
+            [AO_NORMAL]: vec4(normalView, 1),
         })
         sceneMRT.setBlendMode(AO_MASK, { blending: THREE.MaterialBlending })
         sceneMRT.setBlendMode(AO_NORMAL, { blending: THREE.MaterialBlending })
@@ -612,19 +608,38 @@ export default class Renderer {
      * a multi-attachment target, rejected. Hence the pair of errors, and the
      * black screen after them.
      *
-     * Waiting for the shadow map to appear was the first attempt and it held
-     * until the pass grew another attachment, which moved the timing enough to
-     * break it again. Guessing at the timing is the wrong game. This does not
-     * guess: it takes the two operations that are each safe alone and puts a
-     * frame between them.
+     * Where the null actually comes from, in three's own source:
+     * ShadowNode.updateBefore() ends with
+     *
+     *     this.shadowMap.depthTexture.version === this._depthVersionCached
+     *
+     * and nothing on that line is guarded, while _reset() -- reached from both
+     * setup() and dispose() -- sets `this.shadowMap = null`. So any frame that
+     * updates a shadow node between its reset and its next setup() throws, and
+     * moving castShadow is exactly what schedules that pair.
+     *
+     * Which makes the count the thing to fix, not the timing. Two steps, one
+     * frame apart, one transition each:
+     *
+     *   step 1  the shadows move, once, and the frame renders with the old
+     *           pipeline -- momentarily the wrong post-processing for the tier,
+     *           for one frame, which nobody can see;
+     *   step 2  the pipeline is rebuilt against shadows that have already
+     *           settled and been through a full frame.
+     *
+     * Earlier attempts guessed at the timing -- wait for the shadow map, park
+     * castShadow across a frame -- and each held until the pass changed shape.
+     * This does not guess at when the transitions are safe; it reduces how many
+     * there are and never overlaps one with a rebuild.
      */
-    _applyQualityChange() {
-        const sun = this.experience.world?.environment?.sunLight
-
-        // Park it. Restored on the next update(), by which point the shaders
-        // have been rebuilt and the shadow node has been through setup() again.
-        this._shadowToRestore = (sun && sun.castShadow) ? sun : null
-        if (this._shadowToRestore) sun.castShadow = false
+    _applyQualityChange(step) {
+        if (step === 1) {
+            // Everything the tier decides about shadows, in ONE go: castShadow,
+            // the ortho box, the bias, the map size. Environment used to do
+            // this from its own listener -- see the note on the subscription.
+            this.experience.world?.environment?.applyShadowQuality()
+            return
+        }
 
         // The high tier renders above the device pixel ratio (see
         // Quality.pixelRatio), so switching tiers has to resize as well as
@@ -637,13 +652,10 @@ export default class Renderer {
         // Deferred from the quality listener -- see the comment there. Must
         // stay ahead of render() and behind every 'change' listener, which is
         // exactly where it is: Experience ticks camera, then world, then this.
-        if (this._qualityDirty) {
-            this._qualityDirty = false
-            this._applyQualityChange()
-        } else if (this._shadowToRestore) {
-            // A whole frame has been drawn with the new pipeline. Safe now.
-            this._shadowToRestore.castShadow = this.quality.sunShadows
-            this._shadowToRestore = null
+        if (this._qualityStep) {
+            const step = this._qualityStep
+            this._qualityStep = step < 2 ? step + 1 : 0
+            this._applyQualityChange(step)
         }
 
         // Safety net for the no-depth-write rule -- see aoMask.js. Cheap,

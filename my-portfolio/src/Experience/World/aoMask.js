@@ -1,4 +1,4 @@
-import { mrt, float, vec4, transformedNormalView } from 'three/tsl'
+import { mrt, float, vec4, normalView } from 'three/tsl'
 
 /**
  * Letting a surface opt OUT of ambient occlusion.
@@ -172,7 +172,7 @@ export function withAOMask(colorNode, { writesDepth = true, receivesAO = 1 } = {
         // a normal belonging to different surfaces is exactly the artefact this
         // file exists to prevent.
         [AO_NORMAL]: writesDepth
-            ? vec4(transformedNormalView, 1)
+            ? vec4(normalView, 1)
             : vec4(0, 0, 0, 0),
     })
 }
