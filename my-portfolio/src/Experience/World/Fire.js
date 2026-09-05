@@ -87,6 +87,9 @@ export default class Fire {
         // ── Halo / glow ──
         this.uGlowColor    = uniform(new THREE.Color('#ff7a30'))
         this.uGlowStrength = uniform(0.54)
+        // Cuanta noche hay, de 0 a 1. Lo escribe update() desde el ciclo
+        // dia/noche del Environment -- ver el nodo del halo mas abajo.
+        this.uGlowNight = uniform(1.0)
         this.uGlowSize     = uniform(1.2)       // halo sprite scale (× fire scale)
         this.uGlowHeight   = uniform(0.45)      // halo center height offset (× scale)
 
@@ -277,7 +280,21 @@ export default class Fire {
         material.positionNode = glowAttr.xyz.add(vec3(0.0, glowAttr.w.mul(this.uGlowHeight), 0.0))
         material.scaleNode = glowAttr.w.mul(this.uGlowSize)
         material.outputNode = vec4(
-            this.uGlowColor.mul(halo).mul(this.uGlowStrength).mul(flicker),
+            // El halo se apaga con el sol.
+            //
+            // Es aditivo, asi que de dia estaba SUMANDO luz calida sobre
+            // tierra ya clara: se satura, y despues del tone mapping ACES eso
+            // no se lee como mas brillo sino como un disco APAGADO de ocho
+            // metros alrededor de la hoguera. Parecia un artefacto de la
+            // oclusion ambiental y no lo era en absoluto.
+            //
+            // Un charco de luz de hoguera solo existe cuando alrededor hay
+            // menos luz que en el fuego. De dia no hay nada que iluminar, asi
+            // que no debe haber halo. Uniform aparte y no multiplicar sobre
+            // uGlowStrength: ese es el valor autorado y lo edita el panel; si
+            // update() escribiera encima, cada frame lo iria acercando a cero.
+            this.uGlowColor.mul(halo).mul(this.uGlowStrength)
+                .mul(this.uGlowNight).mul(flicker),
             halo
         )
         material.blending = THREE.AdditiveBlending
@@ -375,6 +392,12 @@ export default class Fire {
     }
 
     update() {
+        // El halo sigue al ciclo dia/noche -- ver el nodo donde se usa.
+        // Environment interpola nightFactor entre sus paradas horarias, asi que
+        // esto ya viene suavizado; no hace falta amortiguarlo aqui.
+        const night = this.experience.world?.environment?.skyNightFactor?.value
+        if (night !== undefined) this.uGlowNight.value = night
+
         // Smooth campfire flicker: three sines at non-harmonic frequencies.
         // Only CPU cost of the whole system (a few Math.sin per frame).
         const t = this.experience.time.elapsed * 0.001
