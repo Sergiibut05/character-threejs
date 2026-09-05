@@ -130,6 +130,9 @@ export default class Renderer {
         // pero no arreglo el artefacto que motivo traerlo y todos los valores
         // ajustados del panel se refieren a GTAO.
         this._aoOptions = { halfRes: false, node: 'gtao', view: 'off' }
+        // Ganancia del volcado, ajustable en caliente: lo que se busca suele
+        // estar muy por debajo del umbral en que se ve sobre negro.
+        this.uDebugGain = uniform(8.0)
 
         // -- SSAO --
         //
@@ -179,9 +182,11 @@ export default class Renderer {
             a.add(this._aoOptions, 'view',
                 { Normal: 'off', 'Ver normales': 'normal', 'Ver mascara': 'mask',
                   'Ver AO crudo': 'ao', 'Ver AO x8': 'aoX8',
+                  'Ver multiplicador': 'mulX',
                   'Ver mascara inv': 'maskX', 'Ver profundidad': 'depth' })
                 .name('Volcar bufer')
                 .onChange(() => this._buildPostProcessingPipeline())
+            a.add(this.uDebugGain, 'value', 1, 128, 1).name('Volcado · ganancia')
             a.add(this._aoOptions, 'node', { GTAO: 'gtao', SSAO: 'ssao' })
                 .name('Algoritmo')
                 .onChange(() => this._buildPostProcessingPipeline())
@@ -407,8 +412,13 @@ export default class Renderer {
                 // Invertido y multiplicado: la oclusion real aqui es sutil
                 // (0.97 sobre 1.0) y se pierde entera en el blanco. Asi lo
                 // debil se ve.
-                aoX8: vec4(vec3(occlusion.r.oneMinus().mul(8.0).clamp(0, 1)), 1.0),
-                maskX: vec4(vec3(mask.oneMinus()), 1.0),
+                aoX8: vec4(vec3(occlusion.r.oneMinus().mul(this.uDebugGain).clamp(0, 1)), 1.0),
+                maskX: vec4(vec3(mask.oneMinus().mul(this.uDebugGain).clamp(0, 1)), 1.0),
+                // El multiplicador EXACTO que se aplica al color de la escena.
+                // Si los artefactos estan en el frame final tienen que estar
+                // aqui: es literalmente lo unico que el AO le hace a la imagen.
+                mulX: vec4(vec3(mix(float(1), occlusion.r, mask)
+                    .oneMinus().mul(this.uDebugGain).clamp(0, 1)), 1.0),
                 depth: vec4(vec3(depthTexture.r.oneMinus().mul(40.0).clamp(0, 1)), 1.0),
             }
         } else { this._aoPass = null; this._aoDenoise = null; this._normalCache = null }
