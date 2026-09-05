@@ -27,7 +27,17 @@ import { ignoreAO } from '../aoMask.js'
 // Vertical lift so the flat field clears the grass floor it sits on. The grass
 // is only ~0.01 above the authored field height, so a hair is enough; the
 // material's polygonOffset handles any residual z-fighting at the edges.
-const GROUND_LIFT = 0.02
+//
+// Was 0.02, which read as the field hovering. Nobody could see a 2 cm gap until
+// the ambient occlusion arrived and drew a contact shadow into it, all the way
+// around the edge -- occlusion is very good at announcing exactly the kind of
+// small gap that is invisible on its own.
+//
+// 0.004 because that is what the fringe already uses a few lines down and it
+// has never z-fought. The real protection was always the polygonOffset, which
+// biases the depth test rather than moving the geometry; this lift is only
+// there so the two surfaces are not mathematically coplanar.
+const GROUND_LIFT = 0.004
 
 export default class BaseballPitch {
     constructor(gltf) {
