@@ -81,6 +81,36 @@ const SHADOW_NORMAL_BIAS_TEXELS = 1.0
  */
 const SHADOW_SOFTNESS_WORLD = 0.35
 
+/**
+ * How far the sun is allowed to turn before the SHADOW is allowed to follow,
+ * measured in texels of movement at the edge of the shadow box.
+ *
+ * THE ONE THING TEXEL SNAPPING CANNOT DO. Snapping quantises WHERE the shadow
+ * camera sits, and that fixes the crawl from following the player. It does
+ * nothing for the crawl from the sun turning, because the grid being snapped
+ * to is built from the light direction: rotate the light and the whole grid
+ * rotates with it, so every texel lands somewhere new no matter what the
+ * centre does. The advice going around for this problem gets that wrong -- it
+ * rebuilds its snapping basis from the current light direction every frame,
+ * which is precisely the thing that is moving.
+ *
+ * So the direction itself is quantised. The sun crosses the sky at a degree a
+ * second here, which is about 0.18 of a texel per frame at thirty metres: never
+ * a clean step to the next texel, just a permanent slide between two, and that
+ * slide is what reads as a fast repetitive twitch along every shadow edge.
+ * Held to a grid instead, the shadow map is bit-identical for several frames
+ * and then moves once, by a known amount.
+ *
+ * Two texels is the default: still for about seven frames at 60fps, then a
+ * 98 mm step underneath 350 mm of blur -- under a third of the gradient, so
+ * the step lands inside the softness and cannot be picked out.
+ *
+ * Only the SHADOW is quantised. The sun disc, the sky and the colour of the
+ * light keep moving continuously; shading is a smooth dot product with no
+ * edge to alias, so it has nothing to gain from this and everything to lose.
+ */
+const SHADOW_QUANT_TEXELS = 2.0
+
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
 const _shadowRight = new THREE.Vector3()
@@ -235,6 +265,9 @@ export default class Environment {
         // castShadow, bias and normalBias are all quality-derived — see
         // applyShadowQuality.
         this.shadowNormalBiasTexels = SHADOW_NORMAL_BIAS_TEXELS
+        this.shadowQuantTexels = SHADOW_QUANT_TEXELS
+        // Needed by _quantiseShadowDir before applyShadowQuality has run once.
+        this.shadowTexel = (2 * quality.shadowCameraSize) / quality.shadowMapSize
 
         this.applyShadowQuality()
 
@@ -257,6 +290,33 @@ export default class Environment {
         //
         // Renderer owns that moment and calls applyShadowQuality() from it.
         // See Renderer._applyQualityChange().
+    }
+
+    /**
+     * Round a light direction onto a fixed angular grid, in place.
+     *
+     * Quantising the ANGLES rather than the vector keeps the step uniform: a
+     * grid laid on x/y/z would be fine near the poles and coarse at the
+     * equator. Azimuth and elevation both, because the sun's arc moves in
+     * both. See SHADOW_QUANT_TEXELS for why this exists at all.
+     *
+     * @param {THREE.Vector3} dir  unit direction, modified in place
+     */
+    _quantiseShadowDir(dir) {
+        const step = this.shadowQuantTexels * this.shadowTexel /
+            this.experience.quality.shadowCameraSize
+        if (!(step > 0)) return
+
+        const azimuth = Math.round(Math.atan2(dir.z, dir.x) / step) * step
+        const elevation = Math.round(
+            Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) / step) * step
+
+        const horizontal = Math.cos(elevation)
+        dir.set(
+            Math.cos(azimuth) * horizontal,
+            Math.sin(elevation),
+            Math.sin(azimuth) * horizontal
+        ).normalize()
     }
 
     /**
@@ -505,6 +565,7 @@ export default class Environment {
             shadowDir.y = MIN_SHADOW_ELEVATION
             shadowDir.normalize()
         }
+        this._quantiseShadowDir(shadowDir)
 
         // Bias scaled by how low the sun is.
         //
@@ -639,6 +700,12 @@ export default class Environment {
         f.add(this, 'shadowSoftness', 0.05, 1.2, 0.01)
             .name('Sombras · suavizado (m)')
             .onChange(() => this.applyShadowQuality())
+
+        // 0 = the sun turns continuously and the edges crawl again. Higher
+        // holds the shadow still for longer between bigger steps. See
+        // SHADOW_QUANT_TEXELS.
+        f.add(this, 'shadowQuantTexels', 0, 8, 0.25)
+            .name('Sombras · cuantización (texels)')
 
         // Quick jump presets
         const presets = {
