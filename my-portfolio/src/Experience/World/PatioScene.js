@@ -255,6 +255,26 @@ export default class PatioScene {
     async _buildDecorativePieces() {
         const r = this.resources.items
 
+        // ONE PIECE PER FRAME, and this is the whole point of the method.
+        //
+        // The header above has always promised that these "pop in smoothly
+        // over the next frames". They did not: after the imports resolved,
+        // all nineteen were constructed back to back in a single continuation
+        // -- geometry cloned, instance matrices written, materials built,
+        // pipelines compiled on first draw -- inside ONE frame.
+        //
+        // And `allReady` fires once the player is already walking, so that
+        // frame landed two or three seconds into the first walk. Time.js
+        // clamps a spike like that to 100 ms, so the mixer advanced a tenth of
+        // a second in one go and the walk cycle jumped: it read as the
+        // animation restarting itself, once, and never again -- because this
+        // work is only ever done once.
+        //
+        // Yielding between pieces spends the same total time across ~19 frames
+        // instead of one. Nothing here depends on the piece before it.
+        // `done`, not `r`: `r` is this.resources.items three lines up.
+        const frame = () => new Promise(done => requestAnimationFrame(() => done()))
+
         console.time('PatioScene · decorative imports')
         const [
             { default: Coblestone },
@@ -271,24 +291,29 @@ export default class PatioScene {
         ])
         console.timeEnd('PatioScene · decorative imports')
 
+        await frame()
         if (!this.pieces.coblestone && r.coblestoneModel && r.coblestoneInstances) {
             this.pieces.coblestone = new Coblestone(r.coblestoneModel, r.coblestoneInstances)
         }
 
+        await frame()
         if (!this.pieces.fence && r.fenceModel && r.fenceInstances) {
             this.pieces.fence = new Fence(r.fenceModel, r.fenceInstances, r.tinyAtlas)
         }
 
+        await frame()
         if (!this.pieces.parkThings && r.parkThingsModel) {
             this.pieces.parkThings = new StaticPiece('parkThings', r.parkThingsModel, {
                 map: r.forestAtlas || null
             })
         }
 
+        await frame()
         if (!this.pieces.parkRock && r.parkRockModel && r.parkRockInstances) {
             this.pieces.parkRock = new InstancedProp('parkRock', r.parkRockModel, r.parkRockInstances, r.forestAtlas || null)
         }
 
+        await frame()
         if (!this.pieces.trunk && r.trunkModel && r.trunkInstances) {
             this.pieces.trunk = new InstancedProp('trunk', r.trunkModel, r.trunkInstances, r.forestAtlas || null)
         }
@@ -296,6 +321,8 @@ export default class PatioScene {
         // Palm tree — 3 parts (trunk / coconuts / fronds) that must stay
         // assembled, with its own KTX2 textures and QUANTIZED positions, so it
         // is cloned rather than instanced (see ClonedFromJSON's header).
+
+        await frame()
         if (!this.pieces.palmTree && r.palmTreeModel && r.palmTreeInstances) {
             const { default: ClonedFromJSON } = await import('./scene/ClonedFromJSON.js')
             this.pieces.palmTree = new ClonedFromJSON(
@@ -307,6 +334,8 @@ export default class PatioScene {
 
         // Beach props: signboard + sandcastle on the Tiny atlas, with the sign's
         // artwork kept as its own texture.
+
+        await frame()
         if (!this.pieces.beachThings && r.beachThingsModel && r.tinyAtlas) {
             const art = r.wahuIslandTexture || null
             this.pieces.beachThings = new StaticPiece('beachThings', r.beachThingsModel, {
@@ -326,11 +355,15 @@ export default class PatioScene {
         }
 
         // Deckchairs and parasols — instanced from their reference JSONs.
+
+        await frame()
         if (!this.pieces.beachChair && r.beachChairModel && r.beachChairInstances) {
             this.pieces.beachChair = new InstancedProp(
                 'beachChair', r.beachChairModel, r.beachChairInstances, r.tinyAtlas || null
             )
         }
+
+        await frame()
         if (!this.pieces.beachUmbrella && r.beachUmbrellaModel && r.beachUmbrellaInstances) {
             this.pieces.beachUmbrella = new InstancedProp(
                 'beachUmbrella', r.beachUmbrellaModel, r.beachUmbrellaInstances, r.tinyAtlas || null
@@ -340,6 +373,8 @@ export default class PatioScene {
         // Beach ball — single mesh already placed by the GLB node, with its own
         // texture, so StaticPiece (no atlas) drops it in as authored. Its
         // positions are quantized: never bake a matrix into this geometry.
+
+        await frame()
         if (!this.pieces.beachBall && r.beachBallModel) {
             this.pieces.beachBall = new StaticPiece('beachBall', r.beachBallModel, {})
 
@@ -357,12 +392,14 @@ export default class PatioScene {
             }
         }
 
+        await frame()
         if (!this.pieces.socialArea && r.socialAreaModel) {
             this.pieces.socialArea = new StaticPiece('socialArea', r.socialAreaModel, {
                 map: r.tinyAtlas || null
             })
         }
 
+        await frame()
         if (!this.pieces.socialEntrance && r.socialEntranceModel) {
             const titleTex = r.socialTittleTexture || null
             this.pieces.socialEntrance = new StaticPiece('socialEntrance', r.socialEntranceModel, {
@@ -377,31 +414,42 @@ export default class PatioScene {
         }
 
         // Fallback: build these if they weren't caught by sourceLoaded yet
+
+        await frame()
         if (!this.pieces.house && r.houseModel) {
             this.pieces.house = new StaticPiece('house', r.houseModel, {
                 map: r.tinyAtlas || null
             })
         }
+
+        await frame()
         if (!this.pieces.outsideHouseThings && r.outsideHouseThingsModel) {
             this.pieces.outsideHouseThings = new StaticPiece('outsideHouseThings', r.outsideHouseThingsModel, {
                 map: r.tinyAtlas || null
             })
         }
+
+        await frame()
         if (!this.pieces.river && r.riverModel) {
             this.pieces.river = new River(r.riverModel)
         }
+
+        await frame()
         if (!this.pieces.bridge && r.bridgeModel) {
             this.pieces.bridge = new StaticPiece('bridge', r.bridgeModel, { map: r.forestAtlas || null })
         }
         // Last resort: build the sign even if the map picture never turned up,
         // so a failed texture costs the map ON it rather than the whole sign
         // (and with it the way to open the map from the world).
+        await frame()
         this._buildInfoBoard({ allowWithoutMap: true })
 
+        await frame()
         if (!this.pieces.baseballPitch && r.baseballPitchModel) {
             this.pieces.baseballPitch = new BaseballPitch(r.baseballPitchModel)
         }
 
+        await frame()
         if (!this.pieces.blackCave && r.blackCaveModel) {
             this.pieces.blackCave = new BlackCave(r.blackCaveModel)
         }
