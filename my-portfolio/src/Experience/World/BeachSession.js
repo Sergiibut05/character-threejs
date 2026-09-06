@@ -25,15 +25,12 @@ const tutorialSteps = () => [
         icon: iconAim,
         image: '/images/beach.png',
         title: t('beach.tutorial.title'),
-        body: (d) => {
-            const c = controls(d)
-            // The press label opens the sentence here and sits mid-sentence in
-            // the frisbee copy, so it is capitalised at the call site.
-            return t('beach.tutorial.body', {
-                move: c.move,
-                press: c.press.charAt(0).toUpperCase() + c.press.slice(1)
-            })
-        }
+        // {move} only, and no {press}, because THERE IS NO BUTTON. The return
+        // is a swept test in BeachMinigame._hit: the ball bounces the moment
+        // its underside crosses the contact plane while you are within the hit
+        // radius. Nothing is pressed, ever. The first version of this panel
+        // told people to press Enter, which does nothing at all here.
+        body: (d) => t('beach.tutorial.body', { move: controls(d).move })
     }
 ]
 
@@ -190,21 +187,43 @@ export default class BeachSession {
         if (character) character.movementLocked = false
     }
 
-    _startSession(mode) {
+    async _startSession(mode) {
         const character = this.experience.world?.character
         // start() re-locks movement its own way (planarLock), so release the
         // modal freeze first or the player would be stuck on the court.
         if (character) character.movementLocked = false
 
+        // Iris out, set the court up in the dark, iris back in.
+        //
+        // start() teleports the player onto the court and swings the camera to
+        // a fixed side-on framing in one frame, which as a hard cut reads as a
+        // glitch rather than as arriving somewhere. The frisbee opens the same
+        // way, and so do the house doors, so the whole world enters and leaves
+        // its activities with the same wipe.
+        const renderer = this.experience.renderer
+        renderer.setIrisTransitionEnabled(true)
+        await this.experience.animateValue(1.35, 0.0, 520,
+            (v) => renderer.setIrisTransitionSize(v))
+
         if (!this.minigame.start(mode)) {
+            renderer.setIrisTransitionEnabled(false)
             this._launching = false
             return
         }
         this.active = true
         this._launching = false
 
-        // First time ever: the panel comes up over the served ball, frozen,
-        // so nobody loses a rally to reading it.
+        await this.experience.waitMs(120)
+        await this.experience.animateValue(0.0, 1.35, 700,
+            (v) => renderer.setIrisTransitionSize(v))
+        renderer.setIrisTransitionEnabled(false)
+
+        // Left mid-iris (Esc, or the modal closing under us).
+        if (!this.active) return
+
+        // First time ever, and only once the island is on screen: a panel
+        // over a black circle explains nothing. Frozen, so nobody loses a
+        // rally to reading it.
         if (!this._tutorialSeen()) {
             this._setPaused(true)
             this._showTutorial(() => {

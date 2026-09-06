@@ -195,11 +195,10 @@ export default {
             record: 'récord {n}',
             widerCourt: 'Pista más ancha',
             tutorial: {
-                title: 'Mantén la pelota en el aire',
-                body: 'La pelota cae sola: {press} justo cuando la tengas encima ' +
-                    'para devolverla arriba. Darle en el centro es un ¡Perfecto! ' +
-                    'y encadena el toque. Cada tanto sube el viento y estrecha la ' +
-                    'pista, así que muévete con {move} para seguir debajo.'
+                title: 'Ponte debajo de la pelota',
+                body: 'No hay que pulsar nada: la devuelves solo con estar debajo. ' +
+                    'Muévete con {move} para seguirla, y cuanto más centrada la ' +
+                    'toques, mejor — justo en el centro es un ¡Perfecto!'
             },
             narrowerCourt: 'Pista más estrecha',
             ballBeach: 'Pelota de playa',

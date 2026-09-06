@@ -347,11 +347,10 @@ export default {
             record: 'best {n}',
             widerCourt: 'Wider court',
             tutorial: {
-                title: 'Keep the ball up',
-                body: 'The ball falls on its own: {press} just as it comes overhead ' +
-                    'to send it back up. Hitting it dead centre is a Perfect! and ' +
-                    'keeps the streak going. Every so often the wind picks up and ' +
-                    'the court narrows, so move with {move} to stay underneath it.'
+                title: 'Get under the ball',
+                body: 'Nothing to press: standing underneath is what returns it. ' +
+                    'Move with {move} to follow the ball, and the closer to centre ' +
+                    'you meet it the better — dead centre is a Perfect!'
             },
             narrowerCourt: 'Narrower court',
             ballBeach: 'Beach ball',
