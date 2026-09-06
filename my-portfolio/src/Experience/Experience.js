@@ -17,6 +17,7 @@ import sources from './sources.js'
 import i18n from './Utils/i18n.js'
 import { t } from './Utils/gameText.js'
 import MoveHint from './World/ui/MoveHint.js'
+import FrameSpy from './Utils/FrameSpy.js'
 
 let instance = null
 
@@ -288,6 +289,14 @@ export default class Experience {
         // how to walk. It leaves on the first keypress. See ui/MoveHint.js.
         this.moveHint = new MoveHint()
         this.moveHint.show()
+
+        // Frame profiler, off unless asked for. `#spy` in the URL starts it
+        // immediately; otherwise it waits on window.frameSpy.start(). See
+        // Utils/FrameSpy.js -- it exists to name whoever is behind the one-off
+        // hitch a couple of seconds into the first walk.
+        this.frameSpy = new FrameSpy(this)
+        window.frameSpy = this.frameSpy
+        if (window.location.hash.includes('spy')) this.frameSpy.start()
     }
 
     waitMs(ms) {
