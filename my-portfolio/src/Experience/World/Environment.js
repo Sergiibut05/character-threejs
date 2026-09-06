@@ -28,6 +28,28 @@ const SHADOW_DEPTH_MARGIN = 12
 // around noon, which is where it was tuned.
 const SHADOW_BIAS_WORLD = 0.0035
 
+/**
+ * normalBias, counted in SHADOW-MAP TEXELS rather than in metres.
+ *
+ * Acne is a sampling problem, so its scale is the texel, not the world. Across
+ * one texel the stored depth is constant while the real ground keeps falling
+ * away, and how far it falls is `texel * tan(angle between light and normal)`.
+ * With a 9.8 cm texel and the sun down at its floor of 17.5 degrees that is
+ * 31 cm of depth inside a single sample -- which a fixed 4 cm normalBias, the
+ * number that used to sit here, is not within seven times of covering. Hence
+ * the bands across the flat sand when the sun is low.
+ *
+ * Counted in texels it tracks shadowCameraSize and shadowMapSize by itself, so
+ * widening the shadow box can no longer quietly re-introduce the stripes --
+ * the same reason SHADOW_BIAS_WORLD above is authored in metres and converted.
+ *
+ * The cost of raising it is peter-panning: the shadow slides off its caster by
+ * roughly this distance, which shows up first as a gap under the character's
+ * feet. That trade is the whole tuning range, so it has a slider in the debug
+ * panel -- see setDebug.
+ */
+const SHADOW_NORMAL_BIAS_TEXELS = 1.5
+
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
 const _shadowRight = new THREE.Vector3()
@@ -179,8 +201,9 @@ export default class Environment {
 
         this.sunLight = new THREE.DirectionalLight('#fff4e6', 1.6)
         this.sunLight.shadow.camera.near = 0.5
-        this.sunLight.shadow.normalBias = 0.04
-        // castShadow and bias are both quality-derived — see applyShadowQuality.
+        // castShadow, bias and normalBias are all quality-derived — see
+        // applyShadowQuality.
+        this.shadowNormalBiasTexels = SHADOW_NORMAL_BIAS_TEXELS
 
         this.applyShadowQuality()
 
@@ -260,6 +283,11 @@ export default class Environment {
         this.sunLight.shadow.mapSize.width = quality.shadowMapSize
         this.sunLight.shadow.mapSize.height = quality.shadowMapSize
         this.sunLight.shadow.radius = quality.shadowRadius
+
+        // In texels, so it follows the box and the map. See the constant.
+        this.shadowTexel = (2 * sc) / quality.shadowMapSize
+        this.sunLight.shadow.normalBias =
+            this.shadowTexel * this.shadowNormalBiasTexels
     }
 
     setSky() {
@@ -542,6 +570,14 @@ export default class Environment {
         })
         f.add(this.cycle, 'enabled').name('Cycle running')
         f.add(this.cycle, 'durationSec', 5, 600, 1).name('Day length (s)')
+
+        // Acne at one end, peter-panning at the other, and the sweet spot moves
+        // with the sun -- so it is tuned by looking, at the lowest sun of the
+        // day. Bands across the flat sand: too low. A gap between the character
+        // and his own shadow: too high. See SHADOW_NORMAL_BIAS_TEXELS.
+        f.add(this, 'shadowNormalBiasTexels', 0, 4, 0.05)
+            .name('Sombras · normalBias (texels)')
+            .onChange(() => this.applyShadowQuality())
 
         // Quick jump presets
         const presets = {
