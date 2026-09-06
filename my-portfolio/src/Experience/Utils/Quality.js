@@ -124,8 +124,29 @@ export default class Quality extends EventEmitter {
      */
     get sunShadows() { return REAL_SHADOWS_SUPPORTED && this.isHigh }
 
-    /** Fixed to 1024. Resizing this dynamically in WebGPU causes crashes. */
-    get shadowMapSize()    { return 1024 }
+    /**
+     * 2048, and CONSTANT.
+     *
+     * The constraint was never the number, it was the changing: resizing a
+     * shadow map at runtime crashes the WebGPU backend, so this must return
+     * the same value for every quality level and never be recomputed. It does.
+     *
+     * What the size buys is sharpness, because what actually matters is the
+     * TEXEL -- how much world one shadow-map pixel covers. At 1024 over a
+     * +-50 m box that was 9.8 cm, which is coarse enough that a low sun put
+     * visible bands of self-shadowing across flat ground. Doubling the map
+     * halves it to 4.9 cm.
+     *
+     * Everything downstream follows on its own: Environment derives both the
+     * normalBias and the texel-snapping grid from this and shadowCameraSize
+     * rather than from typed-in numbers, so the bias halves with the texel and
+     * the shadows stop needing as much of it.
+     *
+     * The cost is real and worth knowing: the shadow pass rasterises four
+     * times the pixels, and the map is 4x the memory. Only the sun casts, and
+     * only on high quality, so nothing on a low-end device pays it.
+     */
+    get shadowMapSize()    { return 2048 }
     /** PCF kernel half-size: 1 low (sharp, cheap) / 3 high (soft, expensive). */
     get shadowRadius()     { return this.isLow ? 1 : 3 }
     /**
