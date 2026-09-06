@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
+import { keyboardTaken } from '../Utils/keyboardOwners.js'
+import { socialAreaOwnsArrows } from './SocialArea.js'
 
 /**
  * Physical key positions that drive the character, mapped to the four
@@ -363,6 +365,15 @@ export default class Character {
         // the first thing a lot of people try.
         const mapped = MOVEMENT_KEYS[event.code]
         if (mapped) {
+            // Only a PRESS can be refused; a release is always recorded.
+            //
+            // The asymmetry is the whole safety of this. If a claim can appear
+            // while a key is already held -- walk into the social ring holding
+            // Right, or open the name picker mid-stride -- then dropping the
+            // keyup along with it would leave that direction stuck down, and
+            // the character walking on his own with nothing held.
+            if (pressed && !this._ownsMovementKey(event.code)) return
+
             this.keys[mapped] = pressed
 
             // Arrows scroll the page as well as walking. Suppress that -- but
@@ -771,6 +782,23 @@ export default class Character {
         if (state === 'walking') return this.walkSpeed / this.walkStrideSpeed
         if (state === 'running') return this.runSpeed / this.runStrideSpeed
         return 1
+    }
+
+    /**
+     * Is this key ours to walk on, or has something else claimed it?
+     *
+     * WASD and the arrows both walk, and neither set belongs to the character
+     * alone -- see Utils/keyboardOwners.js for who else wants them and why the
+     * two claims have different shapes.
+     *
+     * @param {string} code  KeyboardEvent.code
+     */
+    _ownsMovementKey(code) {
+        if (keyboardTaken()) return false
+        if ((code === 'ArrowLeft' || code === 'ArrowRight') && socialAreaOwnsArrows()) {
+            return false
+        }
+        return true
     }
 
     _updateState(deltaTime, isMoving) {

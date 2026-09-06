@@ -2,6 +2,7 @@ import './ui.css'
 import { t } from '../../Utils/gameText.js'
 import Modal from './Modal.js'
 import { createButton } from './Button.js'
+import { claimKeyboard } from '../../Utils/keyboardOwners.js'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PAD_REPEAT_MS = 160
@@ -64,6 +65,10 @@ export default class NameEntry {
         this.active = 0
         this._render()
         this.modal.open()
+        // Every key is ours while the picker is up -- the arrows step the
+        // reels and the letters set them, and all eight of those also walk
+        // the character. See Utils/keyboardOwners.js.
+        this._releaseKeyboard = claimKeyboard(this)
 
         const gp = this.experience?.gamepad
         if (gp) { gp.suspendMenuNav = true; this._pa = !!gp.getActions?.().button2 }
@@ -72,6 +77,8 @@ export default class NameEntry {
     }
 
     _close() {
+        this._releaseKeyboard?.()
+        this._releaseKeyboard = null
         window.removeEventListener('keydown', this._onKeyDown, true)
         this.experience?.time?.off('tick', this._onTick)
         const gp = this.experience?.gamepad
@@ -147,6 +154,10 @@ export default class NameEntry {
     }
 
     destroy() {
+        // Destroyed without closing still has to hand the keyboard back, or
+        // nothing walks again for the rest of the session.
+        this._releaseKeyboard?.()
+        this._releaseKeyboard = null
         window.removeEventListener('keydown', this._onKeyDown, true)
         this.experience?.time?.off('tick', this._onTick)
         const gp = this.experience?.gamepad

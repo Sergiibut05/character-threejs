@@ -517,13 +517,27 @@ export default class SocialArea {
     }
 
     // ─── Input ───────────────────────────────────────────────────────────
-    _handleKey(e) {
-        if (this.state !== 'active') return
+
+    /**
+     * Is the ring listening right now?
+     *
+     * One source of truth on purpose. Character asks the same question before
+     * treating Left/Right as walking, so the two can never both answer a press
+     * -- or both ignore it, which is the failure the guards below used to make
+     * easy: whenever one of them said no, the arrow had to go back to being a
+     * step. See Utils/keyboardOwners.js.
+     */
+    ownsInput() {
+        if (this.state !== 'active') return false
         // Don't fight open modals / typing fields.
-        if (document.querySelector('.fz-modal-overlay.is-open, .fz-proj.is-open')) return
-        if (seatOwnsInteract()) return  // the seat you are at wins the key
+        if (document.querySelector('.fz-modal-overlay.is-open, .fz-proj.is-open')) return false
+        if (seatOwnsInteract()) return false  // the seat you are at wins the key
         const tag = document.activeElement?.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return
+        return tag !== 'INPUT' && tag !== 'TEXTAREA'
+    }
+
+    _handleKey(e) {
+        if (!this.ownsInput()) return
 
         if (e.key === 'ArrowLeft') { e.preventDefault(); this._cycle(-1) }
         else if (e.key === 'ArrowRight') { e.preventDefault(); this._cycle(1) }
@@ -660,4 +674,15 @@ export default class SocialArea {
             this.fireflies = null
         }
     }
+}
+
+/**
+ * Do Left/Right belong to the social ring rather than to walking?
+ *
+ * Left and Right ONLY: Up and Down keep walking you, so the arrows are never
+ * a dead end -- you can always step off the pedestal with the same hand.
+ */
+export function socialAreaOwnsArrows() {
+    const area = new Experience().world?.socialArea
+    return area?.ownsInput() === true
 }
