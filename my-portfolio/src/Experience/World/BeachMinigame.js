@@ -349,8 +349,19 @@ export default class BeachMinigame {
         this.helpBtn.classList.add('is-visible')
         this.windEl.classList.toggle('is-visible', this.windEnabled)
         this._renderHud()
-        this._showFlash(t('beach.go'))
         return true
+    }
+
+    /**
+     * The "¡A jugar!" call-out, fired by BeachSession when play actually
+     * begins rather than by start().
+     *
+     * start() runs behind a closed iris, so a flash there was over before the
+     * screen was even open, and it announced a rally that was still waiting on
+     * a tutorial panel.
+     */
+    announceStart() {
+        this._showFlash(t('beach.go'))
     }
 
     /**

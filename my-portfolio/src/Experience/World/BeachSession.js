@@ -210,6 +210,16 @@ export default class BeachSession {
             this._launching = false
             return
         }
+
+        // FROZEN FROM THE FIRST FRAME, before the iris even opens.
+        //
+        // start() serves the ball, and the serve places it at the top of its
+        // arc with zero velocity: it is gravity in update() that drops it. So
+        // pausing here leaves it hanging exactly where it should start from.
+        // Without this it fell for the whole 700 ms of the iris and then some,
+        // behind a black circle, and by the time anyone could see the court
+        // the rally was already underway.
+        this._setPaused(true)
         this.active = true
         this._launching = false
 
@@ -221,16 +231,33 @@ export default class BeachSession {
         // Left mid-iris (Esc, or the modal closing under us).
         if (!this.active) return
 
-        // First time ever, and only once the island is on screen: a panel
-        // over a black circle explains nothing. Frozen, so nobody loses a
-        // rally to reading it.
+        // A beat to take in the court before anything is asked of you.
+        await this.experience.waitMs(450)
+        if (!this.active) return
+
+        // First time ever, and only once the island is on screen: a panel over
+        // a black circle explains nothing.
         if (!this._tutorialSeen()) {
-            this._setPaused(true)
             this._showTutorial(() => {
                 this._markTutorialSeen()
-                this._setPaused(false)
+                this._beginPlay()
             })
+            return
         }
+        this._beginPlay()
+    }
+
+    /**
+     * Hand the rally over to the player: call it out, let that land, then let
+     * the ball go. The pause is lifted LAST, so nothing has moved until the
+     * moment they have been told it is about to.
+     */
+    async _beginPlay() {
+        if (!this.active) return
+        this.minigame.announceStart()
+        await this.experience.waitMs(650)
+        if (!this.active) return
+        this._setPaused(false)
     }
 
     // ─── Rally finished (competitive only) ───────────────────────────────
