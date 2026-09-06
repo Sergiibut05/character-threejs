@@ -269,13 +269,34 @@ export default class Character {
         }
 
         for (const [key, action] of Object.entries(this.actions)) {
-            if (key === 'rest' || key === 'throw') {
+            const oneShot = key === 'rest' || key === 'throw'
+            if (oneShot) {
                 action.setLoop(THREE.LoopOnce)
                 action.clampWhenFinished = true
             } else {
                 action.setLoop(THREE.LoopRepeat)
             }
-            action.play()
+
+            // THE ONE-SHOTS ARE NOT STARTED HERE, and that is the whole point.
+            //
+            // Every action used to be play()ed at weight 0 so the mixer had
+            // them warm. For a looping clip that is free. For a LoopOnce clip
+            // it is not: it runs invisibly from the first frame and REACHES ITS
+            // END, and reaching the end fires 'finished' -- a real event, from
+            // a clip nobody is watching.
+            //
+            // `rest` lasts 5.067 s, so a little over five seconds after the
+            // model loads -- which is a second or two into your first walk,
+            // once the loader and the iris have had their turn -- it ended and
+            // announced itself, and the handler below yanked the character into
+            // idle mid-stride. The state machine put it back on the very next
+            // frame, so what you saw was two crossfades colliding: the spasm.
+            // Once, always at the same moment, and never again, because a
+            // clamped LoopOnce only ever finishes the once.
+            //
+            // Weight 0 hides a clip from the picture. It does not stop it
+            // running, and it does not stop it having opinions.
+            if (!oneShot) action.play()
             action.setEffectiveWeight(0)
         }
 
@@ -283,7 +304,12 @@ export default class Character {
         if (this.activeAction) this.activeAction.setEffectiveWeight(1)
 
         this.mixer.addEventListener('finished', (e) => {
-            if (e.action === this.actions.rest) this._transitionTo('idle')
+            // Guarded on the state as well as the clip. Belt and braces with
+            // the play() above: 'finished' means "go back to idle" only if we
+            // were actually resting, never merely because a clip ran out.
+            if (e.action === this.actions.rest && this.state === 'resting') {
+                this._transitionTo('idle')
+            }
         })
     }
 
@@ -294,7 +320,9 @@ export default class Character {
         if (newAction === this.activeAction) { this.state = newState; return }
 
         const fade = newState === 'resting' ? 0.4 : 0.25
-        newAction.reset()
+        // play() because 'rest' is no longer running from boot -- see
+        // setAnimation(). Harmless on the looping clips, which already are.
+        newAction.reset().play()
         newAction.setEffectiveTimeScale(this._locomotionScale(newState))
         newAction.setEffectiveWeight(1)
         // warp: false, and it matters.
@@ -696,7 +724,8 @@ export default class Character {
         this.throwPauseTime = pauseAtTime ?? this.throwClipDuration
 
         const action = this.actions.throw
-        action.reset()
+        // Same as 'rest': started here, not at boot. See setAnimation().
+        action.reset().play()
         action.setEffectiveWeight(1)
         action.setEffectiveTimeScale(1)
         action.paused = false
