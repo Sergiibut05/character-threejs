@@ -26,7 +26,7 @@ function createRng(seed) {
 }
 
 export default class Foliage {
-    constructor(references, colorANode, colorBNode, seeThrough = false, castShadow = true) {
+    constructor(references, colorANode, colorBNode, seeThrough = false) {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.resources = this.experience.resources
@@ -36,7 +36,6 @@ export default class Foliage {
         this.colorANode = colorANode
         this.colorBNode = colorBNode
         this.seeThrough = seeThrough
-        this.castShadow = castShadow
         this.seeThroughMultiplier = 0.5
         this.lockSeeThroughToScreenCenter = true
         this.seeThroughCenterOffsetY = -0.04
@@ -256,13 +255,7 @@ export default class Foliage {
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material.instance, count)
         this.mesh.receiveShadow = true
-        // Trees pass false and draw a CanopyShadow instead. Leaf cards are
-        // camera-facing billboards with a wind-animated alpha cutout, so the
-        // silhouette they show the sun changes both when the player moves the
-        // camera and when nobody moves at all -- see CanopyShadow.js. Bushes
-        // keep casting: they sit low, they are small, and their shadow is
-        // mostly hidden underneath them anyway.
-        this.mesh.castShadow = this.castShadow
+        this.mesh.castShadow = true
         this.mesh.frustumCulled = false
 
         for (let i = 0; i < count; i++) {

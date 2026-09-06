@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { uniform } from 'three/tsl'
 import Foliage from './Foliage.js'
-import CanopyShadow from './CanopyShadow.js'
 import Experience from '../Experience.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
@@ -144,18 +143,12 @@ export default class Trees {
             }
         }
 
-        this.setCanopyShadow(unshift)
-
         if (references.length > 0) {
             this.leaves = new Foliage(
                 references,
                 this.leavesColorANode,
                 this.leavesColorBNode,
-                true,
-                // The canopy does not cast: CanopyShadow draws its shade
-                // instead. The trunk still casts, and it is what anchors the
-                // pool to the tree. See CanopyShadow.js.
-                false
+                true
             )
             const m = this.leaves.material
             const o = this.foliageOpts
@@ -166,45 +159,6 @@ export default class Trees {
             if (o.colorAPresence !== undefined) m.colorAPresence.value = o.colorAPresence
             if (o.toneVariation !== undefined) m.toneVariation.value = o.toneVariation
         }
-    }
-
-    /**
-     * The soft pool of shade under each tree, sized from the leaves themselves.
-     *
-     * Measured in the trunk-relative frame the clusters are already assembled
-     * in (see setLeaves), so it is the authored canopy that decides how wide
-     * the shadow is -- not a number typed here that a re-export would silently
-     * invalidate.
-     */
-    setCanopyShadow(unshift) {
-        if (!this.modelParts.leaves.length || !this.references.length) return
-        // High tier only, for now. On low the sun casts nothing at all
-        // (Quality.sunShadows), so there would be no shadow-pass work to trade
-        // away -- the pools would be pure added fill rate on exactly the
-        // devices with the least of it. Low keeps FakeShadow's blobs.
-        if (!this.experience.quality.isHigh) return
-
-        const box = new THREE.Box3()
-        const clusterBox = new THREE.Box3()
-        const m = new THREE.Matrix4()
-        for (const leaves of this.modelParts.leaves) {
-            if (!leaves.geometry.boundingBox) leaves.geometry.computeBoundingBox()
-            clusterBox.copy(leaves.geometry.boundingBox)
-            clusterBox.applyMatrix4(m.copy(leaves.matrix).premultiply(unshift))
-            box.union(clusterBox)
-        }
-        if (box.isEmpty()) return
-
-        const size = new THREE.Vector3()
-        const center = new THREE.Vector3()
-        box.getSize(size)
-        box.getCenter(center)
-
-        this.canopyShadow = new CanopyShadow(
-            this.references,
-            Math.max(size.x, size.z) * 0.5,
-            Math.max(center.y, 0.1)
-        )
     }
 
     setPhysical() {
@@ -241,9 +195,6 @@ export default class Trees {
     update() {
         if (this.leaves) {
             this.leaves.update()
-        }
-        if (this.canopyShadow) {
-            this.canopyShadow.update()
         }
     }
 
