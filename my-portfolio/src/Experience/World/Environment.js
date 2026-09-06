@@ -320,9 +320,12 @@ export default class Environment {
             1, this.shadowSoftness / ((2 * sc) / quality.shadowMapSize))
 
         // In texels, so it follows the box and the map. See the constant.
+        //
+        // This is the bias for a sun straight overhead. It is SCALED BY THE
+        // ELEVATION every frame, in _applyTimeOfDay -- see the note there.
         this.shadowTexel = (2 * sc) / quality.shadowMapSize
-        this.sunLight.shadow.normalBias =
-            this.shadowTexel * this.shadowNormalBiasTexels
+        this.shadowNormalBiasBase = this.shadowTexel * this.shadowNormalBiasTexels
+        this.sunLight.shadow.normalBias = this.shadowNormalBiasBase
     }
 
     setSky() {
@@ -502,6 +505,23 @@ export default class Environment {
             shadowDir.y = MIN_SHADOW_ELEVATION
             shadowDir.normalize()
         }
+
+        // Bias scaled by how low the sun is.
+        //
+        // A fixed normalBias is correct at exactly one elevation and wrong at
+        // every other one, because the depth a single texel spans is
+        // texel * tan(angle between the light and the surface normal). Flat
+        // ground under a sun straight overhead needs almost none; the same
+        // ground at the 17 degree floor of this cycle needs 155 mm, three
+        // times what the flat number gives it. So the leftover twitch came and
+        // went with the hour of the day -- acne appearing as the sun dropped
+        // and clearing again as it rose.
+        //
+        // shadowDir.y IS the sine of the elevation (unit vector) and is already
+        // clamped to MIN_SHADOW_ELEVATION, so dividing by it costs nothing, can
+        // never blow up, and lands within a few percent of the tangent it is
+        // standing in for: 1x overhead, 3.3x at the floor.
+        this.sunLight.shadow.normalBias = this.shadowNormalBiasBase / shadowDir.y
 
         // Constant: the range is sized for the worst case up front, so the
         // shadow projection never has to be rebuilt mid-cycle.
