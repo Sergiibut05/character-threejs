@@ -348,9 +348,9 @@ export default {
             widerCourt: 'Wider court',
             tutorial: {
                 title: 'Get under the ball',
-                body: 'Nothing to press: standing underneath is what returns it. ' +
-                    'Move with {move} to follow the ball, and the closer to centre ' +
-                    'you meet it the better — dead centre is a Perfect!'
+                body: 'Nothing to press: standing underneath returns it. Move ' +
+                    'with {move} to follow the ball and meet it dead centre for ' +
+                    'a Perfect!'
             },
             narrowerCourt: 'Narrower court',
             ballBeach: 'Beach ball',

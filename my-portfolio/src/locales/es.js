@@ -196,9 +196,9 @@ export default {
             widerCourt: 'Pista más ancha',
             tutorial: {
                 title: 'Ponte debajo de la pelota',
-                body: 'No hay que pulsar nada: la devuelves solo con estar debajo. ' +
-                    'Muévete con {move} para seguirla, y cuanto más centrada la ' +
-                    'toques, mejor — justo en el centro es un ¡Perfecto!'
+                body: 'No hay que pulsar nada: la devuelves con estar debajo. ' +
+                    'Muévete con {move} para seguirla y tócala centrada: eso es ' +
+                    'un ¡Perfecto!'
             },
             narrowerCourt: 'Pista más estrecha',
             ballBeach: 'Pelota de playa',

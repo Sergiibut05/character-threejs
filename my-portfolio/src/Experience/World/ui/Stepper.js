@@ -40,14 +40,19 @@ export default class Stepper {
         this.textEl = step.querySelector('.fz-step-text')
         this.modal.append(step)
 
+        // Dots only when there is somewhere to go. A lone dot is not a
+        // progress indicator, it is a full stop.
+        this.multi = steps.length > 1
         this.dotsEl = document.createElement('div')
         this.dotsEl.className = 'fz-step-dots'
-        for (let i = 0; i < steps.length; i++) {
-            const dot = document.createElement('span')
-            dot.className = 'fz-step-dot'
-            this.dotsEl.appendChild(dot)
+        if (this.multi) {
+            for (let i = 0; i < steps.length; i++) {
+                const dot = document.createElement('span')
+                dot.className = 'fz-step-dot'
+                this.dotsEl.appendChild(dot)
+            }
+            this.modal.append(this.dotsEl)
         }
-        this.modal.append(this.dotsEl)
 
         const row = document.createElement('div')
         row.className = 'fz-btn-row'
@@ -60,7 +65,14 @@ export default class Stepper {
         this.nextBtn.type = 'button'
         this.nextBtn.className = 'fz-btn fz-btn--primary'
         this.nextBtn.addEventListener('click', () => this._next())
-        row.appendChild(this.backBtn)
+        // Back is APPENDED only when it can ever be used.
+        //
+        // On a multi-step panel it stays in the layout and merely goes
+        // invisible on the first step, so the primary button does not jump
+        // sideways as you page through. With a single step there is no paging
+        // and nothing to keep still, so reserving the space just pushes the
+        // only button off-centre.
+        if (this.multi) row.appendChild(this.backBtn)
         row.appendChild(this.nextBtn)
         this.modal.append(row)
 
@@ -92,7 +104,9 @@ export default class Stepper {
         }
 
         const isLast = this.index === this.steps.length - 1
-        this.backBtn.style.visibility = this.index === 0 ? 'hidden' : 'visible'
+        if (this.multi) {
+            this.backBtn.style.visibility = this.index === 0 ? 'hidden' : 'visible'
+        }
         this.nextBtn.textContent = isLast
             ? (this.finishLabel || t('common.play'))
             : t('common.next')
