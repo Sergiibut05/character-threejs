@@ -26,7 +26,7 @@ function createRng(seed) {
 }
 
 export default class Foliage {
-    constructor(references, colorANode, colorBNode, seeThrough = false) {
+    constructor(references, colorANode, colorBNode, seeThrough = false, castShadow = true) {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.resources = this.experience.resources
@@ -36,6 +36,7 @@ export default class Foliage {
         this.colorANode = colorANode
         this.colorBNode = colorBNode
         this.seeThrough = seeThrough
+        this.castShadow = castShadow
         this.seeThroughMultiplier = 0.5
         this.lockSeeThroughToScreenCenter = true
         this.seeThroughCenterOffsetY = -0.04
@@ -255,7 +256,16 @@ export default class Foliage {
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material.instance, count)
         this.mesh.receiveShadow = true
-        this.mesh.castShadow = true
+        // Opt-out, currently unused, kept because the reason to want it is
+        // real: leaf cards are camera-facing billboards with a wind-animated
+        // alpha cutout, so the silhouette they show the sun changes both when
+        // the player moves the camera and when nobody moves at all. That is
+        // the shimmering in tree shadows, and it is not a depth-precision
+        // problem, so no bias or filter setting will ever settle it. Replacing
+        // the cast shadow with a drawn pool of shade is the fix; that pool is
+        // not written yet, and turning this off without one just deletes the
+        // shadow.
+        this.mesh.castShadow = this.castShadow
         this.mesh.frustumCulled = false
 
         for (let i = 0; i < count; i++) {

@@ -47,8 +47,14 @@ const SHADOW_BIAS_WORLD = 0.0035
  * roughly this distance, which shows up first as a gap under the character's
  * feet. That trade is the whole tuning range, so it has a slider in the debug
  * panel -- see setDebug.
+ *
+ * One texel is the starting point and NOT a verified number: shadows did not
+ * render at all in the machine this was written on, so the value was reasoned
+ * out rather than looked at. If the bands are still there with the slider at
+ * zero, they are not shadow acne and this whole paragraph is barking up the
+ * wrong tree.
  */
-const SHADOW_NORMAL_BIAS_TEXELS = 1.5
+const SHADOW_NORMAL_BIAS_TEXELS = 1.0
 
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
