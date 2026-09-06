@@ -56,6 +56,31 @@ const SHADOW_BIAS_WORLD = 0.0035
  */
 const SHADOW_NORMAL_BIAS_TEXELS = 1.0
 
+/**
+ * How wide the shadow edge is blurred, IN METRES.
+ *
+ * three's PCF filter takes its radius in TEXELS -- `radius.mul(texelSize.x)`
+ * in ShadowFilterNode -- which means the authored number silently means a
+ * different real distance every time the map size or the box size changes.
+ * Doubling the map to 2048 halved the texel and so halved the softness: the
+ * same `radius: 3` went from blurring 293 mm of world to 146 mm, and shadows
+ * twice as sharp show twice as much of the edge crawl below.
+ *
+ * WHY SOFTNESS IS THE ANSWER TO THE CRAWL. The sun turns a full circle in six
+ * minutes, which is 1 degree per second, which is about 8.7 mm of movement per
+ * frame thirty metres out. That is 18% of a texel: never a clean jump to the
+ * next one, just a permanent slide between two, and a hard edge sliding like
+ * that reads as a fast repetitive twitch. Texel snapping cannot fix it, because
+ * the grid being snapped to is derived from the light direction and therefore
+ * turns with it. What does fix it is making the edge wider than the wobble --
+ * at 350 mm of blur an 8.7 mm slide is a fortieth of the gradient and simply
+ * cannot be seen.
+ *
+ * Which is also the right look here. This world is soft-edged and stylised;
+ * nothing in it wants a crisp shadow.
+ */
+const SHADOW_SOFTNESS_WORLD = 0.35
+
 // Reusable temporaries for shadow texel-snapping (no per-frame allocation).
 const _worldUp = new THREE.Vector3(0, 1, 0)
 const _shadowRight = new THREE.Vector3()
@@ -288,7 +313,11 @@ export default class Environment {
         // Shadow map size is locked to 1024x1024 to avoid reallocation crashes
         this.sunLight.shadow.mapSize.width = quality.shadowMapSize
         this.sunLight.shadow.mapSize.height = quality.shadowMapSize
-        this.sunLight.shadow.radius = quality.shadowRadius
+        // Authored in metres, applied in texels -- see the constant. Kept at
+        // least at 1 so it never degenerates into a single unfiltered tap.
+        this.shadowSoftness = this.shadowSoftness ?? SHADOW_SOFTNESS_WORLD
+        this.sunLight.shadow.radius = Math.max(
+            1, this.shadowSoftness / ((2 * sc) / quality.shadowMapSize))
 
         // In texels, so it follows the box and the map. See the constant.
         this.shadowTexel = (2 * sc) / quality.shadowMapSize
@@ -583,6 +612,12 @@ export default class Environment {
         // and his own shadow: too high. See SHADOW_NORMAL_BIAS_TEXELS.
         f.add(this, 'shadowNormalBiasTexels', 0, 4, 0.05)
             .name('Sombras · normalBias (texels)')
+            .onChange(() => this.applyShadowQuality())
+
+        // The knob for the edge crawl. Wider hides it, at the cost of contact
+        // definition. See SHADOW_SOFTNESS_WORLD.
+        f.add(this, 'shadowSoftness', 0.05, 1.2, 0.01)
+            .name('Sombras · suavizado (m)')
             .onChange(() => this.applyShadowQuality())
 
         // Quick jump presets

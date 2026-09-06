@@ -147,8 +147,11 @@ export default class Quality extends EventEmitter {
      * only on high quality, so nothing on a low-end device pays it.
      */
     get shadowMapSize()    { return 2048 }
-    /** PCF kernel half-size: 1 low (sharp, cheap) / 3 high (soft, expensive). */
-    get shadowRadius()     { return this.isLow ? 1 : 3 }
+    // No shadowRadius here on purpose. three takes the PCF radius in TEXELS,
+    // so a number authored at this level means a different real blur width
+    // every time the map or the box changes -- and it did change under us when
+    // the map went to 2048, halving the softness with nobody touching a line.
+    // Environment authors it in METRES and converts. See SHADOW_SOFTNESS_WORLD.
     /**
      * Half-extent of the directional shadow ortho frustum (±size on left/right/top/bottom).
      * Too small → a hard “straight line” on the ground where shadow coverage ends (patio + bridge
