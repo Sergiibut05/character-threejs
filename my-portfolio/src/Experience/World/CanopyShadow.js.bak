@@ -6,7 +6,6 @@ import {
 import Experience from '../Experience.js'
 import { propSunDirection } from './scene/StylizedPropMaterial.js'
 import { ignoreAO } from './aoMask.js'
-import { chunkedInBackground } from '../Utils/Scheduler.js'
 
 /**
  * CanopyShadow — the pool of shade a tree drops, drawn instead of cast.
@@ -70,13 +69,12 @@ const MIN_ELEVATION = 0.22
 /**
  * Draw the ALPHA as a grey opaque quad instead of shading anything.
  *
- * Left in because it is what finally cracked this. Four attempts drew nothing
- * and every one was diagnosed by reasoning about a number nobody could see;
- * painting that number on the screen answered it in one frame -- a clean
- * elliptical gradient, which meant the maths had been right all along and the
- * quads were simply somewhere they could not be seen.
+ * Four attempts at this drew nothing, and every one of them was diagnosed by
+ * reasoning about a number nobody could see. This makes it visible: black
+ * means the falloff really is zero, a grey disc means the maths is fine and
+ * the transparent path is what is failing, and white means it is saturating.
  */
-const DEBUG_ALPHA = false
+const DEBUG_ALPHA = true
 
 export default class CanopyShadow {
     /**
@@ -94,10 +92,8 @@ export default class CanopyShadow {
         // Normalised against the quad, so per-tree scale is the matrix's job.
         this.uCanopyR = uniform(canopyRadius / this.quadRadius)
         this.uCanopyH = uniform(canopyHeight / this.quadRadius)
-        // Tuned by looking, at a low afternoon sun on grass: present enough to
-        // read as shade, light enough not to become a sticker.
-        this.uStrength = uniform(0.46)
-        this.uSoftness = uniform(1.9)
+        this.uStrength = uniform(0.34)
+        this.uSoftness = uniform(1.5)
         this.uNight = uniform(0)
         this.uColor = uniform(new THREE.Color('#241f2b'))
 
@@ -120,13 +116,9 @@ export default class CanopyShadow {
             ref.updateWorldMatrix(true, false)
             ref.matrixWorld.decompose(position, quaternion, scale)
             data[i * 4 + 0] = position.x
-            // Provisional. A tree's reference is NOT its ground: these sit
-            // 0.85 to 1.6 m BELOW the terrain, and by a different amount for
-            // every tree, so there is no constant to add. _dropOntoGround()
-            // finds the real surface right after this. Until it does, the
-            // quads are buried and simply do not draw, which is exactly what
-            // "the pools never render" turned out to be.
-            data[i * 4 + 1] = position.y
+            // Sits ON the ground; polygonOffset below does the rest, so this
+            // does not need a lift big enough to float on a slope.
+            data[i * 4 + 1] = position.y + 0.02
             data[i * 4 + 2] = position.z
             // Rotation deliberately dropped: the shader reasons in world XZ,
             // so a turned quad would turn the sun with it. A round pool
@@ -134,17 +126,7 @@ export default class CanopyShadow {
             data[i * 4 + 3] = (Math.max(scale.x, scale.z) || 1) * this.quadRadius
         }
 
-        // The buffer is KEPT and marked dirty, which is not optional.
-        //
-        // Filling the Float32Array before handing it over is not enough on its
-        // own: without the upload the attribute reads back as zeros, `d.w`
-        // (the per-tree size) comes out 0, and every quad collapses to a
-        // degenerate point at the world origin. That is what "the pools do not
-        // render" was for four attempts -- not the material, not the alpha,
-        // not the instancing style. The maths had been right for a while.
-        this._buffer = instancedArray(data, 'vec4')
-        this._buffer.value.needsUpdate = true
-        const d = this._buffer.toAttribute()
+        const d = instancedArray(data, 'vec4').toAttribute()
 
         // A UNIT quad: local x and z run −1..1, which is already the space the
         // ellipse below is written in, and already oriented like world XZ.
@@ -234,50 +216,6 @@ export default class CanopyShadow {
         // and a wrong one silently deletes the whole mesh.
         this.mesh.frustumCulled = false
         this.scene.add(this.mesh)
-
-        this._data = data
-        this._dropOntoGround(references)
-    }
-
-    /**
-     * Put each pool on the terrain instead of on its tree's pivot.
-     *
-     * One ray straight down per tree, which is exact and copes with slopes
-     * where a constant offset could not. Spread over background ticks rather
-     * than run in one go: 309 rays against the island is precisely the shape
-     * of one-frame stall this project has already been bitten by, and nothing
-     * is waiting on the answer -- a pool one frame late is invisible for that
-     * frame and correct afterwards.
-     *
-     * @param {THREE.Object3D[]} references
-     */
-    _dropOntoGround(references) {
-        const scene = this.scene
-        const targets = []
-        scene.traverse((o) => {
-            if ((o.isMesh || o.isInstancedMesh) && o.receiveShadow && o.visible) {
-                targets.push(o)
-            }
-        })
-        if (!targets.length) return
-
-        const raycaster = new THREE.Raycaster()
-        raycaster.far = 80
-        const from = new THREE.Vector3()
-        const down = new THREE.Vector3(0, -1, 0)
-        const at = new THREE.Vector3()
-
-        chunkedInBackground(references, 4, (ref, i) => {
-            at.setFromMatrixPosition(ref.matrixWorld)
-            from.set(at.x, at.y + 30, at.z)
-            raycaster.set(from, down)
-            const hit = raycaster.intersectObjects(targets, false)[0]
-            if (!hit) return
-            // Just clear of the surface; polygonOffset does the rest.
-            this._data[i * 4 + 1] = hit.point.y + 0.02
-        }).then(() => {
-            if (this._buffer) this._buffer.value.needsUpdate = true
-        })
     }
 
     update() {

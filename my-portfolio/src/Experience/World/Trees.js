@@ -152,12 +152,10 @@ export default class Trees {
                 this.leavesColorANode,
                 this.leavesColorBNode,
                 true,
-                // STILL CASTING, on purpose. The CanopyShadow below is built
-                // and ready but does not draw yet on the machine this was
-                // written on, and switching this to false before it does would
-                // simply delete every tree's shadow. Flip it the day the pools
-                // are confirmed visible. See CanopyShadow.js.
-                true
+                // The canopy does not cast: CanopyShadow draws its shade
+                // instead. The trunk still casts, and it is what anchors the
+                // pool to the tree. See CanopyShadow.js.
+                false
             )
             const m = this.leaves.material
             const o = this.foliageOpts
@@ -180,6 +178,11 @@ export default class Trees {
      */
     setCanopyShadow(unshift) {
         if (!this.modelParts.leaves.length || !this.references.length) return
+        // High tier only, for now. On low the sun casts nothing at all
+        // (Quality.sunShadows), so there would be no shadow-pass work to trade
+        // away -- the pools would be pure added fill rate on exactly the
+        // devices with the least of it. Low keeps FakeShadow's blobs.
+        if (!this.experience.quality.isHigh) return
 
         const box = new THREE.Box3()
         const clusterBox = new THREE.Box3()
