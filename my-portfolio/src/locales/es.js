@@ -194,6 +194,13 @@ export default {
             perfect: '¡Perfecto!',
             record: 'récord {n}',
             widerCourt: 'Pista más ancha',
+            tutorial: {
+                title: 'Mantén la pelota en el aire',
+                body: 'La pelota cae sola: {press} justo cuando la tengas encima ' +
+                    'para devolverla arriba. Darle en el centro es un ¡Perfecto! ' +
+                    'y encadena el toque. Cada tanto sube el viento y estrecha la ' +
+                    'pista, así que muévete con {move} para seguir debajo.'
+            },
             narrowerCourt: 'Pista más estrecha',
             ballBeach: 'Pelota de playa',
             ballFootball: 'Balón de fútbol',

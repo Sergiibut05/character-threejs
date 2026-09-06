@@ -346,6 +346,13 @@ export default {
             perfect: 'Perfect!',
             record: 'best {n}',
             widerCourt: 'Wider court',
+            tutorial: {
+                title: 'Keep the ball up',
+                body: 'The ball falls on its own: {press} just as it comes overhead ' +
+                    'to send it back up. Hitting it dead centre is a Perfect! and ' +
+                    'keeps the streak going. Every so often the wind picks up and ' +
+                    'the court narrows, so move with {move} to stay underneath it.'
+            },
             narrowerCourt: 'Narrower court',
             ballBeach: 'Beach ball',
             ballFootball: 'Football',

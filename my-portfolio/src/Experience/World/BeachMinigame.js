@@ -4,7 +4,7 @@ import { t } from '../Utils/gameText.js'
 import WindLines from './WindLines.js'
 import CourtBounds from './CourtBounds.js'
 import BeachBallVariants from './BeachBallVariants.js'
-import { iconExit } from './ui/icons.js'
+import { iconExit, iconHelp } from './ui/icons.js'
 import './ui/beach.css'
 
 /**
@@ -128,6 +128,8 @@ export default class BeachMinigame {
         this.state = 'idle'             // 'idle' | 'playing' | 'missed' | 'over'
         this.mode = 'libre'             // 'libre' | 'competitivo'
         this.onRallyEnd = null          // set by BeachSession
+        this.onHelpClick = null         // set by BeachSession ("?" button)
+        this.paused = false             // held while the tutorial is open
         this.touches = 0
         this.best = 0
         this._ballPos = new THREE.Vector3()
@@ -243,6 +245,16 @@ export default class BeachMinigame {
         this.exitBtn.addEventListener('click', () => this.onExitClick?.())
         document.body.appendChild(this.exitBtn)
 
+        // "?" — same button, class and placement as the frisbee HUD, so the
+        // two activities are learned once. BeachSession fills in the handler.
+        this.helpBtn = document.createElement('button')
+        this.helpBtn.type = 'button'
+        this.helpBtn.className = 'fz-hud-help'
+        this.helpBtn.setAttribute('aria-label', t('common.howToPlay'))
+        this.helpBtn.innerHTML = `<span class="fz-hud-help-icon">${iconHelp}</span>`
+        this.helpBtn.addEventListener('click', () => this.onHelpClick?.())
+        document.body.appendChild(this.helpBtn)
+
         // Court-resize banner (see _showCourtBanner).
         this.bannerEl = document.createElement('div')
         this.bannerEl.className = 'fz-beach-banner'
@@ -334,6 +346,7 @@ export default class BeachMinigame {
 
         this.hud.classList.add('is-visible')
         this.exitBtn.classList.add('is-visible')
+        this.helpBtn.classList.add('is-visible')
         this.windEl.classList.toggle('is-visible', this.windEnabled)
         this._renderHud()
         this._showFlash(t('beach.go'))
@@ -374,6 +387,7 @@ export default class BeachMinigame {
         this.bannerEl.className = 'fz-beach-banner'
         this.hud.classList.remove('is-visible')
         this.exitBtn.classList.remove('is-visible')
+        this.helpBtn.classList.remove('is-visible')
         this.windEl.classList.remove('is-visible')
         this._restoreDay()
         this.balls.rest()
@@ -498,6 +512,9 @@ export default class BeachMinigame {
     update() {
         if (!this._ready) { this._tryInit(); if (!this._ready) return }
         if (this.state === 'idle') return
+        // Frozen while the tutorial is up: the ball is already in the air by
+        // then, and reading a panel should not cost you the rally.
+        if (this.paused) return
 
         const dt = Math.min(this.time.delta * 0.001, 0.05)
 
@@ -900,6 +917,7 @@ export default class BeachMinigame {
         this.flash?.remove()
         this.windEl?.remove()
         this.exitBtn?.remove()
+        this.helpBtn?.remove()
         this.bannerEl?.remove()
         this.windLines?.dispose()
         this.bounds?.dispose()

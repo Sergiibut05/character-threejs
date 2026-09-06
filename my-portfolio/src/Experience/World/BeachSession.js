@@ -3,11 +3,39 @@ import Modal from './ui/Modal.js'
 import BeachPrompt from './BeachPrompt.js'
 import NameEntry from './ui/NameEntry.js'
 import Leaderboard from '../Utils/Leaderboard.js'
-import { t } from '../Utils/gameText.js'
+import { t, controls } from '../Utils/gameText.js'
+import Stepper from './ui/Stepper.js'
 import { buildLeaderboardList } from './ui/leaderboardView.js'
 import { createModeCard, createCardGrid } from './ui/Card.js'
 import { createButton } from './ui/Button.js'
-import { iconTrophy, iconInfinity } from './ui/icons.js'
+import { iconTrophy, iconInfinity, iconAim } from './ui/icons.js'
+
+const TUTORIAL_SEEN_KEY = 'beach.tutorialSeen'
+
+// ONE step, because there is only one thing to know: be under the ball and
+// press at the right moment. The frisbee needs three because aiming, curving
+// and power are three separate skills; padding this one out to match would be
+// three panels of the same sentence.
+//
+// A function and not a constant, for the same reason as the frisbee's: an
+// array built at module load bakes its strings before any catalog is resident
+// and long before anyone can switch language.
+const tutorialSteps = () => [
+    {
+        icon: iconAim,
+        image: '/images/beach.png',
+        title: t('beach.tutorial.title'),
+        body: (d) => {
+            const c = controls(d)
+            // The press label opens the sentence here and sits mid-sentence in
+            // the frisbee copy, so it is capitalised at the call site.
+            return t('beach.tutorial.body', {
+                move: c.move,
+                press: c.press.charAt(0).toUpperCase() + c.press.slice(1)
+            })
+        }
+    }
+]
 
 /**
  * BeachSession — everything ABOVE a single rally: the proximity prompt, mode
@@ -33,6 +61,7 @@ export default class BeachSession {
         this.resultsModal = null
         this.lbModal = null
         this.nameEntry = null
+        this.tutorial = null
         this.prompt = new BeachPrompt(minigame)
 
         this.active = false
@@ -44,13 +73,53 @@ export default class BeachSession {
 
         this.minigame.onRallyEnd = (touches) => this._onRallyEnd(touches)
         this.minigame.onExitClick = () => { if (!this._anyModalOpen()) this._end() }
+        this.minigame.onHelpClick = () => this._openHelp()
 
         this._onKeyDown = (e) => this._handleKey(e)
         window.addEventListener('keydown', this._onKeyDown)
     }
 
     isModalOpen() {
-        return !!this.modal?.isOpen() || !!this.resultsModal?.isOpen() || !!this.lbModal?.isOpen()
+        return !!this.modal?.isOpen() || !!this.resultsModal?.isOpen() ||
+            !!this.lbModal?.isOpen() || !!this.tutorial
+    }
+
+    // ─── Tutorial ────────────────────────────────────────────────────────
+
+    _tutorialSeen() {
+        try { return localStorage.getItem(TUTORIAL_SEEN_KEY) === '1' } catch { return false }
+    }
+
+    _markTutorialSeen() {
+        try { localStorage.setItem(TUTORIAL_SEEN_KEY, '1') } catch { /* ignore */ }
+    }
+
+    /** Freeze the rally AND the character animation while the panel is up. */
+    _setPaused(paused) {
+        this.minigame.paused = paused
+        const character = this.experience.world?.character
+        if (character) character.animationPaused = paused
+    }
+
+    _showTutorial(onDone) {
+        this.tutorial?.destroy()
+        this.tutorial = new Stepper({
+            title: t('common.howToPlay'),
+            steps: tutorialSteps(),
+            onFinish: () => {
+                this.tutorial?.destroy()
+                this.tutorial = null
+                onDone?.()
+            }
+        })
+        this.tutorial.open()
+    }
+
+    /** Reopen from the "?" button — freezes the rally meanwhile. */
+    _openHelp() {
+        if (!this.active || this.tutorial) return
+        this._setPaused(true)
+        this._showTutorial(() => this._setPaused(false))
     }
 
     _anyModalOpen() {
@@ -133,6 +202,16 @@ export default class BeachSession {
         }
         this.active = true
         this._launching = false
+
+        // First time ever: the panel comes up over the served ball, frozen,
+        // so nobody loses a rally to reading it.
+        if (!this._tutorialSeen()) {
+            this._setPaused(true)
+            this._showTutorial(() => {
+                this._markTutorialSeen()
+                this._setPaused(false)
+            })
+        }
     }
 
     // ─── Rally finished (competitive only) ───────────────────────────────
@@ -251,6 +330,9 @@ export default class BeachSession {
     _end() {
         this._destroyResults()
         this._destroyLeaderboard()
+        this.tutorial?.destroy()
+        this.tutorial = null
+        this._setPaused(false)
         this.active = false
         this.minigame.stop()
     }
