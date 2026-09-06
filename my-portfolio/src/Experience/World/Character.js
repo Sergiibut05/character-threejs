@@ -90,9 +90,28 @@ export default class Character {
         // that to 1.70 and made holding shift feel like it barely did anything.
         this.runSpeed = 3.1
         this.rotationSpeed = 12.0
-        // Playback speed of the locomotion clips (they read a touch slow at 1).
-        this.walkAnimSpeed = 1.15
-        this.runAnimSpeed = 1.08
+
+        // How fast the ground goes by in each locomotion clip, at timeScale 1.
+        //
+        // The playback speed of a walk cycle is NOT a taste setting, it is a
+        // consequence: a planted foot has to travel backwards across the screen
+        // at exactly the speed the world does, or it skates. So the only honest
+        // number to author is the one below -- how much ground the clip itself
+        // covers per second -- and let the timeScale fall out of whatever speed
+        // the character is actually moving at.
+        //
+        // It used to be authored the other way round, as a timeScale, and that
+        // is why the walk started shimmering: walkSpeed went 1.3 -> 1.65 for
+        // feel, the 1.15 that had been tuned against 1.3 stayed put, and the
+        // legs were left cycling 27% too slow for the ground. A planted foot
+        // slid a quarter of a stride and snapped back, every stride. Written
+        // this way that drift cannot happen again -- change walkSpeed and the
+        // feet follow it.
+        //
+        // Derived from the tuning these replace, so the look is unchanged at
+        // the old speeds: 1.3 / 1.15 and 2.8 / 1.08.
+        this.walkStrideSpeed = 1.13
+        this.runStrideSpeed = 2.59
 
         // Reused input vector — no per-frame allocation (GC hitches).
         this._dir = new THREE.Vector3()
@@ -276,11 +295,20 @@ export default class Character {
 
         const fade = newState === 'resting' ? 0.4 : 0.25
         newAction.reset()
-        const animScale = newState === 'walking' ? this.walkAnimSpeed
-            : newState === 'running' ? this.runAnimSpeed : 1
-        newAction.setEffectiveTimeScale(animScale)
+        newAction.setEffectiveTimeScale(this._locomotionScale(newState))
         newAction.setEffectiveWeight(1)
-        if (this.activeAction) newAction.crossFadeFrom(this.activeAction, fade, true)
+        // warp: false, and it matters.
+        //
+        // crossFadeFrom(_, _, true) does not just blend, it MULTIPLIES the
+        // incoming clip's timeScale by clipIn.duration / clipOut.duration and
+        // ramps that back to 1 across the fade. Coming out of the idle that is
+        // 1.267 / 2.033 = 0.62, so the first quarter second of every walk played
+        // the legs at 62% while the body left at 100% -- the "clip" you see in
+        // the first frames of moving. Its purpose is to keep stride phase
+        // aligned between clips of different length, which is worth nothing
+        // here and costs exactly the thing we just spent the block above
+        // guaranteeing.
+        if (this.activeAction) newAction.crossFadeFrom(this.activeAction, fade, false)
 
         this.activeAction = newAction
         this.state = newState
@@ -674,7 +702,10 @@ export default class Character {
         action.paused = false
 
         if (this.activeAction && this.activeAction !== action) {
-            action.crossFadeFrom(this.activeAction, 0.2, true)
+            // warp: false for the same reason as the locomotion fades -- the
+            // wind-up is 3.333s against the idle's 2.033s, so warping opened
+            // every throw at 1.64x speed before settling.
+            action.crossFadeFrom(this.activeAction, 0.2, false)
         }
 
         this.activeAction = action
@@ -700,6 +731,18 @@ export default class Character {
     }
 
     // ─── Per-frame helpers ──────────────────────────────────────────────
+
+    /**
+     * Playback speed that makes the feet match the ground, for a state.
+     *
+     * @param {string} state  'walking' | 'running' | anything else
+     * @returns {number} timeScale for that state's clip
+     */
+    _locomotionScale(state) {
+        if (state === 'walking') return this.walkSpeed / this.walkStrideSpeed
+        if (state === 'running') return this.runSpeed / this.runStrideSpeed
+        return 1
+    }
 
     _updateState(deltaTime, isMoving) {
         const mobileActions = this.experience.mobileControls?.getActions()
@@ -962,8 +1005,10 @@ export default class Character {
 
         f.add(this, 'walkSpeed', 0.5, 3.0, 0.1).name('Walk Speed')
         f.add(this, 'runSpeed', 1.5, 5.0, 0.1).name('Run Speed')
-        f.add(this, 'walkAnimSpeed', 0.6, 2.0, 0.01).name('Walk Anim Speed')
-        f.add(this, 'runAnimSpeed', 0.6, 2.0, 0.01).name('Run Anim Speed')
+        // Tune these by matching the feet to the ground, not by taste: raise
+        // one and that clip's legs cycle SLOWER for the same walking speed.
+        f.add(this, 'walkStrideSpeed', 0.6, 2.5, 0.01).name('Walk · m/s del clip')
+        f.add(this, 'runStrideSpeed', 1.2, 4.5, 0.01).name('Run · m/s del clip')
         f.add(this, 'rotationSpeed', 2.0, 30.0, 0.5).name('Rotation Smoothing')
         f.add(this, 'restAfterRunThreshold', 0.5, 5.0, 0.1).name('Rest After Run (s)')
         f.add(this, 'blinkDuration', 0.05, 0.5, 0.01).name('Blink Duration')
