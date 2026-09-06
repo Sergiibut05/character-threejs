@@ -343,6 +343,14 @@ export default class BeachMinigame {
         this.bounds?.layout(this.courtHalfWidth)
         this.bounds?.setEnabled(true)
         this._serve()
+        // And MOVE THE BALL THERE, not just the number that says where it is.
+        //
+        // _serve() sets _ballPos; the mesh only follows it in update(), and
+        // update() does not run during the paused entry. So the iris opened on
+        // the prop still resting at the player's feet, and the moment play
+        // began it vanished from there and reappeared overhead. One call, in
+        // the dark, and it is already up in the air when you first see it.
+        this.balls.setPosition(this._ballPos)
 
         // Frame it NOW, in the dark, and jump rather than ease.
         //
