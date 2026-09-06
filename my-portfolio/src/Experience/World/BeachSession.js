@@ -231,6 +231,10 @@ export default class BeachSession {
         // Left mid-iris (Esc, or the modal closing under us).
         if (!this.active) return
 
+        // Only now: the court is on screen, so the numbers about it have
+        // something to be about.
+        this.minigame.showHud()
+
         // A beat to take in the court before anything is asked of you.
         await this.experience.waitMs(450)
         if (!this.active) return

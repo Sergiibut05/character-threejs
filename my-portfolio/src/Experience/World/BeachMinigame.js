@@ -344,12 +344,33 @@ export default class BeachMinigame {
         this.bounds?.setEnabled(true)
         this._serve()
 
+        // Frame it NOW, in the dark, and jump rather than ease.
+        //
+        // AFTER the serve, because _updateCamera frames between the player and
+        // the BALL, and before the serve the ball is still wherever the last
+        // rally left it. And needed at all because update() is what normally
+        // pushes this every frame, while update() does not run during the
+        // paused entry -- so without it the camera spends the first second
+        // after the iris opens sliding into position in full view.
+        this._updateCamera(0)
+        this.experience.camera.snapFocus()
+
+        this._renderHud()
+        return true
+    }
+
+    /**
+     * Reveal the HUD. Called by BeachSession once the iris is fully open.
+     *
+     * These used to go up inside start(), which runs behind the closed iris:
+     * the touch counter and the wind gauge were already sitting on top of a
+     * black circle, so the panel arrived before the place it belongs to.
+     */
+    showHud() {
         this.hud.classList.add('is-visible')
         this.exitBtn.classList.add('is-visible')
         this.helpBtn.classList.add('is-visible')
         this.windEl.classList.toggle('is-visible', this.windEnabled)
-        this._renderHud()
-        return true
     }
 
     /**

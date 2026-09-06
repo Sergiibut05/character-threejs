@@ -265,6 +265,25 @@ export default class Camera {
         this.setMode('follow', { snap: false })
     }
 
+    /**
+     * Jump to the focus framing instead of easing into it.
+     *
+     * updateFocusView() eases, which is right while the activity is running
+     * and wrong at the moment of arrival: behind a closed iris there is
+     * nothing to ease FROM that anyone can see, so the ease just spends its
+     * first second after the iris opens sliding into place. Called once, in
+     * the dark, so the shot is already correct on the first visible frame.
+     */
+    snapFocus() {
+        if (!this._hasFocusTarget) return
+        this.smoothPosition.copy(this._focusPos)
+        this.smoothLookAt.copy(this._focusLook)
+        this.instance.position.copy(this.smoothPosition)
+        this.instance.lookAt(this.smoothLookAt)
+        this.instance.fov = this.focusFov
+        this.instance.updateProjectionMatrix()
+    }
+
     /** Where the beach camera should sit / look (world space). */
     setFocusView(pos, look) {
         this._focusPos.copy(pos)
