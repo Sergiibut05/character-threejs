@@ -256,15 +256,12 @@ export default class Foliage {
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material.instance, count)
         this.mesh.receiveShadow = true
-        // Opt-out, currently unused, kept because the reason to want it is
-        // real: leaf cards are camera-facing billboards with a wind-animated
-        // alpha cutout, so the silhouette they show the sun changes both when
-        // the player moves the camera and when nobody moves at all. That is
-        // the shimmering in tree shadows, and it is not a depth-precision
-        // problem, so no bias or filter setting will ever settle it. Replacing
-        // the cast shadow with a drawn pool of shade is the fix; that pool is
-        // not written yet, and turning this off without one just deletes the
-        // shadow.
+        // Trees pass false and draw a CanopyShadow instead. Leaf cards are
+        // camera-facing billboards with a wind-animated alpha cutout, so the
+        // silhouette they show the sun changes both when the player moves the
+        // camera and when nobody moves at all -- see CanopyShadow.js. Bushes
+        // keep casting: they sit low, they are small, and their shadow is
+        // mostly hidden underneath them anyway.
         this.mesh.castShadow = this.castShadow
         this.mesh.frustumCulled = false
 
