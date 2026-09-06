@@ -76,9 +76,18 @@ export default class SocialArea {
         this._prevDpadR = false
         this._prevPadA = false
 
+        // Has the pointer actually MOVED since the last deliberate choice?
+        //
+        // Starts true so a mouse-first visitor is never made to wiggle it
+        // before hovering does anything; _cycle() sets it false. See the note
+        // on onHover() in _registerInteractive.
+        this._pointerMoved = true
+
         this._buildPill()
         this._onKeyDown = (e) => this._handleKey(e)
+        this._onPointerMove = () => { this._pointerMoved = true }
         window.addEventListener('keydown', this._onKeyDown)
+        window.addEventListener('pointermove', this._onPointerMove, { passive: true })
 
         if (this.debug.active) this.setDebug()
     }
@@ -150,8 +159,30 @@ export default class SocialArea {
             },
             onHover() {
                 if (self.state !== 'active') return
-                self._setFocused(entry)
                 document.body.style.cursor = 'pointer'
+
+                // A HOVER ONLY COUNTS IF THE POINTER MOVED TO GET HERE.
+                //
+                // The statues do not hold still: the focused one rises an
+                // extra riseExtra and the rest sink back, every frame, lerped.
+                // So the thing under a PARKED cursor changes on its own, and
+                // the raycaster -- which fires this on the transition, quite
+                // correctly -- reports a hover nobody performed.
+                //
+                // That is the arrow keys "making as if to change and then not".
+                // Press right, focus moves on, the statue you were resting the
+                // mouse over sinks out from under the cursor and comes back,
+                // and its hover snaps the focus home again. The choice was
+                // made and then silently undone by a mouse sitting still.
+                //
+                // Which is also exactly why the on-screen arrows never failed:
+                // clicking them puts the cursor on the pill, where there is no
+                // statue to steal anything back.
+                //
+                // So: a deliberate choice outranks a stationary mouse, until
+                // that mouse is deliberate too.
+                if (!self._pointerMoved) return
+                self._setFocused(entry)
             },
             onUnhover() {
                 document.body.style.cursor = ''
@@ -498,6 +529,9 @@ export default class SocialArea {
         if (!ring?.length) return
         const i = ring.indexOf(this.focused)
         const ni = i === -1 ? 0 : (i + dir + ring.length) % ring.length
+        // This was deliberate. Nothing the mouse is merely lying on top of
+        // gets to overrule it until the mouse moves -- see onHover().
+        this._pointerMoved = false
         this._setFocused(ring[ni])
     }
 
@@ -660,6 +694,7 @@ export default class SocialArea {
 
     destroy() {
         window.removeEventListener('keydown', this._onKeyDown)
+        window.removeEventListener('pointermove', this._onPointerMove)
         this._unsubInput?.()
         this.pill?.remove()
         if (this.aura) {
