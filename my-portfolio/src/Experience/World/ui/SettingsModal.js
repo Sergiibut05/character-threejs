@@ -398,8 +398,16 @@ export default class SettingsModal {
         renderList()
     }
 
-    open() {
+    /**
+     * @param {string} [sectionId]  open straight onto a tab ('controls', …).
+     *   Omitted, it reopens wherever it was left, which is what the gear wants.
+     */
+    open(sectionId) {
         if (this.isOpen()) return // duplicated trigger — don't re-capture the lock
+        if (sectionId) {
+            const i = this.sections.findIndex((s) => s.id === sectionId)
+            if (i >= 0) this.activeIndex = i
+        }
         // Freeze the character while the settings are open (restored on close).
         const character = this.experience.world?.character
         if (character && this._prevLocked === undefined) {

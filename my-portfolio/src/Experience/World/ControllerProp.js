@@ -2,7 +2,6 @@ import * as THREE from 'three'
 import Experience from '../Experience.js'
 import InteractBadge, { anchorAbove } from './ui/InteractBadge.js'
 import { seatOwnsInteract } from './seated.js'
-import ControlsModal from './ui/ControlsModal.js'
 import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
 
 /**
@@ -11,9 +10,10 @@ import { createStylizedPropNodeMaterial } from './scene/StylizedPropMaterial.js'
  *
  * Same shape as every other interactive here (Mailbox, Door): white outline
  * when you are near or hovering, the action glyph floating above it, and one
- * press to open. What it opens is ControlsModal, which asks InputGlyph for the
- * current device rather than printing a keyboard — walk up to it with a pad
- * connected and it shows A and X.
+ * press to open. What it opens is THE settings panel, on its controls tab --
+ * the same one the gear opens, not a second panel repeating it. That panel
+ * already asks InputGlyph for the device in your hands, so walking up to this
+ * with a pad connected shows A and X rather than a keyboard.
  *
  * The model carries its own placement from Blender (position, rotation and a
  * 7.8x scale), so nothing here decides where it goes: whoever moves it in the
@@ -48,7 +48,6 @@ export default class ControllerProp {
         // its centre has to clear its own body before it reaches the player.
         this.proximityRadius = 2.0
 
-        this.modal = null
         this._badge = null
         this._prevMobileB = false
         this._prevPadA = false
@@ -72,7 +71,14 @@ export default class ControllerProp {
         this.node = source.clone(true)
         this.node.name = 'ControllerProp'
 
-        const material = createStylizedPropNodeMaterial({ color: 0x6f7b8c })
+        // Textured off the Tiny atlas, like the rest of the small props.
+        // It used to be a flat slate colour because the GLB ships with no
+        // material -- but shipping without one is not the same as not having
+        // one, and the UVs are authored against this atlas.
+        const material = createStylizedPropNodeMaterial({
+            map: this.resources?.items?.tinyAtlas || null,
+            color: 0xffffff
+        })
         this.node.traverse((child) => {
             if (!child.isMesh) return
             child.material = material
@@ -125,8 +131,11 @@ export default class ControllerProp {
         if (frisbee && frisbee.state !== 'idle') return
         if (this.experience.world?.beachSession?.active) return
 
-        if (!this.modal) this.modal = new ControlsModal()
-        this.modal.open()
+        // THE settings panel, opened on its controls tab -- not a second
+        // modal that says the same thing. A duplicate would have to be kept in
+        // step with the real one every time the controls change, and would
+        // give two different-looking answers to the same question.
+        this.experience.settingsUi?.open('controls')
     }
 
     _updateHighlight() {
@@ -169,7 +178,6 @@ export default class ControllerProp {
         this._badge?.destroy()
         for (const m of this.meshes) this.renderer?.removeOutlinedObject?.(m)
         this.experience.world?.raycaster?.removeInteractiveObject?.(this)
-        this.modal?.destroy?.()
         if (this.node) {
             this.scene.remove(this.node)
             this.node.traverse((c) => { if (c.isMesh) c.geometry?.dispose?.() })
