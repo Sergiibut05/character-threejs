@@ -4,23 +4,30 @@
 /* ── Now-playing toast (top-right) ──────────────────────────────────── */
 .fz-toast {
     position: fixed;
-    /* SLOT 3 of the corner stack, not a hand-measured offset.
-       This was the last thing in the project still positioning itself against
-       the old numbers: "just below the settings gear (top:12px, 46px tall)",
-       a gear that has been 18px and 44px since the slot system landed. The
-       arithmetic that used to clear it put the toast at 68px, and the map now
-       starts at 74px, so the toast sat on top of the map.
-       Slots in use: 0 the settings gear, 1 the map (and the minigame exit),
-       2 the minigame help. Three clears all of them with the same 12px gap
-       every button gets, and follows them if the stack is ever re-spaced. */
-    top: calc(var(--fz-fab-top) + 3 * var(--fz-fab-step));
-    right: var(--fz-fab-right);
+    /* BESIDE the corner buttons, not below them.
+       This used to position itself against numbers that had stopped being
+       true -- "just below the settings gear (top:12px, 46px tall)", a gear
+       that has been 18px and 44px since the slot system landed -- which put
+       it at 68px, right on top of a map that starts at 74px.
+       Stacking it under the buttons instead only traded one problem for
+       another: the column is three slots deep (gear, map/exit, minigame help)
+       so clearing it meant starting at 186px, which is halfway down the
+       screen for a notification.
+       The column is only 44px WIDE, though, and this panel is up to 320px.
+       So it steps left of the column rather than under it, and gets to sit at
+       the top where a "now playing" belongs. Nothing to clear vertically, at
+       any slot, ever. */
+    top: var(--fz-fab-top);
+    right: calc(var(--fz-fab-right) + var(--fz-fab-size) + 12px);
     z-index: 2650;
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 10px 16px 10px 10px;
-    max-width: min(320px, 80vw);
+    /* Whatever is left once the button column and its gap are taken out,
+       plus a margin on the far side. 80vw did not know about the column and
+       on a narrow phone left the panel 4px from the opposite edge. */
+    max-width: min(320px, calc(100vw - var(--fz-fab-right) - var(--fz-fab-size) - 12px - 16px));
     background: linear-gradient(168deg, #ffffff 0%, var(--fz-green-50) 100%);
     border: 2px solid var(--fz-green-200);
     border-radius: var(--fz-radius-sm);
