@@ -125,6 +125,9 @@ const _shadowCenter = new THREE.Vector3()
  */
 const MIN_SHADOW_ELEVATION = 0.30
 
+/** The white the stars are, and therefore the white the moon is. */
+const STAR_WHITE = new THREE.Color(0.95, 0.97, 1.0)
+
 /**
  * Day/night keyframes over a normalized day [0..1):
  *   0.00 = midnight · 0.25 = sunrise · 0.50 = noon · 0.75 = sunset
@@ -389,9 +392,6 @@ export default class Environment {
     }
 
     setSky() {
-        // Grabbed before the shader is written, because the node below closes
-        // over it. See the source entry for why it is not decorative.
-        this.moonMap = this.experience.resources?.items?.moonTexture || null
 
         // Gradient
         this.skyTopColor = uniform(new THREE.Color('#86b8ff'))
@@ -407,7 +407,10 @@ export default class Environment {
         this.skySunHaloSharpness = uniform(7.0)
 
         // Moon (night)
-        this.skyMoonColor = uniform(new THREE.Color('#cdd6ff'))
+        // The same white the stars are drawn in, on purpose: they are the
+        // same kind of light in this sky, and two constants would drift apart
+        // the first time either was tweaked. See STAR_WHITE.
+        this.skyMoonColor = uniform(STAR_WHITE.clone())
         this.skyMoonDirection = uniform(new THREE.Vector3(0, -1, 0))
         this.skyMoonIntensity = uniform(0.0)
         /**
@@ -421,7 +424,7 @@ export default class Environment {
          * is roughly ten times the real moon and about right for a sky this
          * stylised.
          */
-        this.uMoonRadius = uniform(0.05)
+        this.uMoonRadius = uniform(0.085)
 
         // Stars (fades in at night)
         this.skyNightFactor = uniform(0.0)
@@ -443,62 +446,52 @@ export default class Environment {
         const sunContribution = this.skySunColor.mul(sunDisk.add(sunHalo))
 
         // Moon disk + tiny glow
-        // A TEXTURED moon, projected onto the sky where it actually is.
+        // A clean disc, drawn where the moon actually is.
         //
-        // Build a little 2D frame around the moon's direction and measure how
-        // far the view direction sits from it along those two axes; divided by
-        // the angular radius that IS the sprite's uv. The image cuts itself
-        // out with its own alpha, so the edge is as clean as the artwork
-        // rather than as clean as a power curve.
+        // It was pow(dot, 900) once, which is a disc only by accident: a power
+        // curve has no edge, so it was a smudge that blurred further the
+        // dimmer it got, and where it finally stopped was pure aliasing. Then
+        // it was a texture, which had a real edge but read as a photograph
+        // pasted into a sky made of flat colour. This is the shape the rest of
+        // the sky is made of.
         //
-        // The epsilon on the right axis matters: with the moon straight
-        // overhead it is parallel to world up, their cross product is zero,
-        // and normalising that paints NaN across the whole sky.
-        const moonDir = this.skyMoonDirection.normalize()
+        // Build a little 2D frame around the moon's direction, and the view
+        // direction's distance from the centre in that frame -- divided by the
+        // angular radius -- is 1 exactly at the rim. The epsilon matters: with
+        // the moon at the zenith its direction is parallel to world up, their
+        // cross product is zero, and normalising that paints NaN across the
+        // whole sky.
         const moonDot = viewDir.dot(moonDir).max(0.0)
         const moonGlow = moonDot.pow(float(16.0)).mul(this.skyMoonIntensity).mul(0.12)
         // The halo still ADDS -- it is light scattered around the moon, and
         // scattered light is additive. The disc itself is not: see below.
         const moonHalo = this.skyMoonColor.mul(moonGlow)
 
-        // The moon is a BODY, so it covers what is behind it.
-        //
-        // These start as "nothing" and the sky is composed against them at the
-        // end. Adding the disc instead -- which is what it did -- is why the
-        // stars shone straight through it: an added disc brightens the sky
-        // where the moon is, it does not occupy it. A rock a quarter of a
-        // million miles wide does not let starlight past.
-        let moonSurface = vec3(0.0, 0.0, 0.0)
-        let moonCoverage = float(0.0)
+        const moonRight = vec3(0.0, 1.0, 0.0).cross(moonDir)
+            .add(vec3(1e-5, 0.0, 0.0)).normalize()
+        const moonUp = moonDir.cross(moonRight)
+        const moonOffset = vec2(
+            viewDir.dot(moonRight).div(this.uMoonRadius),
+            viewDir.dot(moonUp).div(this.uMoonRadius)
+        ).length()
 
-        // Branched in JS, not in the shader: without a map there is simply no
-        // disc term, and the sky keeps its soft glow. texture(null, ...) would
-        // throw while the sky shader is being built, which would take the
-        // WHOLE SKY down over a decorative moon.
-        if (this.moonMap) {
-            const moonRight = vec3(0.0, 1.0, 0.0).cross(moonDir)
-                .add(vec3(1e-5, 0.0, 0.0)).normalize()
-            const moonUp = moonDir.cross(moonRight)
-            const moonUv = vec2(
-                viewDir.dot(moonRight).div(this.uMoonRadius),
-                viewDir.dot(moonUp).div(this.uMoonRadius)
-            ).mul(0.5).add(0.5)
-            const moonTex = texture(this.moonMap, moonUv)
+        // Soft only over the last 6% of the radius: enough to keep the rim
+        // from stair-stepping, not enough to turn it back into a smudge.
+        const moonEdge = smoothstep(float(1.0), float(0.94), moonOffset)
 
-            // Only the hemisphere the moon is in. Without this the ANTIPODE
-            // also lands at uv (0.5, 0.5) -- dead centre of the image -- and a
-            // second moon rises on the opposite side of the sky.
-            const facingMoon = step(float(0.0), viewDir.dot(moonDir))
+        // Only the hemisphere the moon is in. Without this the ANTIPODE sits
+        // at offset 0 too -- dead centre of the disc -- and a second moon
+        // rises on the opposite side of the sky.
+        const facingMoon = step(float(0.0), viewDir.dot(moonDir))
 
-            // Coverage is about being THERE, not about being bright. The
-            // intensity keyframes peak at 0.60, so folding them straight into
-            // the coverage would have left the moon 40% see-through on its
-            // best night. It only decides whether the moon is out: opaque well
-            // before midnight, gone by day.
-            moonCoverage = moonTex.a.mul(facingMoon)
-                .mul(smoothstep(float(0.0), float(0.25), this.skyMoonIntensity))
-            moonSurface = moonTex.rgb.mul(this.skyMoonColor)
-        }
+        // Coverage is about being THERE, not about being bright. The intensity
+        // keyframes peak at 0.60, so folding them straight into the coverage
+        // would leave the moon 40% see-through on its best night. It only
+        // decides whether the moon is out: opaque well before midnight, gone
+        // by day.
+        const moonCoverage = moonEdge.mul(facingMoon)
+            .mul(smoothstep(float(0.0), float(0.25), this.skyMoonIntensity))
+        const moonSurface = this.skyMoonColor
 
         // Stars: round dots on a hashed grid, only above the horizon at night.
         // Project the sky dome onto a plane, split into cells, and drop one
@@ -516,7 +509,7 @@ export default class Environment {
         const starDist = cellFract.sub(starCenter).length()
         const starDot = smoothstep(this.skyStarSize, float(0.0), starDist)
         const stars = starDot.mul(hasStar).mul(cellRandom.a).mul(upMask).mul(this.skyNightFactor)
-        const starContribution = vec3(0.95, 0.97, 1.0).mul(stars)
+        const starContribution = vec3(STAR_WHITE.r, STAR_WHITE.g, STAR_WHITE.b).mul(stars)
 
         // Everything that is BEHIND the moon, then the moon over the top.
         // Order matters here in a way it did not when all four were summed:

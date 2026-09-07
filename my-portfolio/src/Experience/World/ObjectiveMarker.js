@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { Fn, float, vec2, vec3, vec4, uv, smoothstep, mix, length, abs, texture } from 'three/tsl'
 import Experience from '../Experience.js'
-import { ignoreAO, excludeFromAOByCoverage } from './aoMask.js'
+import { excludeFromAOByCoverage } from './aoMask.js'
 
 // Resting height of the aiming arrow — the low end of its old bob (0.9 − 0.12).
 const ARROW_Y = 0.78
@@ -33,14 +33,17 @@ export default class ObjectiveMarker {
         if (!tex) return
         if (this.arrowSprite) return
 
-        const mat = new THREE.SpriteMaterial({
-            map: tex,
+        // Same treatment as the tick below: a node material so the arrow can
+        // tell the AO mask how much of each pixel it covers. Abstaining left
+        // the fence's occlusion multiplying over an arrow drawn in front of
+        // it -- see excludeFromAOByCoverage.
+        const texNode = texture(tex, uv())
+        const mat = new THREE.SpriteNodeMaterial({
             transparent: true,
             depthWrite: false
         })
-        // No depth write means no say over ambient occlusion -- it abstains
-        // rather than overriding what is behind it. See aoMask.js.
-        ignoreAO(mat)
+        mat.outputNode = vec4(texNode.rgb, texNode.a)
+        excludeFromAOByCoverage(mat, texNode.a)
         this.arrowSprite = new THREE.Sprite(mat)
         this.arrowSprite.scale.set(0.5, 0.6, 1)
         this.arrowSprite.visible = false
@@ -120,12 +123,14 @@ export default class ObjectiveMarker {
             depthWrite: false,
             side: THREE.DoubleSide
         })
-        // No depth write means no say over ambient occlusion -- it abstains
-        // rather than overriding what is behind it. See aoMask.js.
-        ignoreAO(mat)
-
         mat.colorNode = _bullseyeColor()
-        mat.opacityNode = _bullseyeOpacity()
+        const bullseyeAlpha = _bullseyeOpacity()
+        mat.opacityNode = bullseyeAlpha
+        // Opts out of RECEIVING occlusion exactly as far as the rings actually
+        // cover, so the fence's AO stops landing on top of them. Abstaining
+        // inherited the ground's occlusion, and the AO multiplies over the
+        // finished picture. See aoMask.js.
+        excludeFromAOByCoverage(mat, bullseyeAlpha)
 
         this.bullseyeMesh = new THREE.Mesh(geo, mat)
         this.bullseyeMesh.position.y = 0.02
