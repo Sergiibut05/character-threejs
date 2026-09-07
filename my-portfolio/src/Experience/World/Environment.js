@@ -457,7 +457,19 @@ export default class Environment {
         const moonDir = this.skyMoonDirection.normalize()
         const moonDot = viewDir.dot(moonDir).max(0.0)
         const moonGlow = moonDot.pow(float(16.0)).mul(this.skyMoonIntensity).mul(0.12)
-        let moonContribution = this.skyMoonColor.mul(moonGlow)
+        // The halo still ADDS -- it is light scattered around the moon, and
+        // scattered light is additive. The disc itself is not: see below.
+        const moonHalo = this.skyMoonColor.mul(moonGlow)
+
+        // The moon is a BODY, so it covers what is behind it.
+        //
+        // These start as "nothing" and the sky is composed against them at the
+        // end. Adding the disc instead -- which is what it did -- is why the
+        // stars shone straight through it: an added disc brightens the sky
+        // where the moon is, it does not occupy it. A rock a quarter of a
+        // million miles wide does not let starlight past.
+        let moonSurface = vec3(0.0, 0.0, 0.0)
+        let moonCoverage = float(0.0)
 
         // Branched in JS, not in the shader: without a map there is simply no
         // disc term, and the sky keeps its soft glow. texture(null, ...) would
@@ -477,9 +489,15 @@ export default class Environment {
             // also lands at uv (0.5, 0.5) -- dead centre of the image -- and a
             // second moon rises on the opposite side of the sky.
             const facingMoon = step(float(0.0), viewDir.dot(moonDir))
-            const moonDisk = moonTex.a.mul(facingMoon).mul(this.skyMoonIntensity)
-            moonContribution = moonContribution.add(
-                moonTex.rgb.mul(this.skyMoonColor).mul(moonDisk))
+
+            // Coverage is about being THERE, not about being bright. The
+            // intensity keyframes peak at 0.60, so folding them straight into
+            // the coverage would have left the moon 40% see-through on its
+            // best night. It only decides whether the moon is out: opaque well
+            // before midnight, gone by day.
+            moonCoverage = moonTex.a.mul(facingMoon)
+                .mul(smoothstep(float(0.0), float(0.25), this.skyMoonIntensity))
+            moonSurface = moonTex.rgb.mul(this.skyMoonColor)
         }
 
         // Stars: round dots on a hashed grid, only above the horizon at night.
@@ -500,10 +518,14 @@ export default class Environment {
         const stars = starDot.mul(hasStar).mul(cellRandom.a).mul(upMask).mul(this.skyNightFactor)
         const starContribution = vec3(0.95, 0.97, 1.0).mul(stars)
 
-        const skyColor = baseSky
+        // Everything that is BEHIND the moon, then the moon over the top.
+        // Order matters here in a way it did not when all four were summed:
+        // the stars have to exist before something can hide them.
+        const backdrop = baseSky
             .add(sunContribution)
-            .add(moonContribution)
+            .add(moonHalo)
             .add(starContribution)
+        const skyColor = mix(backdrop, moonSurface, moonCoverage)
 
         const material = new THREE.MeshBasicNodeMaterial({
             side: THREE.BackSide,

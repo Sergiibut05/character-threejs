@@ -85,6 +85,13 @@ export default class ObjectiveMarker {
         this.checkSprite = new THREE.Sprite(mat)
         this.checkSprite.scale.set(0.6, 0.6, 1)
         this.checkSprite.visible = false
+        // Draw AFTER the grass, exactly as the arrow above does and for the
+        // same reason: both are transparent and neither writes depth, so
+        // whatever renders last wins, and blades standing behind the tick were
+        // painting straight over it. Ordering it last lets the grass lay down
+        // its depth first, and the tick's own depth TEST then hides it only
+        // where a blade is genuinely in front.
+        this.checkSprite.renderOrder = 12
         this.scene.add(this.checkSprite)
     }
 
