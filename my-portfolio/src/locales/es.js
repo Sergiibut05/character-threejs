@@ -145,20 +145,6 @@ export default {
         },
 
         hint: { touchTo: 'Toca para {verb}', move: 'WASD o flechas para moverte' },
-
-        controlsPanel: {
-            title: 'Controles',
-            move: 'Moverte',
-            sprint: 'Correr',
-            interact: 'Interactuar',
-            back: 'Volver / salir',
-            note: {
-                keyboard: 'También puedes moverte con las flechas.',
-                gamepad: 'Mando detectado. Se adapta solo si lo desconectas.',
-                touch: 'Usa el joystick de la izquierda y los botones de la derecha.'
-            }
-        },
-
         frisbee: {
             title: 'Frisbee',
             chooseMode: 'Elige cómo quieres jugar',

@@ -297,20 +297,6 @@ export default {
         },
 
         hint: { touchTo: 'Tap to {verb}', move: 'WASD or arrow keys to move' },
-
-        controlsPanel: {
-            title: 'Controls',
-            move: 'Move',
-            sprint: 'Run',
-            interact: 'Interact',
-            back: 'Back / leave',
-            note: {
-                keyboard: 'The arrow keys work too.',
-                gamepad: 'Gamepad detected. This adapts on its own if you unplug it.',
-                touch: 'Use the joystick on the left and the buttons on the right.'
-            }
-        },
-
         frisbee: {
             title: 'Frisbee',
             chooseMode: 'Pick how you want to play',
