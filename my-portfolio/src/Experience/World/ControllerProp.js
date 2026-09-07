@@ -60,25 +60,31 @@ export default class ControllerProp {
         this._resolve()
     }
 
-    /** Lazy, like the other props: the model may not have landed yet. */
+    /**
+     * Lazy, and it waits for BOTH pieces.
+     *
+     * The mesh and the atlas are separate downloads that finish whenever they
+     * finish. Gating only on the model is why this rendered flat white: the
+     * model landed first, the material was built once with map: null, and a
+     * material built without a texture never grows one -- the atlas arriving
+     * two seconds later had nothing left to attach to.
+     */
     _resolve() {
         const gltf = this.resources?.items?.controllerModel
         const source = gltf?.scene
-        if (!source) return false
+        const atlas = this.resources?.items?.tinyAtlas
+        if (!source || !atlas) return false
 
         // Cloned, not moved: Resources hands out the one parsed glTF and
         // reparenting it would empty the cache for anyone else who asks.
         this.node = source.clone(true)
         this.node.name = 'ControllerProp'
 
-        // Textured off the Tiny atlas, like the rest of the small props.
-        // It used to be a flat slate colour because the GLB ships with no
-        // material -- but shipping without one is not the same as not having
-        // one, and the UVs are authored against this atlas.
-        const material = createStylizedPropNodeMaterial({
-            map: this.resources?.items?.tinyAtlas || null,
-            color: 0xffffff
-        })
+        // Textured off the Tiny atlas, like the rest of the small props. The
+        // GLB ships with no material, but shipping without one is not the same
+        // as not having one: the UVs are authored against this atlas and land
+        // on a real patch of it (u 0.40-0.85, v 0.32-0.45).
+        const material = createStylizedPropNodeMaterial({ map: atlas })
         this.node.traverse((child) => {
             if (!child.isMesh) return
             child.material = material

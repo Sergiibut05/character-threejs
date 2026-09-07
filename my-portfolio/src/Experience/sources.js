@@ -37,9 +37,13 @@ const allSources = [
     },
     {
         // The controls prop by the house. Draco: 25.8 KB -> 5.0 KB.
+        // Decorative, and deliberately: it is wearing the Tiny atlas, which is
+        // decorative too, and there is nothing to gain from the mesh arriving
+        // long before the texture it needs.
         name: 'controllerModel',
         type: 'gltfModel',
-        path: '/models/controller/controller-compressed.glb'
+        path: '/models/controller/controller-compressed.glb',
+        priority: 'decorative'
     },
     {
         name: 'humanAtlas',
