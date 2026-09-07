@@ -36,6 +36,12 @@ const allSources = [
         path: '/models/human/human-walk-draco.glb'
     },
     {
+        // The controls prop by the house. Draco: 25.8 KB -> 5.0 KB.
+        name: 'controllerModel',
+        type: 'gltfModel',
+        path: '/models/controller/controller-compressed.glb'
+    },
+    {
         name: 'humanAtlas',
         type: 'textureKtx',
         path: '/models/human/human-atlas.ktx2',

@@ -5,6 +5,7 @@ import Character from './Character.js'
 import Physics from './Physics.js'
 import Raycaster from './Raycaster.js'
 import Mailbox from './Mailbox.js'
+import ControllerProp from './ControllerProp.js'
 import SitPoints from './SitPoints.js'
 import Door from './Door.js'
 import HouseInterior from './HouseInterior.js'
@@ -145,6 +146,9 @@ export default class World {
             this.mailbox = new Mailbox() // resolves the mailbox node lazily
             this.sitPoints = new SitPoints() // resolves sit-points.glb lazily
             this.door = new Door() // resolves the house `door` node lazily
+            // The oversized gamepad by the house: shows the controls for
+            // whatever you are actually playing with. See ControllerProp.js.
+            this.controllerProp = new ControllerProp()
             this.houseInterior = new HouseInterior() // far-offset interior + rug exit
 
             // West play area: project carts + goal + kickable ball + confetti
@@ -445,6 +449,9 @@ export default class World {
         }
         if (this.sitPoints) {
             this.sitPoints.update()
+        }
+        if (this.controllerProp) {
+            this.controllerProp.update()
         }
         if (this.door) {
             this.door.update()
