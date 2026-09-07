@@ -74,6 +74,25 @@ const allSources = [
         }
     },
 
+    // ─── Moon ─────────────────────────────────────────────────────
+    {
+        // No priority on purpose: the sky shader is BUILT ONCE, in
+        // Environment's constructor, which runs on resources 'ready'. A
+        // decorative moon would arrive after the shader that samples it and
+        // never make it into the sky at all.
+        name: 'moonTexture',
+        type: 'texture',
+        path: '/texture/moon/moon.png',
+        modifier: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            // The disc is cut out by its own alpha, and everything outside the
+            // sprite reads the clamped edge -- which is transparent. Repeat
+            // would tile moons across the whole sky.
+            texture.wrapS = THREE.ClampToEdgeWrapping
+            texture.wrapT = THREE.ClampToEdgeWrapping
+        }
+    },
+
     // ─── Flowers ──────────────────────────────────────────────────
     {
         name: 'flowerViolet',

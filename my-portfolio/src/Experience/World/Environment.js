@@ -389,6 +389,10 @@ export default class Environment {
     }
 
     setSky() {
+        // Grabbed before the shader is written, because the node below closes
+        // over it. See the source entry for why it is not decorative.
+        this.moonMap = this.experience.resources?.items?.moonTexture || null
+
         // Gradient
         this.skyTopColor = uniform(new THREE.Color('#86b8ff'))
         this.skyBottomColor = uniform(new THREE.Color('#f7fbff'))
@@ -406,7 +410,18 @@ export default class Environment {
         this.skyMoonColor = uniform(new THREE.Color('#cdd6ff'))
         this.skyMoonDirection = uniform(new THREE.Vector3(0, -1, 0))
         this.skyMoonIntensity = uniform(0.0)
-        this.skyMoonSharpness = uniform(900.0)
+        /**
+         * Angular RADIUS of the moon, in radians.
+         *
+         * It used to be a "sharpness" fed to pow(dot, 900), which is a disc
+         * only by accident: the falloff of a power curve has no edge, so the
+         * moon was a smudge that got blurrier the dimmer it was, and the point
+         * where it finally stopped was pure aliasing. A real angular size can
+         * be reasoned about -- 0.05 rad is just under 6 degrees across, which
+         * is roughly ten times the real moon and about right for a sky this
+         * stylised.
+         */
+        this.uMoonRadius = uniform(0.05)
 
         // Stars (fades in at night)
         this.skyNightFactor = uniform(0.0)
@@ -428,10 +443,44 @@ export default class Environment {
         const sunContribution = this.skySunColor.mul(sunDisk.add(sunHalo))
 
         // Moon disk + tiny glow
-        const moonDot = viewDir.dot(this.skyMoonDirection.normalize()).max(0.0)
-        const moonDisk = moonDot.pow(this.skyMoonSharpness).mul(this.skyMoonIntensity)
+        // A TEXTURED moon, projected onto the sky where it actually is.
+        //
+        // Build a little 2D frame around the moon's direction and measure how
+        // far the view direction sits from it along those two axes; divided by
+        // the angular radius that IS the sprite's uv. The image cuts itself
+        // out with its own alpha, so the edge is as clean as the artwork
+        // rather than as clean as a power curve.
+        //
+        // The epsilon on the right axis matters: with the moon straight
+        // overhead it is parallel to world up, their cross product is zero,
+        // and normalising that paints NaN across the whole sky.
+        const moonDir = this.skyMoonDirection.normalize()
+        const moonDot = viewDir.dot(moonDir).max(0.0)
         const moonGlow = moonDot.pow(float(16.0)).mul(this.skyMoonIntensity).mul(0.12)
-        const moonContribution = this.skyMoonColor.mul(moonDisk.add(moonGlow))
+        let moonContribution = this.skyMoonColor.mul(moonGlow)
+
+        // Branched in JS, not in the shader: without a map there is simply no
+        // disc term, and the sky keeps its soft glow. texture(null, ...) would
+        // throw while the sky shader is being built, which would take the
+        // WHOLE SKY down over a decorative moon.
+        if (this.moonMap) {
+            const moonRight = vec3(0.0, 1.0, 0.0).cross(moonDir)
+                .add(vec3(1e-5, 0.0, 0.0)).normalize()
+            const moonUp = moonDir.cross(moonRight)
+            const moonUv = vec2(
+                viewDir.dot(moonRight).div(this.uMoonRadius),
+                viewDir.dot(moonUp).div(this.uMoonRadius)
+            ).mul(0.5).add(0.5)
+            const moonTex = texture(this.moonMap, moonUv)
+
+            // Only the hemisphere the moon is in. Without this the ANTIPODE
+            // also lands at uv (0.5, 0.5) -- dead centre of the image -- and a
+            // second moon rises on the opposite side of the sky.
+            const facingMoon = step(float(0.0), viewDir.dot(moonDir))
+            const moonDisk = moonTex.a.mul(facingMoon).mul(this.skyMoonIntensity)
+            moonContribution = moonContribution.add(
+                moonTex.rgb.mul(this.skyMoonColor).mul(moonDisk))
+        }
 
         // Stars: round dots on a hashed grid, only above the horizon at night.
         // Project the sky dome onto a plane, split into cells, and drop one
@@ -734,6 +783,8 @@ export default class Environment {
         moon.close()
         moon.add(this.params, 'moonAzimuthDeg', -180, 180, 1).name('Direction (azimuth °)')
             .onChange(() => this._applyTimeOfDay(this.timeOfDay))
+        sun.add(this.uMoonRadius, 'value', 0.01, 0.2, 0.005)
+            .name('Luna · radio (rad)')
         sun.add(this.skySunDiskSharpness, 'value', 60, 800, 1).name('Disk size (sharpness)')
         sun.add(this.skySunHaloIntensity, 'value', 0, 1.5, 0.01).name('Halo intensity')
         sun.add(this.skySunHaloSharpness, 'value', 1, 40, 0.1).name('Halo size')

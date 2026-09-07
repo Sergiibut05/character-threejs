@@ -1,7 +1,7 @@
 import * as THREE from 'three'
-import { Fn, float, vec2, vec3, uv, smoothstep, mix, length, abs } from 'three/tsl'
+import { Fn, float, vec2, vec3, vec4, uv, smoothstep, mix, length, abs, texture } from 'three/tsl'
 import Experience from '../Experience.js'
-import { ignoreAO } from './aoMask.js'
+import { ignoreAO, excludeFromAOByCoverage } from './aoMask.js'
 
 // Resting height of the aiming arrow — the low end of its old bob (0.9 − 0.12).
 const ARROW_Y = 0.78
@@ -71,14 +71,17 @@ export default class ObjectiveMarker {
         if (!tex) return
         if (this.checkSprite) return
 
-        const mat = new THREE.SpriteMaterial({
-            map: tex,
+        // A node material, so the tick can tell the AO mask how much of each
+        // pixel it actually covers. Abstaining left the fence's occlusion
+        // multiplying over a tick drawn in front of it -- see
+        // excludeFromAOByCoverage.
+        const texNode = texture(tex, uv())
+        const mat = new THREE.SpriteNodeMaterial({
             transparent: true,
             depthWrite: false
         })
-        // No depth write means no say over ambient occlusion -- it abstains
-        // rather than overriding what is behind it. See aoMask.js.
-        ignoreAO(mat)
+        mat.outputNode = vec4(texNode.rgb, texNode.a)
+        excludeFromAOByCoverage(mat, texNode.a)
         this.checkSprite = new THREE.Sprite(mat)
         this.checkSprite.scale.set(0.6, 0.6, 1)
         this.checkSprite.visible = false

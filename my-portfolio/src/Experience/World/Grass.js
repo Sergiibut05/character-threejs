@@ -375,17 +375,33 @@ export default class Grass {
         if (this.uCharacterPosition && character) {
             this.uCharacterPosition.value.copy(character.position)
 
-            // Cull centre = character pushed `viewAhead` metres along the
-            // camera→character direction (the way the player is looking).
-            const cam = this.experience.camera.instance.position
-            let dx = character.position.x - cam.x
-            let dz = character.position.z - cam.z
+            // Cull centre = WHAT THE CAMERA IS LOOKING AT, pushed `viewAhead`
+            // metres further along the same line.
+            //
+            // It used to be the character, and that is only the same thing
+            // while the camera is following him. Throw the frisbee and the
+            // camera leaves with the disc while the grass stays a disc around
+            // a player standing still: a couple of seconds into the flight the
+            // shot is past the 18 m radius and the ground underneath goes bare.
+            //
+            // smoothLookAt is maintained by every camera mode -- follow, aim,
+            // frisbee flight, the beach's fixed framing -- so this follows the
+            // shot everywhere instead of needing a branch per activity. In
+            // follow mode it lerps onto the character, so nothing changes there.
+            //
+            // uCharacterPosition above is deliberately NOT this: the blades
+            // part around the player's feet, wherever the camera happens to be.
+            const camera = this.experience.camera
+            const look = camera.smoothLookAt
+            const cam = camera.instance.position
+            let dx = look.x - cam.x
+            let dz = look.z - cam.z
             const len = Math.hypot(dx, dz) || 1
             dx /= len; dz /= len
             this.uViewCenter.value.set(
-                character.position.x + dx * this.viewAhead,
-                character.position.y,
-                character.position.z + dz * this.viewAhead
+                look.x + dx * this.viewAhead,
+                look.y,
+                look.z + dz * this.viewAhead
             )
         }
         this.uCharacterCullEnabled.value = this.enableCharacterCulling ? 1 : 0

@@ -237,6 +237,33 @@ function _applyIfDepthless(material) {
 }
 
 /**
+ * Opt OUT of receiving occlusion, but only as far as you actually cover.
+ *
+ * Between the two above there was a gap, and the frisbee catch marker fell
+ * straight into it. Abstaining leaves the ground's own occlusion in place, and
+ * the AO is a multiply over the FINISHED picture -- so the fence's shading was
+ * landing on top of a tick drawn in front of it. Opting out with a flat alpha
+ * would have fixed that and broken something worse: a sprite covers a QUAD, so
+ * a 0.6 m square of ground would have lit up around the icon, which is the
+ * bright-rectangle bug the music notes already taught us once.
+ *
+ * So the vote is weighted by coverage. Where the glyph is opaque the mask goes
+ * to zero and no occlusion is applied; where the sprite is transparent it
+ * contributes nothing and the ground keeps whatever it had. Pass the same
+ * alpha the material is drawing with.
+ *
+ * @param {THREE.Material} material  a node material (needs an alpha node)
+ * @param {Node<float>} coverage     its alpha, 0..1
+ */
+export function excludeFromAOByCoverage(material, coverage) {
+    if (!material) return
+    material.mrtNode = mrt({
+        [AO_MASK]: vec4(0, 0, 0, coverage),
+        [AO_NORMAL]: vec4(0, 0, 0, 0),
+    })
+}
+
+/**
  * The opt-OUT's quieter sibling: for anything drawn without a depth write.
  *
  * Says nothing about occlusion rather than turning it off, so the surface

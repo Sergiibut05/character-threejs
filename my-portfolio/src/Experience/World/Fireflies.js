@@ -131,17 +131,22 @@ export default class Fireflies {
         // Only uniform update needed — all animation is on GPU.
         // Culling-only uniform → shifted toward the view direction so the
         // visible disc matches what's on screen (see Grass.uViewCenter).
-        const character = this.experience.world?.character
-        if (character) {
-            const cam = this.experience.camera.instance.position
+        // Centred on WHAT THE CAMERA LOOKS AT, not on the character -- the
+        // same fix, and the same reason, as Grass.uViewCenter: the two are
+        // only the same point while the camera is following the player, and
+        // the frisbee flight is exactly when it is not.
+        const camera = this.experience.camera
+        const look = camera?.smoothLookAt
+        if (look) {
+            const cam = camera.instance.position
             const ahead = this.experience.quality.grassViewAhead
-            let dx = character.position.x - cam.x
-            let dz = character.position.z - cam.z
+            let dx = look.x - cam.x
+            let dz = look.z - cam.z
             const len = Math.hypot(dx, dz) || 1
             this.uCharacterPos.value.set(
-                character.position.x + (dx / len) * ahead,
-                character.position.y,
-                character.position.z + (dz / len) * ahead
+                look.x + (dx / len) * ahead,
+                look.y,
+                look.z + (dz / len) * ahead
             )
         }
     }
