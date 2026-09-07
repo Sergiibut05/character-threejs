@@ -461,6 +461,7 @@ export default class Environment {
         // the moon at the zenith its direction is parallel to world up, their
         // cross product is zero, and normalising that paints NaN across the
         // whole sky.
+        const moonDir = this.skyMoonDirection.normalize()
         const moonDot = viewDir.dot(moonDir).max(0.0)
         const moonGlow = moonDot.pow(float(16.0)).mul(this.skyMoonIntensity).mul(0.12)
         // The halo still ADDS -- it is light scattered around the moon, and
