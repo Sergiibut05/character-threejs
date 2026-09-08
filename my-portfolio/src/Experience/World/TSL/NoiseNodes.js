@@ -24,6 +24,32 @@ hashTexture.wrapT = THREE.RepeatWrapping
 hashTexture.generateMipmaps = false
 hashTexture.needsUpdate = true
 
+/**
+ * The SAME random bytes, filtered smoothly instead of per-texel.
+ *
+ * hashTexture above is deliberately Nearest: the star field reads one flat
+ * value per cell and interpolating between cells would smear the dots into
+ * streaks. Clouds want the opposite, and the difference is worth a second
+ * texture rather than a compromise on either.
+ *
+ * Linear filtering is also where the performance is. Value noise done in the
+ * shader costs four fetches plus the interpolation maths for every octave --
+ * that is what snoise() below does, and what the old cloud shader did four
+ * times over. Asking the sampler for LinearFilter buys exactly the same
+ * bilinear interpolation from fixed-function hardware, for ONE fetch.
+ *
+ * Shares the pixel array with hashTexture: same 256 KB, uploaded twice with
+ * different sampler state.
+ */
+export const smoothNoiseTexture = new THREE.DataTexture(
+    noiseData, NOISE_SIZE, NOISE_SIZE, THREE.RGBAFormat)
+smoothNoiseTexture.minFilter = THREE.LinearFilter
+smoothNoiseTexture.magFilter = THREE.LinearFilter
+smoothNoiseTexture.wrapS = THREE.RepeatWrapping
+smoothNoiseTexture.wrapT = THREE.RepeatWrapping
+smoothNoiseTexture.generateMipmaps = false
+smoothNoiseTexture.needsUpdate = true
+
 // --- 2D Value Noise ---
 // O(1) texture lookup instead of O(N) mathematical trigonometry
 export const snoise = Fn(([v]) => {

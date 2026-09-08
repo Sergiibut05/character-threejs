@@ -2,9 +2,9 @@ import * as THREE from 'three'
 import Experience from '../Experience.js'
 import {
     uniform, mix, positionWorld, cameraPosition, smoothstep, vec2, vec3, float,
-    floor, fract, step, texture
+    floor, fract, step, texture, time, If, Fn
 } from 'three/tsl'
-import { hashTexture } from './TSL/NoiseNodes.js'
+import { hashTexture, smoothNoiseTexture } from './TSL/NoiseNodes.js'
 import { dayNightTint, dayNightLitTint } from './DayNight.js'
 import {
     syncPropStylizedSunDirection,
@@ -426,6 +426,67 @@ export default class Environment {
          */
         this.uMoonRadius = uniform(0.085)
 
+        // ─── Clouds ──────────────────────────────────────────────────────
+        //
+        // Off by default and eased to 1 only where they earn their cost: high
+        // quality, and only while an activity has the camera pointed at the
+        // sky for seconds at a time. See _cloudTarget().
+        //
+        // WHY THIS IS AFFORDABLE AT ALL. Two things.
+        //
+        // One: the noise is a LINEARLY FILTERED texture, so an octave is a
+        // single fetch and the interpolation is free fixed-function work. The
+        // cloud shader this project already had and never used did value noise
+        // in the shader, four octaves deep -- sixteen hashes a pixel.
+        //
+        // Two: the sky is drawn BEFORE the terrain (it follows the camera, so
+        // three sorts it nearest, and depthWrite:false lets everything paint
+        // over it). That means this shader runs on every pixel of the screen,
+        // not on the sky you can see -- so what is added here is paid at full
+        // resolution whatever the shot. Hence the uniform branch below rather
+        // than a multiply by zero: a branch on a uniform is the same for every
+        // pixel in the draw, so the GPU skips the work outright when it is off.
+        this.uCloudAmount = uniform(0.0)
+        // 0.07, and the small number is the point. The dome is flattened by
+        // dividing xz by the height, so one unit here is already most of the
+        // visible sky: the first value tried was 1.15 and it wrapped the 256px
+        // noise dozens of times across the screen, which is not clouds, it is
+        // static. Big soft shapes with sky between them read as weather; fine
+        // ones read as a broken texture.
+        this.uCloudScale = uniform(0.07)
+        // 0.0005, and it needs to be this small.
+        //
+        // The drift is added to the noise UV, and the flattened dome puts the
+        // whole visible sky inside about 0.04 of UV. So 0.012 crossed it in
+        // roughly eight seconds -- clouds scudding past like a timelapse. At
+        // 0.0005 the same crossing takes about a minute and a half, which is
+        // drift you notice only if you stop and watch, which is what weather
+        // does.
+        this.uCloudSpeed = uniform(0.0005)
+        this.uCloudCoverage = uniform(0.52)
+        this.uCloudColor = uniform(new THREE.Color('#ffffff'))
+        /**
+         * How far the shapes are pushed around before being read.
+         *
+         * Hardware bilinear filtering interpolates LINEARLY, and value noise
+         * wants a Hermite curve. The difference is visible: straight creases
+         * along every texel boundary and blobs with flat diagonal sides, which
+         * is what made the first version read as "not quite clouds". Warping
+         * the lookup with another sample of the same noise bends those
+         * boundaries into curves for the price of one extra fetch, which is
+         * still a quarter of what one octave of in-shader value noise costs.
+         */
+        // 0.05, found by looking rather than by reasoning. Enough to bend the
+        // sampler's straight creases into curves; any more and it stops
+        // bending edges and starts dragging the whole shape, which turned
+        // cotton into cirrus streaks at 0.15 and into fingerprint swirls when
+        // it was still an absolute offset.
+        this.uCloudWarp = uniform(0.05)
+        /** Lifts them off a bright daytime sky, where white on pale blue is
+         *  nearly no contrast at all. */
+        this.uCloudBrightness = uniform(1.12)
+        this._cloudEase = 0
+
         // Stars (fades in at night)
         this.skyNightFactor = uniform(0.0)
         this.skyStarScale = uniform(55.0)      // grid density
@@ -512,6 +573,83 @@ export default class Environment {
         const stars = starDot.mul(hasStar).mul(cellRandom.a).mul(upMask).mul(this.skyNightFactor)
         const starContribution = vec3(STAR_WHITE.r, STAR_WHITE.g, STAR_WHITE.b).mul(stars)
 
+        // ─── Clouds ─────────────────────────────────────────────────────
+        // Two octaves of the smooth noise, drifting at different speeds so the
+        // shapes churn instead of sliding as one sheet.
+        //
+        // The dome is flattened onto a plane the same way the stars are: divide
+        // xz by the height, and the sky spreads out toward the horizon exactly
+        // as a real cloud layer does in perspective.
+        // Wrapped in an Fn because If() needs a node stack to push onto, and
+        // the sky's colorNode is built as loose expressions rather than inside
+        // a shader function. Outside one, If() has nothing to attach the
+        // branch to and throws while the sky is being assembled -- which takes
+        // the whole Environment with it.
+        const cloudCover = Fn(() => {
+            const cover = float(0.0).toVar()
+            const thickness = float(0.0).toVar()
+            If(this.uCloudAmount.greaterThan(0.001), () => {
+                const drift = time.mul(this.uCloudSpeed)
+                const plane = vec2(viewDir.x, viewDir.z)
+                    .div(viewDir.y.abs().add(0.28))
+                    .mul(this.uCloudScale)
+
+                // Domain warp: read the noise once to decide WHERE to read it.
+                // This is what turns the grid's straight creases into curves.
+                const warp = texture(smoothNoiseTexture,
+                    plane.mul(0.4).add(vec2(drift.mul(0.5), drift.mul(0.2)))).rg
+                // Scaled BY uCloudScale, so it is a fraction of a cloud and
+                // not a fraction of the sky. Absolute, it was +-0.275 of UV
+                // against a visible sky barely 0.04 wide -- seven times the
+                // whole view -- and the lookup came apart into fingerprint
+                // swirls instead of bending cloud edges.
+                const wp = plane.add(
+                    warp.sub(0.5).mul(this.uCloudWarp).mul(this.uCloudScale))
+
+                // Each octave reads the SAME texture through a rotated frame.
+                // Sampling it three times unrotated would stack three grids in
+                // register and make the seams stronger, not weaker; turned
+                // against each other they interfere and disappear.
+                const rot = (p, c, sn) => vec2(
+                    p.x.mul(c).sub(p.y.mul(sn)),
+                    p.x.mul(sn).add(p.y.mul(c)))
+
+                const a = texture(smoothNoiseTexture,
+                    wp.add(vec2(drift, drift.mul(0.35)))).r
+                const b = texture(smoothNoiseTexture,
+                    rot(wp, 0.80, 0.60).mul(2.1)
+                        .sub(vec2(drift.mul(0.7), drift.mul(0.25)))).g
+                const c = texture(smoothNoiseTexture,
+                    rot(wp, -0.50, 0.87).mul(4.3)
+                        .add(vec2(drift.mul(1.3), drift.mul(0.4)))).b
+
+                const density = a.mul(0.54).add(b.mul(0.31)).add(c.mul(0.15))
+
+                // Coverage as a threshold, not a fade: below it there is
+                // clear sky, above it there is cloud, and the 0.16 band is the
+                // soft rim. A plain multiply would have given a permanent grey
+                // haze everywhere rather than clouds with gaps between them.
+                const shaped = smoothstep(
+                    this.uCloudCoverage,
+                    this.uCloudCoverage.add(0.16),
+                    density)
+
+                // Nothing at the horizon: the layer is overhead, and letting it
+                // run all the way down turns the skyline into a grey band.
+                const horizon = smoothstep(float(0.03), float(0.42), viewDir.y)
+                cover.assign(shaped.mul(horizon).mul(this.uCloudAmount))
+
+                // How far PAST the threshold, i.e. how thick the cloud is
+                // there. Shading the thin edges darker than the middles is
+                // most of what makes a flat shape read as a volume.
+                thickness.assign(smoothstep(
+                    this.uCloudCoverage,
+                    this.uCloudCoverage.add(0.34),
+                    density))
+            })
+            return vec2(cover, thickness)
+        })()
+
         // Everything that is BEHIND the moon, then the moon over the top.
         // Order matters here in a way it did not when all four were summed:
         // the stars have to exist before something can hide them.
@@ -519,7 +657,18 @@ export default class Environment {
             .add(sunContribution)
             .add(moonHalo)
             .add(starContribution)
-        const skyColor = mix(backdrop, moonSurface, moonCoverage)
+        // Clouds go over the moon too: they are the nearest thing in the sky,
+        // and a moon showing through a cloud is the same mistake the stars
+        // showing through the moon was.
+        const litSky = mix(backdrop, moonSurface, moonCoverage)
+
+        // Tinted a quarter of the way toward the sky so they belong to it, and
+        // shaded from edge to middle so they have a body. Flat white was the
+        // other half of why they did not read as clouds.
+        const cloudTint = mix(this.uCloudColor, this.skyTopColor, float(0.25))
+            .mul(this.uCloudBrightness)
+        const cloudBody = cloudTint.mul(mix(float(0.74), float(1.0), cloudCover.y))
+        const skyColor = mix(litSky, cloudBody, cloudCover.x)
 
         const material = new THREE.MeshBasicNodeMaterial({
             side: THREE.BackSide,
@@ -725,8 +874,36 @@ export default class Environment {
         dayNightLitTint.value.copy(cA).lerp(cB, f)
     }
 
+    /**
+     * Should there be clouds right now? 1 yes, 0 no.
+     *
+     * High quality only, and only while an activity is running. That is not
+     * arbitrary: an activity is exactly when the camera stops looking at the
+     * ground and spends seconds pointed at the sky, which is both when clouds
+     * are worth having and when there is a whole sky's worth of pixels to pay
+     * for them with. Walking around, the sky is a strip at the top of the
+     * screen and nobody is looking at it.
+     */
+    _cloudTarget() {
+        if (this._forceClouds) return 1
+        if (!this.experience.quality.isHigh) return 0
+        const world = this.experience.world
+        const frisbee = world?.frisbeeMinigame
+        if (frisbee && frisbee.state !== 'idle') return 1
+        if (world?.beachSession?.active) return 1
+        return 0
+    }
+
     update() {
         const camera = this.experience.camera.instance
+
+        // Eased, not switched. Clouds appearing the instant an activity starts
+        // reads as a bug; over about a second and a half it reads as weather.
+        const target = this._cloudTarget()
+        const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
+        this._cloudEase += (target - this._cloudEase) * (1 - Math.exp(-dt / 0.55))
+        if (Math.abs(target - this._cloudEase) < 0.002) this._cloudEase = target
+        this.uCloudAmount.value = this._cloudEase
 
         if (this.cycle.enabled && this.cycle.durationSec > 0) {
             const dt = this.experience.time.delta * 0.001
@@ -799,8 +976,26 @@ export default class Environment {
         moon.close()
         moon.add(this.params, 'moonAzimuthDeg', -180, 180, 1).name('Direction (azimuth °)')
             .onChange(() => this._applyTimeOfDay(this.timeOfDay))
-        sun.add(this.uMoonRadius, 'value', 0.01, 0.2, 0.005)
-            .name('Luna · radio (rad)')
+        moon.add(this.uMoonRadius, 'value', 0.01, 0.2, 0.005).name('Radio (rad)')
+        moon.addColor({ value: this.skyMoonColor.value }, 'value').name('Color')
+            .onChange((v) => this.skyMoonColor.value.copy(v))
+
+        // --- Clouds ---
+        const clouds = f.addFolder('Clouds')
+        clouds.close()
+        // Normally they only exist on high quality during an activity, which
+        // makes them impossible to tune. This holds them on; _cloudTarget()
+        // takes the decision back the moment it is unticked.
+        clouds.add({ force: false }, 'force').name('Forzar (ver siempre)')
+            .onChange((v) => { this._forceClouds = v })
+        clouds.add(this.uCloudCoverage, 'value', 0.2, 0.9, 0.01).name('Cobertura')
+        clouds.add(this.uCloudScale, 'value', 0.02, 0.4, 0.005).name('Escala')
+        clouds.add(this.uCloudSpeed, 'value', 0, 0.004, 0.0001).name('Velocidad')
+        clouds.add(this.uCloudWarp, 'value', 0, 0.3, 0.005).name('Deformacion')
+        clouds.add(this.uCloudBrightness, 'value', 0.6, 1.8, 0.02).name('Brillo')
+        clouds.addColor({ value: this.uCloudColor.value }, 'value').name('Color')
+            .onChange((v) => this.uCloudColor.value.copy(v))
+
         sun.add(this.skySunDiskSharpness, 'value', 60, 800, 1).name('Disk size (sharpness)')
         sun.add(this.skySunHaloIntensity, 'value', 0, 1.5, 0.01).name('Halo intensity')
         sun.add(this.skySunHaloSharpness, 'value', 1, 40, 0.1).name('Halo size')
