@@ -23,6 +23,15 @@ export const LINKS = {
 // behind a disclosure there. The trophy in-world still lists all of them.
 export const CERTIFICATES = [
     {
+        // Destacado, y con mas razon que ninguno: esta isla entera está
+        // construida con lo que enseña este curso.
+        title: 'Three.js Journey',
+        issuer: 'Bruno Simon',
+        date: 'Septiembre 2026',
+        url: 'https://threejs-journey.com/certificate/view/50944/threejs-journey',
+        featured: true
+    },
+    {
         title: 'JavaScript Moderno: Guía para dominar el lenguaje',
         issuer: 'DevTalles',
         date: 'Septiembre 2025',
