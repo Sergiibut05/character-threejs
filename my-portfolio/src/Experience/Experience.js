@@ -261,9 +261,18 @@ export default class Experience {
      *     corresponding fragment stage output but writeMask is not zero") and
      *     the next frame throws "parameter 1 is not of type GPURenderPipeline".
      *
-     * Both were tried, in that order, and the quotes above are what came back.
-     * Precompiling would need three to build the shadow variant too, and in
-     * r183 there is no way to ask it to.
+     * A third attempt narrowed it to "only where there is no shadow pass",
+     * since Android has none and Android is where this hurts. That is not
+     * enough either: the same two errors came back on low quality with the sun
+     * casting nothing. The shadow pass is not the only thing that re-renders
+     * these objects into a target of its own shape -- the outline pass does,
+     * and so does anything built on RTTNode, both from inside updateBefore,
+     * which is where the failing stack ends. Precompiling would have to build a
+     * variant for every one of those target shapes, and in r183 there is no way
+     * to ask it to.
+     *
+     * So: three attempts, three failures, and the conclusion is that this stall
+     * is paid here or it is paid in the first seconds of play. Here is better.
      */
     warmUpRender() {
         this.loadSpy?.mark('calentamiento (compila shaders)')
@@ -271,12 +280,23 @@ export default class Experience {
         const totalFrames = 3
 
         const doWarmUp = () => {
-            const t = performance.now()
+            const spy = this.loadSpy
+            if (frames === 0) spy?.mark('  (primer frame del calentamiento empieza)')
+            const t0 = spy ? performance.now() : 0
             this.camera.update()
+            const t1 = spy ? performance.now() : 0
             this.world.update()
+            const t2 = spy ? performance.now() : 0
             this.renderer.update()
             frames++
-            this.loadSpy?.mark(`  calentamiento f${frames}: ${Math.round(performance.now() - t)} ms`)
+            if (spy) {
+                const t3 = performance.now()
+                const ms = (a, b) => String(Math.round(b - a)).padStart(4)
+                spy.mark(
+                    `  f${frames}: total ${ms(t0, t3)}  ·  cam ${ms(t0, t1)}` +
+                    `  mundo ${ms(t1, t2)}  render ${ms(t2, t3)}`
+                )
+            }
 
             if (frames < totalFrames) {
                 requestAnimationFrame(doWarmUp)

@@ -38,7 +38,12 @@ export default class LoadSpy {
     }
 
     constructor() {
-        this.t0 = performance.now()
+        // NO t0 of its own, deliberately. performance.now() is already measured
+        // from navigation start, which is also the clock longtask entries use --
+        // so leaving it alone puts marks, gaps and tasks on ONE timeline. An
+        // earlier version subtracted the moment this class was built, which put
+        // its own marks about 0.9 s ahead of the tasks they were there to
+        // explain, on a phone slow enough to take that long to run the bundle.
         this.tasks = []
         this.gaps = []
         this.marks = []
@@ -63,7 +68,7 @@ export default class LoadSpy {
             const now = performance.now()
             const gap = now - prev
             prev = now
-            if (gap > GAP_MS) this.gaps.push({ at: now - this.t0, ms: gap })
+            if (gap > GAP_MS) this.gaps.push({ at: now, ms: gap, from: now - gap })
             if (!this._done) requestAnimationFrame(tick)
         }
         requestAnimationFrame(tick)
@@ -74,7 +79,7 @@ export default class LoadSpy {
 
     /** Name a moment, so the numbers above can be placed against the phases. */
     mark(label) {
-        this.marks.push({ label, at: performance.now() - this.t0 })
+        this.marks.push({ label, at: performance.now() })
         this.render()
     }
 
@@ -103,31 +108,33 @@ export default class LoadSpy {
         }
 
         const blocked = this.tasks.reduce((s, t) => s + t.ms, 0)
-        const worstTasks = [...this.tasks].sort((a, b) => b.ms - a.ms).slice(0, 6)
-        const worstGaps = [...this.gaps].sort((a, b) => b.ms - a.ms).slice(0, 6)
+        const worstTasks = [...this.tasks].sort((a, b) => b.ms - a.ms).slice(0, 5)
+        const worstGaps = [...this.gaps].sort((a, b) => b.ms - a.ms).slice(0, 5)
         const s = (ms) => (ms / 1000).toFixed(1) + 's'
 
+        // FASES first: it is the part that says WHERE the time went, and on a
+        // phone it is the part that risks falling off the bottom of the screen.
         const lines = []
-        lines.push(`LoadSpy   dpr ${(window.devicePixelRatio || 1).toFixed(2)}   ${innerWidth}x${innerHeight}`)
+        lines.push(`LoadSpy  dpr ${(window.devicePixelRatio || 1).toFixed(2)}  ${innerWidth}x${innerHeight}`)
         lines.push('')
-        lines.push(`TAREAS LARGAS  ${this.tasks.length}  ·  bloqueado ${Math.round(blocked)} ms`)
+        lines.push('FASES')
+        for (const m of this.marks) lines.push(`${s(m.at).padStart(6)}  ${m.label}`)
+        lines.push('')
+        lines.push(`TAREAS LARGAS ${this.tasks.length} · bloqueado ${Math.round(blocked)} ms`)
         if (this._noLongtask) {
             lines.push('  (este navegador no reporta longtask)')
         } else if (!worstTasks.length) {
             lines.push('  ninguna — el hilo principal no es el problema')
         } else {
-            for (const t of worstTasks) lines.push(`  ${String(Math.round(t.ms)).padStart(5)} ms   a los ${s(t.at)}`)
+            for (const t of worstTasks) lines.push(`  ${String(Math.round(t.ms)).padStart(5)} ms  ${s(t.at)}->${s(t.at + t.ms)}`)
         }
         lines.push('')
-        lines.push(`SALTOS ENTRE FRAMES  ${this.gaps.length}`)
+        lines.push(`SALTOS ENTRE FRAMES ${this.gaps.length}`)
         if (!worstGaps.length) {
             lines.push('  ninguno — la pantalla no se paro')
         } else {
-            for (const g of worstGaps) lines.push(`  ${String(Math.round(g.ms)).padStart(5)} ms   a los ${s(g.at)}`)
+            for (const g of worstGaps) lines.push(`  ${String(Math.round(g.ms)).padStart(5)} ms  ${s(g.from)}->${s(g.at)}`)
         }
-        lines.push('')
-        lines.push('FASES')
-        for (const m of this.marks) lines.push(`  ${s(m.at).padStart(6)}   ${m.label}`)
 
         this.el.textContent = lines.join('\n')
     }

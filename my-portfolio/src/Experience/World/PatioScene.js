@@ -628,8 +628,20 @@ export default class PatioScene {
         // Time-budgeted background scheduler (4 ms per setTimeout tick).
         // Unlike rAF-based chunking, this does NOT compete with the render
         // loop for the browser's single animation frame slot.
-        chunkedInBackground(meshes, 4, (mesh) => this._createConvexCollider(mesh))
+        const spy = this.experience.loadSpy
+        spy?.mark(`  colliders del patio: ${meshes.length} mallas, empieza`)
+        let worst = 0, worstName = ''
+        chunkedInBackground(meshes, 4, (mesh) => {
+            if (!spy) { this._createConvexCollider(mesh); return }
+            // A per-tick budget cannot split ONE item, so the number that
+            // matters is the slowest single mesh, not the budget.
+            const t = performance.now()
+            this._createConvexCollider(mesh)
+            const ms = performance.now() - t
+            if (ms > worst) { worst = ms; worstName = mesh.name || '(sin nombre)' }
+        })
             .then(() => {
+                spy?.mark(`  colliders del patio: fin · peor malla ${Math.round(worst)} ms (${worstName})`)
                 console.timeEnd('PatioScene · colliders')
                 console.log(`✅ PatioScene: ${this.colliderBodies.length} static colliders`)
                 this.resources.trigger('patioCollidersReady', [])

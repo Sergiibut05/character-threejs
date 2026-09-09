@@ -91,6 +91,7 @@ export default class World {
             // Load the patio scene (GLB model with colliders, ground, water)
             this.patioScene = new PatioScene()
 
+            this.experience.loadSpy?.mark('    mundo: patioScene')
             // Character
             this.character = new Character()
 
@@ -100,9 +101,11 @@ export default class World {
             // Footprints on dirt/sand (stamped by Character via stampFootprint)
             this.footprints = new Footprints()
 
+            this.experience.loadSpy?.mark('    mundo: personaje + notas + huellas')
             // Grass — placed on grass regions from the ground mesh vertex colors
             this.setupGrass()
 
+            this.experience.loadSpy?.mark('    mundo: cesped')
         // Flowers + fireflies — decorate the grass zones with vibes
         this.setupMeadowDecor()
 
@@ -126,9 +129,11 @@ export default class World {
             }
             this.resources.on('sourceLoaded', _placeFire)
 
+            this.experience.loadSpy?.mark('    mundo: flores + luciernagas + fuego')
             // Trees — instanced per type from reference models
             this.setupTrees()
 
+            this.experience.loadSpy?.mark('    mundo: arboles')
             // Bushes (standalone, ready for future reference models)
             this.bushes = new Bushes()
 
@@ -138,7 +143,9 @@ export default class World {
                 this.setupFakeShadows()
             }
 
-            // Initialize raycaster for mouse interactions
+            this.experience.loadSpy?.mark('    mundo: arbustos + sombras')
+            // Initialize raycaster for mouse interactions -- and then two dozen
+            // more constructors, which is why the next mark is worth having
             this.raycaster = new Raycaster()
             this.activityPrompt = new ActivityPrompt()
             this.frisbeeMinigame = new FrisbeeMinigame()
@@ -199,6 +206,7 @@ export default class World {
 
             // Setup modal close functionality
             this.setupModal()
+            this.experience.loadSpy?.mark('    mundo: interactivos y minijuegos (fin)')
         })
     }
 
