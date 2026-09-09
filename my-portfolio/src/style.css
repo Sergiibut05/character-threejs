@@ -147,11 +147,17 @@ a
     box-shadow: 0 0 34px 3px rgba(228, 236, 255, 0.45);
 }
 
-/* Drifting clouds */
+/* Drifting clouds.
+   Moved by transform, NOT by `left`. See the note above @keyframes
+   loading-drift -- animating `left` put a layout pass on the main thread every
+   frame, and the main thread is the one thing the loading screen cannot have. */
 .loading-cloud {
     position: absolute;
+    left: -25%;
     width: 132px;
     height: 46px;
+    transform: scale(var(--lc-scale, 1));
+    will-change: transform;
     background: #ffffff;
     border-radius: 999px;
     opacity: 0.9;
@@ -166,11 +172,23 @@ a
 }
 .loading-cloud::before { width: 58px; height: 58px; top: -26px; left: 22px; }
 .loading-cloud::after  { width: 42px; height: 42px; top: -16px; left: 66px; }
-.loading-cloud.lc1 { top: 18%; transform: scale(0.9);  animation: loading-drift 42s linear infinite; }
-.loading-cloud.lc2 { top: 32%; transform: scale(0.6);  opacity: 0.7; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
-.loading-cloud.lc3 { top: 11%; transform: scale(1.1);  opacity: 0.8; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
+.loading-cloud.lc1 { top: 18%; --lc-scale: 0.9; animation: loading-drift 42s linear infinite; }
+.loading-cloud.lc2 { top: 32%; --lc-scale: 0.6; opacity: 0.7; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
+.loading-cloud.lc3 { top: 11%; --lc-scale: 1.1; opacity: 0.8; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
 
-@keyframes loading-drift { from { left: -25%; } to { left: 115%; } }
+/* THE WHOLE POINT OF THIS FILE'S ANIMATIONS BEING WHAT THEY ARE.
+   Only `transform` and `opacity` can be animated by the compositor, and only a
+   compositor animation keeps running while the main thread is blocked. During
+   the loading screen the main thread is blocked constantly -- parsing glTF,
+   uploading textures, compiling shaders -- so every animation here has to be one
+   of those two or it stutters in exactly the moments it exists to cover.
+   This used to animate `left`, which is layout: three clouds, a layout pass each
+   per frame, all on the thread that was already the bottleneck.
+   Travel is the same as before: -25% to 115% of a full-viewport parent. */
+@keyframes loading-drift {
+    from { transform: translateX(0)      scale(var(--lc-scale, 1)); }
+    to   { transform: translateX(140vw)  scale(var(--lc-scale, 1)); }
+}
 
 /* Dusk/night veil mutes the sky + clouds as it gets dark */
 .loading-nightveil {
@@ -233,6 +251,22 @@ a
     .loading-scene { --orbit-r: 82vh; --orbit-y: -12%; }
     .loading-sun { width: 62px; height: 62px; margin: -31px; }
     .loading-moon { width: 50px; height: 50px; margin: -25px; }
+
+    /* The hills stop changing colour on phones, and the veil does the darkening
+       instead.
+       `fill` is a paint property, so animating it repaints the whole hill band
+       every frame -- around a megapixel of it on a 1080-wide phone -- and it
+       also pins the sway next to it to the main thread, since an element that
+       repaints anyway cannot have its transform composited. Two of the four
+       animations on this screen were therefore main-thread, which is what made
+       the loading screen lurch on a mid-range Android while the loader worked.
+       The veil is a plain opacity fade over everything and already covers the
+       hills, so it reaches the same dusk without repainting anything. Desktop
+       keeps the tint: it has the frames to spare and the colours are nicer. */
+    .wave-1 { animation: wave-sway-1 11s ease-in-out infinite alternate; }
+    .wave-2 { animation: wave-sway-2 9s  ease-in-out infinite alternate; }
+    .wave-3 { animation: wave-sway-3 13s ease-in-out infinite alternate; }
+    @keyframes nightveil { 0%,18%{opacity:0} 30%{opacity:.14} 50%{opacity:.62} 70%{opacity:.14} 82%,100%{opacity:0} }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -379,14 +413,22 @@ a
     left: 0;
     top: 0;
     height: 100%;
-    width: 0%;
+    /* Full width, revealed by scaleX -- the bar is the one thing on this screen
+       that updates WHILE the main thread is busy, so growing it by `width`
+       (layout) queued a reflow behind whatever the loader was in the middle of.
+       Clipped by the button's own overflow:hidden, so the pill edge still
+       rounds correctly. */
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
     background: linear-gradient(90deg,
         rgba(126, 224, 177, 0.45),
         rgba(95, 197, 148, 0.6)
     );
     border-radius: inherit;
     pointer-events: none;
-    transition: width 0.12s linear;
+    transition: transform 0.12s linear;
 }
 
 .cloud-btn.ready .cloud-btn-fill { display: none; }

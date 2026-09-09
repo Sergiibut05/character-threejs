@@ -93,7 +93,16 @@ export default class Experience {
             this.cloudTransition.classList.add('visible')
         }
 
-        // Resource loading progress
+        // Resource loading progress.
+        //
+        // This subscription did not exist. updateLoadingBar was written, and
+        // Resources emitted 'progress' the whole time, and the two were never
+        // introduced -- so the bar sat at zero for the entire load and jumped
+        // to full when the button turned into "Explorar". Weighing that
+        // progress by bytes, as the commit before this one did, changed a
+        // number nobody was reading.
+        this.resources.on('progress', (value) => this.updateLoadingBar(value))
+
         this.resources.on('ready', () => {
             this.resourcesReady = true
             this.checkAllReady()
@@ -165,7 +174,10 @@ export default class Experience {
 
     updateLoadingBar(progress) {
         if (this.progressFill) {
-            this.progressFill.style.width = `${progress * 100}%`
+            // scaleX, not width: this runs while the loader is mid-parse, and a
+            // width change is a layout the browser has to queue behind it. See
+            // .cloud-btn-fill.
+            this.progressFill.style.transform = `scaleX(${progress})`
         }
         if (this.progressBtnText && !this.loadingEnterBtn?.classList.contains('ready')) {
             this.progressBtnText.textContent = `${Math.round(progress * 100)}%`
@@ -220,7 +232,7 @@ export default class Experience {
 
     showEnterButton() {
         if (this.progressFill) {
-            this.progressFill.style.width = '100%'
+            this.progressFill.style.transform = 'scaleX(1)'
         }
         if (this.progressBtnText) {
             this.progressBtnText.textContent = t('landing.explore')
