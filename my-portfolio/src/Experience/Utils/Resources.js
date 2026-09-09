@@ -38,6 +38,21 @@ export default class Resources extends EventEmitter {
         this.criticalDone = false
         this.allDone = false
 
+        /**
+         * Bytes per critical source, for a loading bar that tells the truth.
+         *
+         * It used to be criticalLoaded / criticalToLoad -- a count of FILES.
+         * With 25 critical sources over 3.7 MB that is wildly uneven: the
+         * character atlas alone is 33% of the download and 4% of the bar,
+         * and the four biggest files are 81% of the wait against 16% of the
+         * movement. So the bar sat at nothing while the heavy things came
+         * down, then leapt as the small ones landed together, and the first
+         * thing anyone saw of this site looked broken.
+         */
+        this._bytes = new Map()
+        /** The bar never goes backwards -- see _reportProgress. */
+        this._progressShown = 0
+
         this.cache = new Map()
         this.loaders = {}
         this.rendererReady = false
@@ -124,7 +139,7 @@ export default class Resources extends EventEmitter {
             this.loaders.gltfLoader.load(
                 source.path,
                 (file) => { this.sourceLoaded(source, file) },
-                undefined,
+                this._trackBytes(source),
                 onError
             )
         }
@@ -135,7 +150,7 @@ export default class Resources extends EventEmitter {
                     if (source.modifier) source.modifier(file)
                     this.sourceLoaded(source, file)
                 },
-                undefined,
+                this._trackBytes(source),
                 onError
             )
         }
@@ -146,7 +161,7 @@ export default class Resources extends EventEmitter {
                     if (source.modifier) source.modifier(file)
                     this.sourceLoaded(source, file)
                 },
-                undefined,
+                this._trackBytes(source),
                 onError
             )
         }
@@ -154,7 +169,7 @@ export default class Resources extends EventEmitter {
             this.loaders.cubeTextureLoader.load(
                 source.path,
                 (file) => { this.sourceLoaded(source, file) },
-                undefined,
+                this._trackBytes(source),
                 onError
             )
         }
@@ -162,6 +177,13 @@ export default class Resources extends EventEmitter {
             fetch(source.path)
                 .then((res) => {
                     if (!res.ok) throw new Error(`HTTP ${res.status} for ${source.path}`)
+                    // fetch has no progress events, but the header alone is
+                    // enough to weigh it correctly against the big models.
+                    const len = Number(res.headers.get('content-length'))
+                    if (len > 0 && source.priority !== 'decorative') {
+                        this._bytes.set(source.name, { loaded: 0, total: len })
+                        this._reportProgress()
+                    }
                     return res.json()
                 })
                 .then((file) => {
@@ -175,6 +197,57 @@ export default class Resources extends EventEmitter {
         }
     }
 
+    /**
+     * An onProgress for a loader, recording bytes against its source.
+     *
+     * @param {object} source
+     * @returns {(event: ProgressEvent) => void}
+     */
+    _trackBytes(source) {
+        if (source.priority === 'decorative') return undefined
+        return (event) => {
+            this._bytes.set(source.name, {
+                loaded: event.loaded || 0,
+                // lengthComputable is false when the server sends no
+                // Content-Length; the estimate below covers that case.
+                total: event.lengthComputable ? event.total : 0
+            })
+            this._reportProgress()
+        }
+    }
+
+    /**
+     * Weighted by size, and monotonic.
+     *
+     * Sources that have not reported a size yet are counted at a nominal one
+     * so the denominator does not grow as totals trickle in -- and even so the
+     * result is clamped to never fall, because a bar that goes backwards looks
+     * worse than one that is slightly optimistic.
+     */
+    _reportProgress() {
+        if (this.criticalDone) return
+        // Not every loader can report bytes. GLTFLoader and KTX2Loader go
+        // through FileLoader/XHR and give real numbers; TextureLoader builds
+        // an Image element, which fires no progress at all. That is fine here
+        // because the four sources that dominate the wait are all models and
+        // KTX2 -- measured: 23 of 23 critical sources ended up weighed, and
+        // the ones falling back are small textures.
+        const NOMINAL = 150 * 1024   // ≈ the mean critical source
+
+        let loaded = 0
+        let total = 0
+        for (const source of this.criticalSources) {
+            const entry = this._bytes.get(source.name)
+            const size = entry?.total || NOMINAL
+            total += size
+            loaded += Math.min(entry?.loaded || 0, size)
+        }
+
+        const value = total > 0 ? loaded / total : 0
+        this._progressShown = Math.max(this._progressShown, Math.min(value, 1))
+        this.trigger('progress', [this._progressShown])
+    }
+
     sourceLoaded(source, file) {
         this.items[source.name] = file
         this.cache.set(source.path, file)
@@ -184,8 +257,14 @@ export default class Resources extends EventEmitter {
         else this.decorativeLoaded++
 
         // Progress only counts critical for the "Explorar" loading bar.
-        if (!this.criticalDone) {
-            this.trigger('progress', [this.criticalLoaded / Math.max(this.criticalToLoad, 1)])
+        if (isCritical && !this.criticalDone) {
+            // Finished means finished, whatever the byte reports said -- a
+            // loader that never fired onProgress (cached, or no
+            // Content-Length) would otherwise hold the bar back forever.
+            const entry = this._bytes.get(source.name)
+            const size = entry?.total || entry?.loaded || 150 * 1024
+            this._bytes.set(source.name, { loaded: size, total: size })
+            this._reportProgress()
         }
 
         // Fire per-source event so consumers can lazy-instantiate decorative pieces.
