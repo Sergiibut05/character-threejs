@@ -320,6 +320,10 @@ export default class BeachMinigame {
         // the ball prop's collider, and landing inside it is what wedged the
         // player in place. Cleared for the whole rally, not just the spawn —
         // the run crosses that point constantly.
+        // Resolve anything still suspended from a previous session before
+        // suspending again, or the undo from that one is dropped on the floor
+        // and those colliders never come back at all.
+        this._releaseCourt?.()
         this._releaseCourt = this._clearCourtColliders()
         character.teleportTo(this.courtCenter.x, this.courtCenter.y, this.courtCenter.z, 0)
         character.planarLock = {
@@ -410,7 +414,45 @@ export default class BeachMinigame {
             new THREE.Vector3(c.x - hw, c.y + 0.06, c.z - 1.4),
             new THREE.Vector3(c.x + hw, c.y + 2.2, c.z + 1.4)
         )
+        // The box is kept, not just the undo: giving the colliders back is
+        // only safe once the player is out of it. See _releasePendingCourt.
+        this._courtBox = box
         return ps.suspendCollidersIn(box)
+    }
+
+    /**
+     * Give the suspended colliders back, but only once nobody is standing in
+     * them.
+     *
+     * stop() used to restore them on the spot, with a comment saying the court
+     * was free again. It is not: leaving the minigame leaves you exactly where
+     * you were playing, and where you were playing is the middle of the court
+     * -- which is the resting spot of the ball prop, which is the box that was
+     * suspended in the first place. The collider came back around the player
+     * and the character controller had no way out. Stuck on the spot, with
+     * nothing on screen to explain it: the same failure this suspension was
+     * written to prevent on the way IN, just on the way out instead.
+     *
+     * So it waits. Checked from update() ahead of its idle guard, because the
+     * whole point is that the minigame is already over.
+     */
+    _releasePendingCourt() {
+        if (!this._releaseCourt || !this._courtBox) return
+        const character = this.experience.world?.character
+        if (!character) return
+
+        // Body radius included: clear of the box means clear of it, not
+        // touching its edge with the collider about to reappear inside you.
+        const p = character.position
+        const r = this.bodyRadius
+        const b = this._courtBox
+        const inside = p.x > b.min.x - r && p.x < b.max.x + r &&
+            p.z > b.min.z - r && p.z < b.max.z + r
+        if (inside) return
+
+        this._releaseCourt()
+        this._releaseCourt = null
+        this._courtBox = null
     }
 
     stop() {
@@ -431,9 +473,8 @@ export default class BeachMinigame {
         this.windEl.classList.remove('is-visible')
         this._restoreDay()
         this.balls.rest()
-        // Give the ball prop its collider back now the court is free again.
-        this._releaseCourt?.()
-        this._releaseCourt = null
+        // NOT restored here -- see _releasePendingCourt. The player is still
+        // standing in the middle of the court at this exact moment.
     }
 
     /** Restart a rally without leaving the court (used by "Jugar otra vez"). */
@@ -551,6 +592,9 @@ export default class BeachMinigame {
     // ── Frame ──
     update() {
         if (!this._ready) { this._tryInit(); if (!this._ready) return }
+        // BEFORE the idle guard: the whole point is that the game is over and
+        // the player is walking away from the court.
+        this._releasePendingCourt()
         if (this.state === 'idle') return
         // Frozen while the tutorial is up: the ball is already in the air by
         // then, and reading a panel should not cost you the rally.
@@ -951,6 +995,12 @@ export default class BeachMinigame {
     }
 
     destroy() {
+        // Unconditionally, unlike the deferred path: nobody is going to be
+        // around to walk out of the box, and leaving it suspended would hand
+        // the world back with a hole where the ball prop's collider was.
+        this._releaseCourt?.()
+        this._releaseCourt = null
+        this._courtBox = null
         clearTimeout(this._flashTimer)
         clearTimeout(this._bannerTimer)
         this.hud?.remove()
