@@ -431,6 +431,21 @@ a
     transition: transform 0.12s linear;
 }
 
+/* No backdrop blur on a touchscreen.
+   A backdrop-filter re-blurs whatever is behind the element every time that
+   changes -- and what is behind this button is the sky, the clouds and the
+   hills, all of them moving, all the time. So it is a full re-blur every
+   frame, on the GPU, during the one stretch where the GPU is already busy
+   compiling the world's shaders. A slightly more opaque surface reads the
+   same and costs one composite. */
+@media (hover: none) and (pointer: coarse) {
+    .cloud-btn {
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}
+
 .cloud-btn.ready .cloud-btn-fill { display: none; }
 
 .cloud-btn-text

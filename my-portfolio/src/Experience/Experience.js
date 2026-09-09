@@ -18,6 +18,7 @@ import i18n from './Utils/i18n.js'
 import { t } from './Utils/gameText.js'
 import MoveHint from './World/ui/MoveHint.js'
 import FrameSpy from './Utils/FrameSpy.js'
+import LoadSpy from './Utils/LoadSpy.js'
 
 let instance = null
 
@@ -52,6 +53,11 @@ export default class Experience {
         // Setup
         this.debug = new Debug()
         this.quality = new Quality()
+        // First, so its longtask observer covers everything below. Only exists
+        // when the URL asks for it -- see Utils/LoadSpy.js.
+        this.loadSpy = LoadSpy.wanted() ? new LoadSpy() : null
+        window.loadSpy = this.loadSpy
+
         this.sizes = new Sizes()
         this.time = new Time()
         this.scene = new THREE.Scene()
@@ -105,12 +111,14 @@ export default class Experience {
 
         this.resources.on('ready', () => {
             this.resourcesReady = true
+            this.loadSpy?.mark('recursos listos')
             this.checkAllReady()
         })
 
         // Renderer init
         this.renderer.init().then(() => {
             this.rendererReady = true
+            this.loadSpy?.mark('renderer listo (GPU)')
             const backendName = this.renderer.instance?.backend?.constructor?.name || 'Unknown'
             console.log('✅ Renderer backend ready:', backendName)
 
@@ -207,18 +215,68 @@ export default class Experience {
     }
 
     /**
-     * Render a few frames of the main scene behind the cloud overlay
-     * to compile shaders, then reveal the enter button.
+     * Render a few frames of the main scene behind the cloud overlay to compile
+     * shaders, then reveal the enter button.
+     *
+     * THIS IS WHERE THE LOADING SCREEN FREEZES, AND IT CANNOT BE FIXED HERE.
+     *
+     * These frames exist to force every shader in the scene to compile now,
+     * where a stall is hidden, rather than during the first seconds of play.
+     * The stall is real, and it is not on this thread: compiling a pipeline is
+     * the GPU process and the graphics driver, which the browser's compositor
+     * shares. So while it runs the compositor cannot present, and the loading
+     * screen's animation stops dead with nothing blocking the main thread.
+     *
+     * Measured rather than assumed -- LoadSpy, cold cache, on a desktop:
+     *
+     *     TAREAS LARGAS  5  ·  bloqueado 648 ms      SALTOS ENTRE FRAMES
+     *       199 ms  a los 2.1s                         1254 ms  a los 2.0s
+     *       143 ms  a los 0.7s                          223 ms  a los 2.2s
+     *
+     * A frame gap of 1254 ms with only 199 ms of main-thread work under it, in
+     * the middle of this method's window. The three frames below cost 17, 6 and
+     * 7 ms of JavaScript. Everything else was the driver.
+     *
+     * The same page reloaded, with Chrome's shader cache now warm, reaches the
+     * enter button in 0.9 s with no gap over 200 ms. So this is a COLD-CACHE
+     * cost, which is to say it is what a first-time visitor gets -- and on a
+     * mid-range phone, with a slower driver and no spare core to hide it on,
+     * that same second becomes several.
+     *
+     * The textbook remedy is compileAsync, which builds the same pipelines
+     * through createRenderPipelineAsync, off the driver's critical path. It
+     * does not work here, and it is worth writing down why so nobody spends
+     * the afternoon again:
+     *
+     *   - renderer.compileAsync(scene, camera) compiles with NO render target
+     *     bound. Every material here writes to a multi-target attachment, so
+     *     MRTNode.setup() asks which target it is writing into, gets null, and
+     *     the shader cannot be built: "Cannot read properties of null
+     *     (reading 'textures')".
+     *   - scenePass.compileAsync(renderer) does bind the target and the MRT,
+     *     and gets further -- straight into a worse failure. It fills the
+     *     pipeline cache with variants shaped for the scene pass's two colour
+     *     attachments, and the SHADOW pass then draws the same objects into a
+     *     target that has one. Dawn rejects the pipeline ("target has no
+     *     corresponding fragment stage output but writeMask is not zero") and
+     *     the next frame throws "parameter 1 is not of type GPURenderPipeline".
+     *
+     * Both were tried, in that order, and the quotes above are what came back.
+     * Precompiling would need three to build the shadow variant too, and in
+     * r183 there is no way to ask it to.
      */
     warmUpRender() {
+        this.loadSpy?.mark('calentamiento (compila shaders)')
         let frames = 0
         const totalFrames = 3
 
         const doWarmUp = () => {
+            const t = performance.now()
             this.camera.update()
             this.world.update()
             this.renderer.update()
             frames++
+            this.loadSpy?.mark(`  calentamiento f${frames}: ${Math.round(performance.now() - t)} ms`)
 
             if (frames < totalFrames) {
                 requestAnimationFrame(doWarmUp)
@@ -231,6 +289,8 @@ export default class Experience {
     }
 
     showEnterButton() {
+        this.loadSpy?.mark('listo para entrar')
+        this.loadSpy?.finish()
         if (this.progressFill) {
             this.progressFill.style.transform = 'scaleX(1)'
         }

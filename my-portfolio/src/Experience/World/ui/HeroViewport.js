@@ -44,22 +44,22 @@ export default class HeroViewport {
 
         this.reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 
-        // A touchscreen gets a cheaper version of this viewport.
+        // Multisampled on every device, INCLUDING phones, and the pixel ratio
+        // is not capped below 2 either.
         //
-        // This is a SECOND WebGPU device, alive at the same time as the world's
-        // -- there is no way around that without sharing a renderer across two
-        // canvases -- so what it costs per frame matters more here than it
-        // would anywhere else. Multisampling is the expensive half: at the
-        // pixel ratio below it is 4 samples on every pixel of the card, for
-        // edges that a phone's pixel density has already smoothed. Turning it
-        // off and capping the ratio at 1.5 cuts the work per frame by roughly
-        // three quarters and is genuinely hard to see at arm's length.
-        this.lowPower = matchMedia('(hover: none) and (pointer: coarse)').matches
-
+        // Both were tried the other way to buy back frames -- this is a second
+        // WebGPU device alive at the same time as the world's, so its cost per
+        // frame is worth attacking. It is the wrong thing to attack. The
+        // character here is a big flat-shaded silhouette against a pale card,
+        // which is the exact case where losing MSAA is most visible: without it
+        // he comes out visibly stepped, and a phone's pixel density does not
+        // hide it the way the argument for removing it assumed. The overview's
+        // real cost was never here anyway -- it was two full-width repaints per
+        // frame in CSS, which is fixed and cost nothing to look at.
         this.renderer = new THREE.WebGPURenderer({
             canvas,
             alpha: true,
-            antialias: !this.lowPower,
+            antialias: true,
             powerPreference: 'low-power'
         })
         this.renderer.setClearColor(0x000000, 0)
@@ -491,7 +491,7 @@ export default class HeroViewport {
     resize() {
         const w = this.canvas.clientWidth || 1
         const h = this.canvas.clientHeight || 1
-        this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.lowPower ? 1.5 : 2))
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
         this.renderer.setSize(w, h, false)
         this.camera.aspect = w / h
         this.camera.updateProjectionMatrix()
