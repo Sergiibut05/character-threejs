@@ -66,6 +66,7 @@ export default class MobileControls
             this.createUI()
             this.createJoystick()
             this.createActionButtons()
+            this._watchViewport()
         }
     }
 
@@ -123,8 +124,50 @@ export default class MobileControls
         document.body.appendChild(this.container)
     }
 
+    /**
+     * Build the stick.
+     *
+     * WHY THIS IS ALSO CALLED AGAIN, LATER, FROM _watchViewport.
+     *
+     * nipplejs records where the stick's centre is in page coordinates, once,
+     * and every drag is measured from that recorded point. It does try to keep
+     * it current -- it listens for window resize and recomputes -- but the
+     * recompute is not the same calculation as the original.
+     *
+     * On creation the centre is the point at 50%/50% of the zone: nipplejs
+     * drops a zero-size probe div there and takes its rect, which IS a point.
+     * On resize it instead takes the rect of the STICK element and keeps
+     * `left`/`top`. That element is `size` across and drawn centred on the
+     * point, so its top-left corner is half a stick up and to the left of it.
+     * The recorded centre therefore jumps by size/2 -- 60 px here -- on every
+     * resize, which is further than the stick's own radius.
+     *
+     * Once the centre sits outside the area you can actually touch, every drag
+     * lands on the same side of it, and nipplejs clamps the reading to a
+     * 60 px circle around that point. The stick answers, always in about the
+     * same direction, no matter which way you pull it.
+     *
+     * The resize that triggers it is the one you cannot avoid on a phone: the
+     * address bar sliding away as you enter the world. Which is exactly when
+     * it was reported, and why it never reproduced on the second attempt --
+     * the bar is already gone by then.
+     *
+     * Rebuilding the manager outright is the fix, because creation is the path
+     * that computes the centre correctly.
+     */
     createJoystick()
     {
+        const zone = this.joystickArea
+        if (!zone) return
+
+        this.joystick?.destroy?.()
+        this.movement.x = 0
+        this.movement.y = 0
+        this.movement.angle = 0
+        this.movement.force = 0
+        this._dragging = false
+        this._viewportKey = this._readViewportKey()
+
         this.joystick = nipplejs.create({
             zone: this.joystickArea,
             mode: 'static',
@@ -137,6 +180,8 @@ export default class MobileControls
         })
 
         // Handle joystick events
+        this.joystick.on('start', () => { this._dragging = true })
+
         this.joystick.on('move', (evt, data) => {
             this.movement.x = data.vector.x
             this.movement.y = data.vector.y
@@ -145,11 +190,65 @@ export default class MobileControls
         })
 
         this.joystick.on('end', () => {
+            this._dragging = false
             this.movement.x = 0
             this.movement.y = 0
             this.movement.angle = 0
             this.movement.force = 0
         })
+
+        // A resize that arrived mid-drag was held back rather than yanking the
+        // stick out from under the finger. Now that the finger is up, take it.
+        if (this._rebuildPending) {
+            this._rebuildPending = false
+            requestAnimationFrame(() => this._rebuildJoystickIfMoved())
+        }
+    }
+
+    /**
+     * The number nipplejs actually depends on: where the zone sits in PAGE
+     * coordinates. It stores scroll offset + rect, so a scroll with a fixed
+     * element (which does not move) invalidates it just as a resize does.
+     */
+    _readViewportKey()
+    {
+        const r = this.joystickArea?.getBoundingClientRect()
+        if (!r || r.width < 1) return null
+        return [r.left + window.scrollX, r.top + window.scrollY,
+                r.width, r.height].map(Math.round).join('|')
+    }
+
+    _watchViewport()
+    {
+        this._rebuildPending = false
+        // Deliberately LONGER than the 100 ms nipplejs debounces its own resize
+        // handler by. Both fire off the same event, and whichever runs last
+        // decides where the centre is -- so this has to be the one that does.
+        const schedule = () => {
+            clearTimeout(this._rebuildTimer)
+            this._rebuildTimer = setTimeout(() => this._rebuildJoystickIfMoved(), 260)
+        }
+
+        this.sizes?.on('resize', schedule)
+        // window resize does not always fire for the address bar sliding away,
+        // which is the specific event that broke the stick. visualViewport does.
+        const vv = window.visualViewport
+        if (vv) {
+            vv.addEventListener('resize', schedule)
+            vv.addEventListener('scroll', schedule)
+        }
+        window.addEventListener('orientationchange', schedule)
+    }
+
+    /** Rebuild only if the geometry nipplejs cached is genuinely stale. */
+    _rebuildJoystickIfMoved()
+    {
+        const key = this._readViewportKey()
+        if (!key || key === this._viewportKey) return
+        // Never mid-drag: destroying the manager under a live touch loses the
+        // 'end' event, and the character would keep walking on his own.
+        if (this._dragging) { this._rebuildPending = true; return }
+        this.createJoystick()
     }
 
     createActionButtons()
