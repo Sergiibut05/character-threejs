@@ -501,14 +501,35 @@ export default class PatioScene {
             bounds.copy(geometry.boundingBox).applyMatrix4(entry.mesh.matrixWorld)
             if (!bounds.intersectsBox(box)) continue
             collider.setEnabled(false)
-            suspended.push(collider)
+            // The collider's OWN bounds travel with it, so each one can be
+            // given back the moment the player is clear of THAT box rather
+            // than of the whole suspended region. The region is metres wide;
+            // the ball prop inside it is not, and waiting for the region meant
+            // walking through a ghost ball for the length of the beach.
+            suspended.push({ collider, bounds: bounds.clone() })
         }
-        return () => {
-            for (const collider of suspended) {
+
+        /**
+         * Re-enable every collider the player is not standing inside.
+         *
+         * @param {{x:number,z:number}} [at]  the player, or nothing to restore all
+         * @param {number} [radius]           their body radius
+         * @returns {boolean} true once nothing is left suspended
+         */
+        const restore = (at, radius = 0) => {
+            for (let i = suspended.length - 1; i >= 0; i--) {
+                const { collider, bounds: b } = suspended[i]
+                if (at) {
+                    const inside = at.x > b.min.x - radius && at.x < b.max.x + radius &&
+                        at.z > b.min.z - radius && at.z < b.max.z + radius
+                    if (inside) continue
+                }
                 try { collider.setEnabled(true) } catch { /* world torn down */ }
+                suspended.splice(i, 1)
             }
-            suspended.length = 0
+            return suspended.length === 0
         }
+        return restore
     }
 
     /**

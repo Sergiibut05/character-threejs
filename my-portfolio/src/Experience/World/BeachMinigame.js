@@ -414,9 +414,6 @@ export default class BeachMinigame {
             new THREE.Vector3(c.x - hw, c.y + 0.06, c.z - 1.4),
             new THREE.Vector3(c.x + hw, c.y + 2.2, c.z + 1.4)
         )
-        // The box is kept, not just the undo: giving the colliders back is
-        // only safe once the player is out of it. See _releasePendingCourt.
-        this._courtBox = box
         return ps.suspendCollidersIn(box)
     }
 
@@ -437,22 +434,18 @@ export default class BeachMinigame {
      * whole point is that the minigame is already over.
      */
     _releasePendingCourt() {
-        if (!this._releaseCourt || !this._courtBox) return
+        if (!this._releaseCourt) return
         const character = this.experience.world?.character
         if (!character) return
 
-        // Body radius included: clear of the box means clear of it, not
-        // touching its edge with the collider about to reappear inside you.
-        const p = character.position
-        const r = this.bodyRadius
-        const b = this._courtBox
-        const inside = p.x > b.min.x - r && p.x < b.max.x + r &&
-            p.z > b.min.z - r && p.z < b.max.z + r
-        if (inside) return
-
-        this._releaseCourt()
-        this._releaseCourt = null
-        this._courtBox = null
+        // Per collider, not all-or-nothing. Everything you are not standing in
+        // comes back this frame; the one you ARE standing in waits for you to
+        // step off it, and that is usually just the ball prop. Asking for the
+        // whole suspended region to be clear meant the ball stayed walkable
+        // for metres after the game ended, which is its own kind of wrong.
+        if (this._releaseCourt(character.position, this.bodyRadius)) {
+            this._releaseCourt = null
+        }
     }
 
     stop() {
@@ -1000,7 +993,6 @@ export default class BeachMinigame {
         // the world back with a hole where the ball prop's collider was.
         this._releaseCourt?.()
         this._releaseCourt = null
-        this._courtBox = null
         clearTimeout(this._flashTimer)
         clearTimeout(this._bannerTimer)
         this.hud?.remove()
