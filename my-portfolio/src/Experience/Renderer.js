@@ -129,7 +129,9 @@ export default class Renderer {
         // 'gtao' por defecto: SSAO esta aqui para poder compararlos en vivo,
         // pero no arreglo el artefacto que motivo traerlo y todos los valores
         // ajustados del panel se refieren a GTAO.
-        this._aoOptions = { halfRes: false, node: 'gtao', view: 'off' }
+        // halfRes is the quality tier's call, not a fixed default -- a phone
+        // gets it, a desktop does not. The debug panel can still override it.
+        this._aoOptions = { halfRes: this.quality.aoHalfRes, node: 'gtao', view: 'off' }
         // Ganancia del volcado, ajustable en caliente: lo que se busca suele
         // estar muy por debajo del umbral en que se ve sobre negro.
         this.uDebugGain = uniform(8.0)
@@ -462,7 +464,7 @@ export default class Renderer {
         // 2. Tilt-Shift Blur (Both Qualities)
         // Reduced intensity: radius 3 for High, 2 for Low to save GPU.
         // No resolutionScale to prevent fractional texture crashes on iPhone.
-        const blurRadius = this.quality.isLow ? 2 : 3
+        const blurRadius = this.quality.tiltShiftRadius
         const blurredScene = gaussianBlur(composited, vec2(1), blurRadius)
 
         const centerY = float(0.5)
@@ -527,7 +529,7 @@ export default class Renderer {
         // FXAA rather than SMAA: this art is big clean silhouettes with almost
         // no high-frequency detail, which is the case FXAA handles well and
         // the one where SMAA's extra cost buys least.
-        if (this.quality.isHigh) graded = fxaa(graded)
+        if (this.quality.fxaa) graded = fxaa(graded)
 
         // 7. Iris last: a curtain over the finished frame, not something the
         // grade or the AA should be looking at.

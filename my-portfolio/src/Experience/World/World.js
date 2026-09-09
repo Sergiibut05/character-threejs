@@ -246,7 +246,7 @@ export default class World {
         const isLow = this.experience.quality.isLow
 
         // Candidate ground positions on the grass regions (reuse the spawner)
-        const candidateCount = isLow ? 2500 : 4500
+        const candidateCount = this.experience.quality.meadowCandidates
         const candidates = this.patioScene?.getGrassSpawnPositions
             ? this.patioScene.getGrassSpawnPositions(candidateCount)
             : []

@@ -73,6 +73,29 @@ export default class Quality extends EventEmitter {
     get isHigh() { return this.level === 0 }
 
     /**
+     * High quality on a phone, which is NOT the same thing as high quality on
+     * a desktop and should never have been.
+     *
+     * The two levels were written as one set of numbers each, and on a desktop
+     * the gap between them is a fair trade. On a mid-range Android it is not a
+     * trade at all: low runs, high does not, so the level exists without being
+     * usable and the phone is left with one option instead of two.
+     *
+     * What makes the difference there is not the same as what makes it on a
+     * desktop. A phone already renders at pixel ratio 2 on BOTH levels, so
+     * resolution is not the variable -- the full-screen passes on top of it
+     * are, and each one costs a phone far more per pixel than it costs a GPU
+     * with the bandwidth to spare. So mobile high keeps every effect that you
+     * can actually see on a 6-inch screen and gives up the ones you cannot:
+     * see aoHalfRes, fxaa and tiltShiftRadius below.
+     *
+     * The point is that High on a phone still LOOKS like High -- ambient
+     * occlusion, more grass, denser foliage -- while costing something a phone
+     * can pay. Half a High is worth having; a High that stutters is not.
+     */
+    get isMobileHigh() { return this.isHigh && this.isMobile }
+
+    /**
      * pixelRatio — capped at 2 on every device (matching Bruno's defaults).
      * Mobile retina screens already supersample, so a pixelRatio < 2 is
      * almost always wasteful blur. Low quality keeps the cap because the
@@ -100,6 +123,40 @@ export default class Quality extends EventEmitter {
     get antialias() {
         return this.pixelRatio < 2
     }
+
+    /**
+     * Whether the post pipeline runs FXAA.
+     *
+     * Exactly the reasoning in `antialias` directly above, applied to the pass
+     * that does the same job: below a pixel ratio of 2 there is no
+     * supersampling and the edges need help; at 2 there already is, and a
+     * full-screen dependent-texture-read pass buys nothing you can see. Every
+     * phone here is at 2, so this only ever cost them frames.
+     */
+    get fxaa() { return this.isHigh && this.pixelRatio < 2 }
+
+    /**
+     * Ambient occlusion at half resolution.
+     *
+     * Occlusion is a low-frequency signal -- it is soft contact darkening, and
+     * it goes through an edge-aware denoise afterwards regardless -- so
+     * resolving it per pixel is the least useful place a phone can spend a
+     * quarter of its frame. Both the AO pass and the denoise that follows it
+     * drop to a quarter of the pixels, and what you lose is smaller than what
+     * the denoise was already smoothing away.
+     */
+    get aoHalfRes() { return this.isMobile }
+
+    /**
+     * Tilt-shift blur radius, in taps.
+     *
+     * Runs on BOTH levels and over the whole frame, so it is the one
+     * full-screen pass a phone cannot opt out of -- which is exactly why it
+     * should not also be the widest one. The blur is a background effect at
+     * the top and bottom edges of the screen; nobody is inspecting its
+     * falloff on a phone.
+     */
+    get tiltShiftRadius() { return (this.isLow || this.isMobile) ? 2 : 3 }
 
     /**
      * Real shadow maps on both quality levels — EXCEPT on Android, where
@@ -160,8 +217,11 @@ export default class Quality extends EventEmitter {
      */
     get shadowCameraSize() { return this.isLow ? 40 : 50 }
 
-    /** Grass blade count (per spawn cluster). */
-    get grassCount()      { return this.isLow ? 6000 : 10000 }
+    /**
+     * Grass blades spawned across the whole patio -- so this is vertex work,
+     * paid whether or not a blade survives the view cull below.
+     */
+    get grassCount()      { return this.isLow ? 6000 : (this.isMobileHigh ? 7500 : 10000) }
     /**
      * The visible-grass disc is shifted `grassViewAhead` metres toward where
      * the camera looks, so the character sits near its rear (south) edge and
@@ -169,8 +229,20 @@ export default class Quality extends EventEmitter {
      * why the radius can be trimmed vs. the old character-centred values
      * (14 / 20) with MORE on-screen coverage, not less.
      */
-    get grassViewRadius() { return this.isLow ? 12.5 : 18 }
-    get grassViewAhead()  { return this.isLow ? 8 : 12 }
-    /** Foliage SDF cubes (Bushes / dense vegetation). */
-    get foliagePlanes()   { return this.isLow ? 36 : 80 }
+    get grassViewRadius() { return this.isLow ? 12.5 : (this.isMobileHigh ? 14.5 : 18) }
+    get grassViewAhead()  { return this.isLow ? 8 : (this.isMobileHigh ? 9.5 : 12) }
+    /**
+     * Foliage SDF cubes (Bushes / dense vegetation). Every one is an
+     * alpha-tested plane, so these are overdrawn fill -- the cost a mobile GPU
+     * feels most and the one a 6-inch screen shows least.
+     */
+    get foliagePlanes()   { return this.isLow ? 36 : (this.isMobileHigh ? 52 : 80) }
+
+    /**
+     * Ground positions offered to the meadow decor (flowers, clover, stones).
+     * More candidates means a denser scatter of instanced quads, which is more
+     * transparent overdraw over the ground -- the same fill cost as the
+     * foliage above, in a different shape.
+     */
+    get meadowCandidates() { return this.isLow ? 2500 : (this.isMobileHigh ? 3200 : 4500) }
 }
