@@ -6,6 +6,15 @@ import Experience from './Experience.js'
 // clips by distance, so this alone decides how far you can see.
 const DEFAULT_RENDER_DISTANCE = 100
 
+// One 60 fps frame, in seconds. Follow factors below are written as
+// "fraction of the gap closed in one 60 fps frame", and this converts them
+// into the time constant that actually governs the filter.
+const FRAME60 = 1 / 60
+
+// Module scratch for the follow lead -- read and discarded within one frame.
+const _v = new THREE.Vector3()
+const _lead = new THREE.Vector3()
+
 export default class Camera {
     constructor() {
         this.experience = new Experience()
@@ -111,7 +120,47 @@ export default class Camera {
             : new THREE.Vector3(0, 2.5, 7)
         this.smoothPosition = this.instance.position.clone()
         this.smoothLookAt = new THREE.Vector3(0, 0, 0)
-        this.lerpFactor = this.isMobile ? 0.78 : 0.12
+
+        // WHY THIS IS NO LONGER 0.78 ON MOBILE.
+        //
+        // Exponential smoothing only behaves like a filter while its time
+        // constant is comfortably LONGER than a frame. 0.78 per 60 fps frame is
+        // a time constant of 11 ms -- shorter than the frame that samples it --
+        // and in that regime the maths stops filtering anything.
+        //
+        // The camera settles a fixed distance behind the character, and that
+        // distance works out as speed x frametime / alpha. Keep the time
+        // constant long and it reduces to speed x tau: the same lag every frame,
+        // whatever the frame rate. Let it go short and the two stop cancelling,
+        // so the lag itself starts tracking the frame time -- at 0.78 it swings
+        // by about 60% between a 16 ms frame and a 33 ms one, and the camera
+        // reaches each new value within a single frame because that is what a
+        // factor of 0.78 does.
+        //
+        // So on a phone whose frame times wander, the character slides back and
+        // forth on screen at frame rate. That is the trembling: not noise in
+        // anything being measured, but a smoother running faster than the clock
+        // driving it. A steady 60 fps desktop hides it, which is why it read as
+        // a mobile problem.
+        //
+        // 0.30 puts the time constant at 46 ms -- longer than a frame at 30 fps,
+        // let alone 60 -- and the velocity lead below pays back the lag that
+        // buys, so it still sits glued behind a running character.
+        this.lerpFactor = this.isMobile ? 0.30 : 0.12
+
+        // Velocity lead. A gentle follow lags behind by speed x tau, which is
+        // what made a snappy factor tempting in the first place. Aiming the
+        // camera where the character is ABOUT to be cancels that lag directly,
+        // so the framing no longer has to be bought with a filter too fast to
+        // filter. Heavily smoothed and clamped: it is a framing hint, and a
+        // teleport (respawn, leaving a minigame) must not fling the camera.
+        // Mobile only. It is here to pay back the lag that dropping 0.78 to
+        // 0.30 introduced, and desktop's 0.12 was never changed, so applying it
+        // there would tighten a framing nobody asked to have tightened.
+        this._followVel = new THREE.Vector3()
+        this._prevCharPos = null
+        this._leadScale = this.isMobile ? 0.85 : 0
+        this._maxLeadSpeed = 8
 
         // Per-frame scratch vectors — no allocations inside update() (per-frame
         // `new Vector3()` churn caused recurring GC hitches).
@@ -176,6 +225,48 @@ export default class Camera {
         return 1 - Math.pow(1 - f, dt * 60)
     }
 
+    /**
+     * Where the character will be in one time constant, as an offset.
+     *
+     * Differentiating a position by frame time is a noisy business, so the
+     * result is put through a filter far slower than the one it feeds: real
+     * speed changes over a few tenths of a second when you start or stop, while
+     * the noise is per-frame, and this keeps the first and drops the second.
+     *
+     * Clamped, because the character does not only walk -- it also gets moved
+     * outright (respawn, exiting a minigame), and one frame of that read as
+     * velocity would be hundreds of metres per second.
+     */
+    _updateFollowLead(characterPosition) {
+        const dt = Math.min(this.experience.time.delta * 0.001, 0.1)
+        if (!this._prevCharPos) {
+            this._prevCharPos = characterPosition.clone()
+            return this._followVel.set(0, 0, 0)
+        }
+
+        _v.subVectors(characterPosition, this._prevCharPos).divideScalar(Math.max(dt, 1e-4))
+        this._prevCharPos.copy(characterPosition)
+        // Vertical is deliberately dropped: slopes and the controller's own
+        // ground correction make it the noisiest axis, and leading the camera
+        // up and down a hill is not wanted anyway.
+        _v.y = 0
+        if (_v.lengthSq() > this._maxLeadSpeed * this._maxLeadSpeed) {
+            _v.setLength(this._maxLeadSpeed)
+        }
+        this._followVel.lerp(_v, 1 - Math.pow(1 - 0.10, dt * 60))
+
+        // tau for the follow factor in use, so the lead matches the lag it is
+        // there to cancel: alpha = 1 - exp(-frame/tau)  =>  tau = -frame/ln(1-f)
+        const tau = -FRAME60 / Math.log(1 - this.lerpFactor)
+        return _lead.copy(this._followVel).multiplyScalar(tau * this._leadScale)
+    }
+
+    /** Forget the last sampled position, so a teleport is not read as speed. */
+    resetFollowLead() {
+        this._prevCharPos = null
+        this._followVel.set(0, 0, 0)
+    }
+
     setOrbitControls() {
         this.controls = new OrbitControls(this.instance, this.canvas)
         this.controls.enableDamping = true
@@ -229,8 +320,12 @@ export default class Camera {
             // Ease the zoom here rather than on input, so a wheel notch glides
             // in instead of stepping.
             this.zoom += (this.zoomTarget - this.zoom) * this._alpha(this.zoomLerp)
-            const desiredPosition = this._scratchPos
+            const lead = this._updateFollowLead(characterPosition)
+            const followTarget = this._scratchLook
                 .copy(characterPosition)
+                .add(lead)
+            const desiredPosition = this._scratchPos
+                .copy(followTarget)
                 .addScaledVector(this.cameraOffset, this.zoom)
 
             // Handing back from a focused view: ease in from a gentle factor to
@@ -246,7 +341,7 @@ export default class Camera {
             }
             const a = this._alpha(follow)
             this.smoothPosition.lerp(desiredPosition, a)
-            this.smoothLookAt.lerp(characterPosition, a)
+            this.smoothLookAt.lerp(followTarget, a)
             this.instance.position.copy(this.smoothPosition)
             this.instance.lookAt(this.smoothLookAt)
 
@@ -548,6 +643,9 @@ export default class Camera {
     setMode(mode, { snap = true } = {}) {
         this.mode = mode
         this.controls.enabled = this.mode === 'free'
+        // The character is usually put somewhere else across a mode change, and
+        // the first follow frame after would otherwise read that jump as speed.
+        this.resetFollowLead()
 
         if (!snap) return
 
