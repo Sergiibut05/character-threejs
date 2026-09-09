@@ -1705,3 +1705,36 @@ body.ov-page {
     .ov-sheet { transform: none; }
     .ov-portal-canvas { opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Phones: the two things on this page that repaint every frame
+   ═══════════════════════════════════════════════════════════════════════
+   Both are decorative, both are effectively invisible at this size, and both
+   cost a full-width repaint on the main thread for as long as the overview is
+   open. Keyed on the pointer rather than the width, because what makes them
+   expensive is the GPU behind a touchscreen, not how many CSS pixels it has.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (hover: none) and (pointer: coarse) {
+
+    /* The motif field stops drifting and simply sits there.
+       `background-position` is a paint property: every frame of the drift
+       repaints the whole hero band, and unlike the transform version it was
+       chosen over, that repaint is main-thread work rather than compositor
+       work. On a desktop that is a fair trade for not holding two large
+       layers. On a phone -- where this same thread is also driving a second
+       WebGPU canvas a few hundred pixels away -- it is not, and the field is
+       at 6-10% opacity, so nothing legible is lost by holding it still. */
+    .ov-hero-pattern::before,
+    .ov-hero-pattern::after { animation: none; }
+
+    /* The bar keeps its surface and loses the blur behind it.
+       The surface is already 94% opaque, so the backdrop blur is doing almost
+       nothing you can see -- while costing a re-blur of the full-width strip
+       on every scroll frame, which is precisely the frame budget the scroll
+       itself needs. Two more percent of opacity covers the difference. */
+    .ov-bar::before {
+        background: rgba(251, 253, 245, 0.96);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}

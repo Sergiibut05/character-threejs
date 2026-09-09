@@ -44,10 +44,22 @@ export default class HeroViewport {
 
         this.reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 
+        // A touchscreen gets a cheaper version of this viewport.
+        //
+        // This is a SECOND WebGPU device, alive at the same time as the world's
+        // -- there is no way around that without sharing a renderer across two
+        // canvases -- so what it costs per frame matters more here than it
+        // would anywhere else. Multisampling is the expensive half: at the
+        // pixel ratio below it is 4 samples on every pixel of the card, for
+        // edges that a phone's pixel density has already smoothed. Turning it
+        // off and capping the ratio at 1.5 cuts the work per frame by roughly
+        // three quarters and is genuinely hard to see at arm's length.
+        this.lowPower = matchMedia('(hover: none) and (pointer: coarse)').matches
+
         this.renderer = new THREE.WebGPURenderer({
             canvas,
             alpha: true,
-            antialias: true,
+            antialias: !this.lowPower,
             powerPreference: 'low-power'
         })
         this.renderer.setClearColor(0x000000, 0)
@@ -479,7 +491,7 @@ export default class HeroViewport {
     resize() {
         const w = this.canvas.clientWidth || 1
         const h = this.canvas.clientHeight || 1
-        this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.lowPower ? 1.5 : 2))
         this.renderer.setSize(w, h, false)
         this.camera.aspect = w / h
         this.camera.updateProjectionMatrix()
