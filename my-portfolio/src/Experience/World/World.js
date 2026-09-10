@@ -50,144 +50,59 @@ export default class World {
         this.isDevLightMode = import.meta.env.VITE_DEV_LIGHT_MODE === 'true'
 
         // Wait for resources to be ready
-        this.resources.on('ready', () => {
-            this.environment = new Environment()
+        // The world is NOT built here any more; build() is called after the
+        // player presses Explorar, behind the black boot screen.
+        //
+        // It used to run straight off 'ready', which put roughly 600 ms of
+        // constructors between the last byte downloading and the button
+        // appearing -- 600 ms in ONE synchronous task, with the loading
+        // screen frozen through all of it, for work nobody could see. Behind
+        // the boot screen the same work is covered by a mark that pulses on
+        // the compositor and does not care that this thread is busy.
+        this.resources.on('ready', () => { this.resourcesReady = true })
+    }
 
-            if (this.isDevLightMode) {
-                this.ground = new Ground()
-                this.character = new Character()
-                this.musicNotes = new MusicNotes()
-                this.activityPrompt = new ActivityPrompt()
-                this.frisbeeMinigame = new FrisbeeMinigame()
-                this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
-                this.raycaster = new Raycaster()
-                this._showDogAtAnchor()
+    /**
+     * Subscribe to 'sourceLoaded' AND catch up on whatever already arrived.
+     *
+     * THIS IS NOT OPTIONAL NOW THAT build() IS DEFERRED. These subscriptions
+     * used to be registered within milliseconds of the last critical asset, so
+     * every decorative one still arrived after them. build() now runs when the
+     * player presses Explorar, which can be a minute later -- by then the dog,
+     * the frisbee and the markers may all have landed already, and a plain
+     * subscription would miss those events for good: the dog would never get
+     * its model and the frisbee never its mesh, silently.
+     */
+    _onSourceLoaded(names, handler) {
+        this.resources.on('sourceLoaded', handler)
+        for (const name of names) {
+            if (this.resources.items?.[name]) handler(name)
+        }
+    }
 
-                // Stylized TSL fire — test instance near world center
-                this.fire = new Fire()
-                this.fire.addFire(new THREE.Vector3(2, 0, 0), 1.0)
+    /**
+     * Build the island. Called once, from Experience.startExperience(), with
+     * the black boot screen already up.
+     */
+    async build() {
+        if (this.built) return
+        this.built = true
+        this.environment = new Environment()
 
-                this.resources.on('sourceLoaded', (name) => {
-                    if (name === 'dogModel') {
-                        this.frisbeeMinigame?.dog?.setupModel()
-                        this._showDogAtAnchor()
-                    }
-                    if (name === 'frisbeeModel' || name === 'frisbeeTexture') {
-                        this.frisbeeMinigame?.flightController?.setupMesh()
-                    }
-                    if (name === 'objectiveArrowTexture') {
-                        this.frisbeeMinigame?.objectiveMarker?.setupArrow()
-                    }
-                    if (name === 'checkTexture') {
-                        this.frisbeeMinigame?.objectiveMarker?.setupCheck()
-                    }
-                })
-
-                this.setupModal()
-                console.info('World: VITE_DEV_LIGHT_MODE enabled (minimal world)')
-                return
-            }
-
-            // Load the patio scene (GLB model with colliders, ground, water)
-            this.patioScene = new PatioScene()
-
-            this.experience.loadSpy?.mark('    mundo: patioScene')
-            // Character
+        if (this.isDevLightMode) {
+            this.ground = new Ground()
             this.character = new Character()
-
-            // Idle musical notes (Animal-Crossing "humming" while standing still)
             this.musicNotes = new MusicNotes()
-
-            // Footprints on dirt/sand (stamped by Character via stampFootprint)
-            this.footprints = new Footprints()
-
-            this.experience.loadSpy?.mark('    mundo: personaje + notas + huellas')
-            // Grass — placed on grass regions from the ground mesh vertex colors
-            this.setupGrass()
-
-            this.experience.loadSpy?.mark('    mundo: cesped')
-        // Flowers + fireflies — decorate the grass zones with vibes
-        this.setupMeadowDecor()
-
-            this.fire = new Fire()
-            // Known fire location in Blender Z-up space (the 'fire-point' empty
-            // is no longer exported into park-things.glb). Converted to Three
-            // Y-up with the standard (bx, bz, -by) swap.
-            const FIRE_POINT_THREE = new THREE.Vector3(-14.1581, 0.204325, 3.11002)
-            const FIRE_SCALE = 1.2
-            const _placeFire = (name) => {
-                if (name !== 'parkThingsModel') return
-                const firePoint = this.resources.items.parkThingsModel?.scene?.getObjectByName('fire-point')
-                if (firePoint) {
-                    firePoint.updateWorldMatrix(true, false)
-                    const pos = new THREE.Vector3().setFromMatrixPosition(firePoint.matrixWorld)
-                    this.fire.addFire(pos, FIRE_SCALE)
-                } else {
-                    this.fire.addFire(FIRE_POINT_THREE.clone(), FIRE_SCALE)
-                }
-                this.resources.off('sourceLoaded', _placeFire)
-            }
-            this.resources.on('sourceLoaded', _placeFire)
-
-            this.experience.loadSpy?.mark('    mundo: flores + luciernagas + fuego')
-            // Trees — instanced per type from reference models
-            this.setupTrees()
-
-            this.experience.loadSpy?.mark('    mundo: arboles')
-            // Bushes (standalone, ready for future reference models)
-            this.bushes = new Bushes()
-
-            // Fake blob shadows: on low quality, and ALSO wherever the real
-            // shadow pipeline is unavailable (Android — see DeviceCaps.js).
-            if (this.experience.quality.isLow || !this.experience.quality.shadowsEnabled) {
-                this.setupFakeShadows()
-            }
-
-            this.experience.loadSpy?.mark('    mundo: arbustos + sombras')
-            // Initialize raycaster for mouse interactions -- and then two dozen
-            // more constructors, which is why the next mark is worth having
-            this.raycaster = new Raycaster()
             this.activityPrompt = new ActivityPrompt()
             this.frisbeeMinigame = new FrisbeeMinigame()
             this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
-            this.mailbox = new Mailbox() // resolves the mailbox node lazily
-            this.sitPoints = new SitPoints() // resolves sit-points.glb lazily
-            this.door = new Door() // resolves the house `door` node lazily
-            // The oversized gamepad by the house: shows the controls for
-            // whatever you are actually playing with. See ControllerProp.js.
-            this.controllerProp = new ControllerProp()
-            this.houseInterior = new HouseInterior() // far-offset interior + rug exit
-
-            // West play area: project carts + goal + kickable ball + confetti
-            this.projectCarts = new ProjectCarts()
-            this.mapBoard = new MapBoard()
-            this.socialArea = new SocialArea()
-            this.beachMinigame = new BeachMinigame()
-            this.beachSession = new BeachSession(this.beachMinigame)
-            this.goalPost = new GoalPost()
-            this.confetti = new Confetti()
-            this.ball = new Ball()
-            this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
-            // Live ranking screens. Both boards ship in InfoBoard.glb: the
-            // pitch one ('scoreboard') and the beach one ('scoreboard.001'),
-            // each painted with ITS OWN ranking.
-            this.scoreboardScreen = new ScoreboardScreen()
-            this.beachScoreboard = new ScoreboardScreen({
-                targetName: 'scoreboard001', board: 'beach',
-                footerKey: 'beach.boardFooter'
-            })
-            // …and the physical boards are interactive: outline + top-10 modal.
-            this.scoreboardInteractive = new ScoreboardInteractive()
-            this.beachScoreboardInteractive = new ScoreboardInteractive({
-                nodeName: 'leaderboard001',
-                screenName: 'scoreboard001',
-                board: 'beach',
-                subtitleKey: 'beach.lbSubtitle'
-            })
-
+            this.raycaster = new Raycaster()
             this._showDogAtAnchor()
 
-            // When decorative assets finish, retry minigame component setup
+            // Stylized TSL fire — test instance near world center
+            this.fire = new Fire()
+            this.fire.addFire(new THREE.Vector3(2, 0, 0), 1.0)
+
             this.resources.on('sourceLoaded', (name) => {
                 if (name === 'dogModel') {
                     this.frisbeeMinigame?.dog?.setupModel()
@@ -204,10 +119,133 @@ export default class World {
                 }
             })
 
-            // Setup modal close functionality
             this.setupModal()
-            this.experience.loadSpy?.mark('    mundo: interactivos y minijuegos (fin)')
+            console.info('World: VITE_DEV_LIGHT_MODE enabled (minimal world)')
+            return
+        }
+
+        // Load the patio scene (GLB model with colliders, ground, water)
+        this.patioScene = new PatioScene()
+
+        this.experience.loadSpy?.mark('    mundo: patioScene')
+        // Character
+        this.character = new Character()
+
+        // Idle musical notes (Animal-Crossing "humming" while standing still)
+        this.musicNotes = new MusicNotes()
+
+        // Footprints on dirt/sand (stamped by Character via stampFootprint)
+        this.footprints = new Footprints()
+
+        this.experience.loadSpy?.mark('    mundo: personaje + notas + huellas')
+        // Grass — placed on grass regions from the ground mesh vertex colors
+        this.setupGrass()
+
+        this.experience.loadSpy?.mark('    mundo: cesped')
+    // Flowers + fireflies — decorate the grass zones with vibes
+    this.setupMeadowDecor()
+
+        this.fire = new Fire()
+        // Known fire location in Blender Z-up space (the 'fire-point' empty
+        // is no longer exported into park-things.glb). Converted to Three
+        // Y-up with the standard (bx, bz, -by) swap.
+        const FIRE_POINT_THREE = new THREE.Vector3(-14.1581, 0.204325, 3.11002)
+        const FIRE_SCALE = 1.2
+        const _placeFire = (name) => {
+            if (name !== 'parkThingsModel') return
+            const firePoint = this.resources.items.parkThingsModel?.scene?.getObjectByName('fire-point')
+            if (firePoint) {
+                firePoint.updateWorldMatrix(true, false)
+                const pos = new THREE.Vector3().setFromMatrixPosition(firePoint.matrixWorld)
+                this.fire.addFire(pos, FIRE_SCALE)
+            } else {
+                this.fire.addFire(FIRE_POINT_THREE.clone(), FIRE_SCALE)
+            }
+            this.resources.off('sourceLoaded', _placeFire)
+        }
+        this._onSourceLoaded(['parkThingsModel'], _placeFire)
+
+        this.experience.loadSpy?.mark('    mundo: flores + luciernagas + fuego')
+        // Trees — instanced per type from reference models
+        this.setupTrees()
+
+        this.experience.loadSpy?.mark('    mundo: arboles')
+        // Bushes (standalone, ready for future reference models)
+        this.bushes = new Bushes()
+
+        // Fake blob shadows: on low quality, and ALSO wherever the real
+        // shadow pipeline is unavailable (Android — see DeviceCaps.js).
+        if (this.experience.quality.isLow || !this.experience.quality.shadowsEnabled) {
+            this.setupFakeShadows()
+        }
+
+        this.experience.loadSpy?.mark('    mundo: arbustos + sombras')
+        // Initialize raycaster for mouse interactions -- and then two dozen
+        // more constructors, which is why the next mark is worth having
+        this.raycaster = new Raycaster()
+        this.activityPrompt = new ActivityPrompt()
+        this.frisbeeMinigame = new FrisbeeMinigame()
+        this.frisbeeSession = new FrisbeeSession(this.frisbeeMinigame)
+        this.mailbox = new Mailbox() // resolves the mailbox node lazily
+        this.sitPoints = new SitPoints() // resolves sit-points.glb lazily
+        this.door = new Door() // resolves the house `door` node lazily
+        // The oversized gamepad by the house: shows the controls for
+        // whatever you are actually playing with. See ControllerProp.js.
+        this.controllerProp = new ControllerProp()
+        this.houseInterior = new HouseInterior() // far-offset interior + rug exit
+
+        // West play area: project carts + goal + kickable ball + confetti
+        this.projectCarts = new ProjectCarts()
+        this.mapBoard = new MapBoard()
+        this.socialArea = new SocialArea()
+        this.beachMinigame = new BeachMinigame()
+        this.beachSession = new BeachSession(this.beachMinigame)
+        this.goalPost = new GoalPost()
+        this.confetti = new Confetti()
+        this.ball = new Ball()
+        this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
+        // Live ranking screens. Both boards ship in InfoBoard.glb: the
+        // pitch one ('scoreboard') and the beach one ('scoreboard.001'),
+        // each painted with ITS OWN ranking.
+        this.scoreboardScreen = new ScoreboardScreen()
+        this.beachScoreboard = new ScoreboardScreen({
+            targetName: 'scoreboard001', board: 'beach',
+            footerKey: 'beach.boardFooter'
         })
+        // …and the physical boards are interactive: outline + top-10 modal.
+        this.scoreboardInteractive = new ScoreboardInteractive()
+        this.beachScoreboardInteractive = new ScoreboardInteractive({
+            nodeName: 'leaderboard001',
+            screenName: 'scoreboard001',
+            board: 'beach',
+            subtitleKey: 'beach.lbSubtitle'
+        })
+
+        this._showDogAtAnchor()
+
+        // When decorative assets finish, retry minigame component setup
+        this._onSourceLoaded(
+            ['dogModel', 'frisbeeModel', 'frisbeeTexture', 'objectiveArrowTexture', 'checkTexture'],
+            (name) => {
+                if (name === 'dogModel') {
+                    this.frisbeeMinigame?.dog?.setupModel()
+                    this._showDogAtAnchor()
+                }
+                if (name === 'frisbeeModel' || name === 'frisbeeTexture') {
+                    this.frisbeeMinigame?.flightController?.setupMesh()
+                }
+                if (name === 'objectiveArrowTexture') {
+                    this.frisbeeMinigame?.objectiveMarker?.setupArrow()
+                }
+                if (name === 'checkTexture') {
+                    this.frisbeeMinigame?.objectiveMarker?.setupCheck()
+                }
+            }
+        )
+
+        // Setup modal close functionality
+        this.setupModal()
+        this.experience.loadSpy?.mark('    mundo: interactivos y minijuegos (fin)')
     }
 
     setupGrass() {

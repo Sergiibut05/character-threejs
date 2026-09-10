@@ -33,6 +33,9 @@ export default class Experience {
 
         this.canvas = canvas
         this.ready = false
+        // Nothing is rendered into the canvas while something opaque is on top
+        // of it. See update().
+        this._sceneCovered = true
 
         // The landing button is painted once and then sits there — and the
         // Quick Overview, reachable from that very screen, has its own language
@@ -86,6 +89,7 @@ export default class Experience {
         this.loadingEnterBtn = document.getElementById('loading-enter-btn')
         this.loadingOverviewBtn = document.getElementById('loading-overview-btn')
         this.initialCover = document.getElementById('initial-cover')
+        this.bootScreen = document.getElementById('boot-screen')
         this._setupOverviewButton()
 
         // State tracking
@@ -211,106 +215,125 @@ export default class Experience {
 
         this.allReadyHandled = true
         this.showCloudOverlay()
-        this.warmUpRender()
+        // Straight to the button. The warm-up used to happen HERE, which meant
+        // the loading screen sat frozen for its whole duration -- and a frozen
+        // animation is the loudest possible way to stall, because the motion
+        // stopping is the thing you notice. It now runs behind the iris
+        // instead, where the screen is black and nothing is moving anyway.
+        // See warmUpBehindIris().
+        this.showEnterButton()
     }
 
     /**
-     * Render a few frames of the main scene behind the cloud overlay to compile
-     * shaders, then reveal the enter button.
+     * Compile everything that would otherwise stall, while the screen is fully
+     * black -- and compile far more of it than a plain render would.
      *
-     * THIS IS WHERE THE LOADING SCREEN FREEZES, AND IT CANNOT BE FIXED HERE.
+     * WHY IT MOVED HERE. Pipeline compilation is not main-thread work; it is
+     * the GPU process and the driver, which the browser's compositor shares.
+     * Measured on a phone: a 1.6 second gap between two warm-up frames with the
+     * main thread completely idle through it. Nothing can make that cheaper
+     * from JavaScript -- compileAsync was tried three times and cannot be used
+     * in this project, see the note at the end. So the only thing left to
+     * choose is WHEN it is paid, and this is the moment: the iris is at 0, the
+     * screen is solid black, and a stall against black is invisible where the
+     * same stall against a drifting sky reads as the page hanging.
      *
-     * These frames exist to force every shader in the scene to compile now,
-     * where a stall is hidden, rather than during the first seconds of play.
-     * The stall is real, and it is not on this thread: compiling a pipeline is
-     * the GPU process and the graphics driver, which the browser's compositor
-     * shares. So while it runs the compositor cannot present, and the loading
-     * screen's animation stops dead with nothing blocking the main thread.
-     *
-     * Measured rather than assumed -- LoadSpy, cold cache, on a desktop:
-     *
-     *     TAREAS LARGAS  5  ·  bloqueado 648 ms      SALTOS ENTRE FRAMES
-     *       199 ms  a los 2.1s                         1254 ms  a los 2.0s
-     *       143 ms  a los 0.7s                          223 ms  a los 2.2s
-     *
-     * A frame gap of 1254 ms with only 199 ms of main-thread work under it, in
-     * the middle of this method's window. The three frames below cost 17, 6 and
-     * 7 ms of JavaScript. Everything else was the driver.
-     *
-     * The same page reloaded, with Chrome's shader cache now warm, reaches the
-     * enter button in 0.9 s with no gap over 200 ms. So this is a COLD-CACHE
-     * cost, which is to say it is what a first-time visitor gets -- and on a
-     * mid-range phone, with a slower driver and no spare core to hide it on,
-     * that same second becomes several.
-     *
-     * The textbook remedy is compileAsync, which builds the same pipelines
-     * through createRenderPipelineAsync, off the driver's critical path. It
-     * does not work here, and it is worth writing down why so nobody spends
-     * the afternoon again:
-     *
-     *   - renderer.compileAsync(scene, camera) compiles with NO render target
-     *     bound. Every material here writes to a multi-target attachment, so
-     *     MRTNode.setup() asks which target it is writing into, gets null, and
-     *     the shader cannot be built: "Cannot read properties of null
-     *     (reading 'textures')".
-     *   - scenePass.compileAsync(renderer) does bind the target and the MRT,
-     *     and gets further -- straight into a worse failure. It fills the
-     *     pipeline cache with variants shaped for the scene pass's two colour
-     *     attachments, and the SHADOW pass then draws the same objects into a
-     *     target that has one. Dawn rejects the pipeline ("target has no
-     *     corresponding fragment stage output but writeMask is not zero") and
-     *     the next frame throws "parameter 1 is not of type GPURenderPipeline".
-     *
-     * A third attempt narrowed it to "only where there is no shadow pass",
-     * since Android has none and Android is where this hurts. That is not
-     * enough either: the same two errors came back on low quality with the sun
-     * casting nothing. The shadow pass is not the only thing that re-renders
-     * these objects into a target of its own shape -- the outline pass does,
-     * and so does anything built on RTTNode, both from inside updateBefore,
-     * which is where the failing stack ends. Precompiling would have to build a
-     * variant for every one of those target shapes, and in r183 there is no way
-     * to ask it to.
-     *
-     * So: three attempts, three failures, and the conclusion is that this stall
-     * is paid here or it is paid in the first seconds of play. Here is better.
+     * WHY IT IS MORE AGGRESSIVE THAN A RENDER. A normal frame only compiles
+     * what it actually draws, and that leaves out most of the island: anything
+     * behind the camera, anything past the far plane, anything switched off
+     * until you walk up to it. Those all compiled later, one at a time, which
+     * is the hitching in the first seconds of play. Behind a black screen there
+     * is no reason to respect any of that, so for these frames every object is
+     * made visible and unculled, an object is put through the outline pass, and
+     * the camera is spun so the rest of the shadow atlas gets touched too.
+     * Everything is restored exactly afterwards.
      */
-    warmUpRender() {
-        this.loadSpy?.mark('calentamiento (compila shaders)')
-        let frames = 0
-        const totalFrames = 3
+    async warmUpBehindIris() {
+        const spy = this.loadSpy
+        const t0 = performance.now()
 
-        const doWarmUp = () => {
-            const spy = this.loadSpy
-            if (frames === 0) spy?.mark('  (primer frame del calentamiento empieza)')
-            const t0 = spy ? performance.now() : 0
-            this.camera.update()
-            const t1 = spy ? performance.now() : 0
-            this.world.update()
-            const t2 = spy ? performance.now() : 0
-            this.renderer.update()
-            frames++
-            if (spy) {
-                const t3 = performance.now()
-                const ms = (a, b) => String(Math.round(b - a)).padStart(4)
-                spy.mark(
-                    `  f${frames}: total ${ms(t0, t3)}  ·  cam ${ms(t0, t1)}` +
-                    `  mundo ${ms(t1, t2)}  render ${ms(t2, t3)}`
-                )
-            }
+        // Remember, then override. Recorded per object rather than blanket-set,
+        // because plenty of things here are deliberately unculled or hidden and
+        // must go back to being exactly that.
+        //
+        // Colliders are pruned, subtree and all. They are invisible geometry
+        // the physics reads and the camera never sees, and there are 86 of
+        // them -- forcing those visible compiles a pipeline apiece for meshes
+        // that will not be drawn once in the whole session, which is the exact
+        // cost this method exists to avoid paying.
+        const saved = []
+        const isCollider = (o) => /collider|collaider/i.test(o.name || '')
+        const walk = (o) => {
+            if (isCollider(o)) return
+            saved.push([o, o.frustumCulled, o.visible])
+            o.frustumCulled = false
+            o.visible = true
+            for (const c of o.children) walk(c)
+        }
+        for (const c of this.scene.children) walk(c)
 
-            if (frames < totalFrames) {
-                requestAnimationFrame(doWarmUp)
-            } else {
-                this.showEnterButton()
+        // The outline pass builds its own variant of an object's shader, and it
+        // never runs with an empty selection -- so the first time you walked up
+        // to anything, it compiled then. One mesh through it now covers it.
+        const outlined = this.world?.controllerProp?.meshes?.[0]
+            || this.world?.mailbox?.mesh
+            || null
+        if (outlined) this.renderer.addOutlinedObject(outlined)
+
+        const camera = this.camera.instance
+        const yaw0 = camera.rotation.y
+        const FRAMES = 4
+
+        try {
+            for (let i = 0; i < FRAMES; i++) {
+                // Spin between frames: the sun's shadow camera and the frustum
+                // both follow where we look, so four quarters cover far more of
+                // the island than four identical frames would.
+                camera.rotation.y = yaw0 + (i / FRAMES) * Math.PI * 2
+                camera.updateMatrixWorld(true)
+
+                const t = performance.now()
+                try {
+                    this.renderer.update()
+                } catch (err) {
+                    console.warn('warmUpBehindIris: frame failed', err)
+                }
+                spy?.mark(`  iris f${i + 1}: ${Math.round(performance.now() - t)} ms`)
+
+                // Hand the frame back so the driver can chew on what was just
+                // submitted instead of queueing four submissions at once.
+                //
+                // Raced against a timer, because requestAnimationFrame stops
+                // firing in a backgrounded tab -- and the one thing worse than
+                // a stall behind a black screen is being stuck behind it
+                // because someone checked a message mid-transition. Measured
+                // at 14.9 s that way, against 1.4 s in the foreground.
+                await new Promise((r) => {
+                    let done = false
+                    const go = () => { if (!done) { done = true; r() } }
+                    requestAnimationFrame(go)
+                    setTimeout(go, 150)
+                })
             }
+        } finally {
+            if (outlined) this.renderer.removeOutlinedObject(outlined)
+            for (const [o, culled, visible] of saved) {
+                o.frustumCulled = culled
+                o.visible = visible
+            }
+            camera.rotation.y = yaw0
+            camera.updateMatrixWorld(true)
         }
 
-        requestAnimationFrame(doWarmUp)
+        spy?.mark(`calentamiento tras el iris: ${Math.round(performance.now() - t0)} ms`)
     }
 
     showEnterButton() {
+        // Marked, but NOT finished: the button appearing is no longer the end
+        // of loading, it is the end of the first half. The boot screen after
+        // the click is where the expensive half happens, and stopping the
+        // report here meant its numbers were collected and never shown.
         this.loadSpy?.mark('listo para entrar')
-        this.loadSpy?.finish()
         if (this.progressFill) {
             this.progressFill.style.transform = 'scaleX(1)'
         }
@@ -333,42 +356,78 @@ export default class Experience {
      */
     async startExperience() {
         if (!this.rendererReady) return
+        // Three things can call this -- the button, the overview's CTA and a
+        // keypress -- and it is now a long await chain, so a second call could
+        // land in the middle of the first and run the whole transition twice.
+        if (this._starting) return
+        this._starting = true
         if (this.loadingEnterBtn) {
             this.loadingEnterBtn.disabled = true
             this.loadingEnterBtn.classList.remove('ready')
         }
 
-        // Start rendering scene immediately under the iris.
-        this.ready = true
+        // ── The boot screen goes up FIRST, and gets a frame to paint ──────
+        // Everything below it is expensive and blocking, so the mark has to be
+        // on screen and already beating before any of it starts -- otherwise
+        // the first thing the player sees after clicking is a frozen white
+        // shape, which is worse than the frozen sky it replaced.
+        this.bootScreen?.classList.add('is-visible')
+        this.bootScreen?.setAttribute('aria-hidden', 'false')
+        await this._nextPaint()
+
         // Reveals the world-only chrome (the map button); the start screen has
         // nothing to travel around.
         document.body.classList.add('is-in-world')
 
         // Kick off the soundtrack — this click is the user gesture that unlocks
-        // audio autoplay. AudioManager handles its own delay + fade-in so the
-        // music swells in just as the iris opens.
+        // audio autoplay, and it is also the only signal the player gets that
+        // the press registered while the island is being built.
         this.audio?.startSoundtrack()
 
-        // Start from full black instantly to avoid a visible frame leak.
-        this.renderer.setIrisTransitionEnabled(true)
-        this.renderer.setIrisTransitionSize(0.0)
-
-        // Remove white UI overlay after iris is active.
+        // The start screen is gone from underneath.
         this.cloudTransition?.remove()
         this.cloudTransition = null
-
-        // The overview belongs to the start screen; once we are in the world
-        // there is nothing to go back to.
         this.overview?.destroy()
         this.overview = null
 
-        // Iris transition: open to a small hole, hold, anticipation in, open fully.
-        // Total ~3.2 s — shaders compile naturally in the render loop during this time.
-        // On mobile, we make the hole significantly bigger because 0.075 is microscopic 
-        // on a phone screen, which makes it look like a "black screen bug" to the user.
-        const isMobile = this.quality.isLow
-        const holeSize = isMobile ? 0.25 : 0.075
-        const shrinkSize = isMobile ? 0.18 : 0.058
+        // ── Everything that stalls, paid here ──────────────────────────────
+        // Behind the mark: the island gets built, then every shader it needs
+        // gets compiled. Both block the main thread and stall the GPU, and
+        // neither can be made cheap -- see warmUpBehindIris(). What CAN be
+        // chosen is where they land, and this is the one screen in the whole
+        // run whose only moving part is animated by the compositor and does
+        // not care that this thread has stopped.
+        await this.world.build()
+        this.loadSpy?.mark('mundo construido (tras el boton)')
+
+        this.ready = true
+        this.renderer.setIrisTransitionEnabled(true)
+        this.renderer.setIrisTransitionSize(0.0)
+        await this.warmUpBehindIris()
+
+        // Hand over. The iris underneath is already solid black, so the mark
+        // simply fades out over it and the hole opens in the same black --
+        // there is no seam between the two screens to notice.
+        this._sceneCovered = false
+        await this._nextPaint()
+        this.bootScreen?.classList.remove('is-visible')
+        this.bootScreen?.setAttribute('aria-hidden', 'true')
+        this.loadSpy?.finish()
+
+        // Iris: open to a small hole, hold, breathe in, then open fully.
+        //
+        // The size is a RADIUS in units where the screen's half-height is 0.5 --
+        // so 0.25 is a hole half the screen tall, which on a portrait phone is
+        // most of the view and stops reading as a peephole at all. The phone
+        // value exists because the desktop one really is too small there, not
+        // because it wanted to be big.
+        //
+        // Keyed off the user agent rather than the quality tier: the tier was
+        // only ever standing in for "is this a phone", and it gets it wrong the
+        // moment someone picks high quality on one.
+        const isMobile = this.quality.isMobile
+        const holeSize = isMobile ? 0.14 : 0.075
+        const shrinkSize = isMobile ? 0.10 : 0.058
 
         await this.animateValue(0.0, holeSize, 420, (v) => this.renderer.setIrisTransitionSize(v))
         await this.waitMs(1000)
@@ -393,6 +452,21 @@ export default class Experience {
 
     waitMs(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms))
+    }
+
+    /**
+     * Wait for the browser to actually put a frame up.
+     *
+     * Raced against a timer because requestAnimationFrame does not fire in a
+     * backgrounded tab, and a transition that waits on it forever is a hang.
+     */
+    _nextPaint() {
+        return new Promise((resolve) => {
+            let done = false
+            const go = () => { if (!done) { done = true; resolve() } }
+            requestAnimationFrame(() => requestAnimationFrame(go))
+            setTimeout(go, 200)
+        })
     }
 
     animateValue(from, to, duration, onUpdate) {
@@ -428,6 +502,17 @@ export default class Experience {
     update() {
         // Prevent any render call before WebGPU backend init finishes.
         if (!this.rendererReady) return
+
+        // AND NOT WHILE SOMETHING OPAQUE IS COVERING THE CANVAS.
+        //
+        // This used to render the whole island every frame from the moment the
+        // backend was up -- underneath the start screen, which is a solid sky
+        // gradient, and then underneath the boot screen, which is solid black.
+        // Full scene, full pixel ratio, every post-processing pass, sixty times
+        // a second, for pixels that could not reach a display. On a phone it
+        // was competing for the GPU with the only thing anyone could actually
+        // see: the loading screen's own animation.
+        if (this._sceneCovered) return
 
         // Render main scene behind transition while locked.
         // NOTE the order: world BEFORE camera — the camera must frame the
