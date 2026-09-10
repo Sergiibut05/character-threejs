@@ -633,9 +633,8 @@ body.ov-page {
     cursor: default;
     transition: transform 0.45s var(--ov-ease);
 }
-/* No hover at all: he is a character standing there, not a control that
-   lights up. The two explicit "Entrar al mundo" buttons carry that job. */
-.ov-portal.is-armed { cursor: pointer; }
+/* No hover and no pointer: he is a character standing there, and no longer a
+   control at all. The two explicit "Entrar al mundo" buttons carry that job. */
 
 .ov-portal-canvas {
     position: absolute;
@@ -798,16 +797,19 @@ body.ov-page {
     gap: clamp(24px, 4vw, 48px);
     align-items: start;
 }
+/* ONE treatment for the whole story, deliberately.
+   The first paragraph used to be two pixels bigger and a shade darker, as a
+   lede. It does not read as a lede -- both paragraphs are body copy of exactly
+   the same rank, one after the other, so the difference lands as two different
+   typefaces in the same block rather than as hierarchy. The section title is
+   what gives this section its entrance; the prose under it should be even.
+   Ink rather than muted, because this is the one block on the page that is
+   there to be read rather than scanned. */
 .ov-prose p {
     margin: 0 0 20px;
-    color: var(--ov-muted);
+    color: var(--fz-ink);
     font-size: var(--ov-t-base);
     line-height: 1.74;
-}
-/* The opening line carries the story; give it a little more presence. */
-.ov-prose p:first-child {
-    font-size: var(--ov-t-md);
-    color: var(--fz-ink);
 }
 .ov-prose p:last-child { margin-bottom: 0; }
 

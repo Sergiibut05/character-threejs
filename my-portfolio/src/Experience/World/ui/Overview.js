@@ -336,12 +336,19 @@ export default class Overview {
 
         text.append(name, role, lede, ctas)
 
-        // ── The window: the character from the world, and the door into it ──
-        const portal = el('button', 'ov-portal ov-reveal')
-        portal.type = 'button'
+        // ── The window: the character from the world ──
+        //
+        // A picture, not a door. It used to enter the world when clicked, and
+        // nothing said so -- there is no label, no hover, no cursor change
+        // worth the name, just a character standing there. A control that
+        // takes you somewhere else while looking exactly like an illustration
+        // is a trapdoor, and the two "Entrar al mundo" buttons already say the
+        // thing out loud. So it is a div now, with the role that describes what
+        // it actually is.
+        const portal = el('div', 'ov-portal ov-reveal')
+        portal.setAttribute('role', 'img')
         portal.setAttribute('aria-label', c.a11y.portrait)
         portal.style.setProperty('--i', 2)
-        portal.addEventListener('click', () => this._explore())
 
         portal.appendChild(this.portalCanvas)
         portal.appendChild(el('span', 'ov-portal-glow'))
@@ -365,7 +372,12 @@ export default class Overview {
         grid.style.setProperty('--i', 1)
 
         const prose = el('div', 'ov-prose')
-        for (const p of c.about.story) prose.appendChild(txt('p', null, p))
+        // richText, not plain text: the story marks its load-bearing nouns with
+        // **bold**, the same convention the project highlights already use. Two
+        // solid paragraphs of even grey is a wall you decide not to read; a
+        // couple of anchors in each give the eye somewhere to land and turn it
+        // into something scannable without shortening a word of it.
+        for (const p of c.about.story) prose.appendChild(el('p', null, richText(p)))
 
         const langs = el('p', 'ov-langs')
         langs.append(
@@ -818,7 +830,6 @@ export default class Overview {
             btn.innerHTML = `<span>${label}</span><span class="ov-btn-arrow">${SVG.arrow}</span>`
             btn.disabled = !this.worldReady
         }
-        this.portal?.classList.toggle('is-armed', this.worldReady)
     }
 
     _explore() {
