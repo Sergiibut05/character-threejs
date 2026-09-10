@@ -400,10 +400,36 @@ export default class Experience {
         await this.world.build()
         this.loadSpy?.mark('mundo construido (tras el boton)')
 
+        // And wait for him to be STANDING before anything opens.
+        //
+        // The character's physics does not start until the patio's colliders
+        // exist -- otherwise the capsule spawns into half a floor and sinks --
+        // and until it starts he has no final position. Opening onto that is
+        // what put him a little off, mid-settle, in the first frames.
+        await this._waitForCharacterPhysics()
+        this._settleCharacter()
+        this.loadSpy?.mark('personaje de pie')
+
         this.ready = true
         this.renderer.setIrisTransitionEnabled(true)
         this.renderer.setIrisTransitionSize(0.0)
         await this.warmUpBehindIris()
+
+        // Put the camera exactly where it belongs, in one step, while the
+        // screen is still black.
+        //
+        // It starts at its constructor pose looking at the origin and eases
+        // toward the character at 0.12 of the gap per frame, so it needed
+        // dozens of frames to arrive -- and the iris started opening after
+        // about twenty of them. The first thing you saw through the hole was
+        // the tail of that approach: the camera still sliding into place and
+        // the character drifting under it. setMode('follow') is the snap that
+        // already existed for coming back from a focused view; it lands
+        // smoothPosition and smoothLookAt on him outright, and the update()
+        // after it writes that to the lens so the very first visible frame is
+        // the settled one.
+        this.camera.setMode('follow')
+        this.camera.update()
 
         // Hand over. The iris underneath is already solid black, so the mark
         // simply fades out over it and the hole opens in the same black --
@@ -452,6 +478,64 @@ export default class Experience {
 
     waitMs(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms))
+    }
+
+    /**
+     * Let him fall the last 32 cm here, where nobody is looking.
+     *
+     * He is spawned deliberately above the ground (spawnOffsetY = 0.32) so the
+     * capsule cannot start inside it, and then he drops. That drop used to
+     * happen during the iris opening, because the tick loop is gated while the
+     * screen is covered and this is the only thing that steps the physics --
+     * so the first thing through the hole was a character settling into place
+     * with the camera chasing him down. About a quarter of a second of it.
+     *
+     * Only the two things that make him fall are stepped, not the whole world:
+     * this runs on a phone too, and the raycaster and the minigames have
+     * nothing to contribute to a capsule finding the floor.
+     *
+     * The delta is pinned rather than borrowed from the last real frame, which
+     * after the boot screen's work could be anything at all.
+     */
+    _settleCharacter(maxFrames = 80) {
+        const character = this.world?.character
+        if (!character?.rigidBody || !this.world.physics?.world) return
+
+        const realDelta = this.time.delta
+        this.time.delta = 16
+        let still = 0
+        for (let i = 0; i < maxFrames; i++) {
+            const before = character.position.y
+            character.update()
+            this.world.physics.update(0.016)
+            if (character.isGrounded && Math.abs(character.position.y - before) < 0.001) {
+                if (++still >= 3) break
+            } else {
+                still = 0
+            }
+        }
+        this.time.delta = realDelta
+    }
+
+    /**
+     * Resolve once the character is standing on real ground.
+     *
+     * Bounded, and it gives up rather than trapping anyone behind the boot
+     * screen: Character has its own 15 s fallback that starts the physics
+     * anyway, so the worst case here is entering a moment early, which is
+     * where we were before.
+     */
+    _waitForCharacterPhysics(timeoutMs = 8000) {
+        const character = this.world?.character
+        if (!character || character.rigidBody) return Promise.resolve()
+        return new Promise((resolve) => {
+            let done = false
+            const go = () => { if (!done) { done = true; resolve() } }
+            // Character subscribed to this first, in its constructor, so by the
+            // time this runs setPhysics() has already placed him.
+            this.resources.on('patioCollidersReady', go)
+            setTimeout(go, timeoutMs)
+        })
     }
 
     /**
