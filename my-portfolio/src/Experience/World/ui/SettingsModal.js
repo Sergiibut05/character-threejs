@@ -62,8 +62,20 @@ export default class SettingsModal {
         this.modal.append(this.nav)
         this.modal.append(this.content)
 
+        // Three tabs, each about ONE thing.
+        //
+        // It used to be General / Efectos / Controles, and the split did not
+        // survive being read: General held quality, the music player, the
+        // language and the server status -- four unrelated things -- while a
+        // whole tab next to it held a single slider for sound effects. So the
+        // two halves of "audio" sat on opposite sides of the modal, and the
+        // tab that looked biggest was the one with the least in it.
+        //
+        // Now the audio lives together and General keeps what is actually
+        // general. The id stays 'sfx' so anything deep-linking to that tab
+        // still lands on it.
         this._registerSection({ id: 'general', label: t('settings.tabGeneral'), build: (c) => this._buildGeneral(c) })
-        this._registerSection({ id: 'sfx', label: t('settings.tabSfx'), build: (c) => this._buildSfx(c) })
+        this._registerSection({ id: 'sfx', label: t('settings.tabSound'), build: (c) => this._buildAudio(c) })
         this._registerSection({ id: 'controls', label: t('settings.tabControls'), build: (c) => this._buildControls(c) })
 
         // Keep the quality cards in sync with external changes.
@@ -102,7 +114,7 @@ export default class SettingsModal {
     /** Re-read every string from the catalog. Safe to call when closed. */
     _relabel() {
         this.modal.setTitle(t('settings.title'))
-        const labels = [t('settings.tabGeneral'), t('settings.tabSfx'), t('settings.tabControls')]
+        const labels = [t('settings.tabGeneral'), t('settings.tabSound'), t('settings.tabControls')]
         for (let i = 0; i < this.nav.children.length; i++) {
             if (labels[i]) this.nav.children[i].textContent = labels[i]
         }
@@ -118,15 +130,26 @@ export default class SettingsModal {
         this.sections[i].build(this.content)
     }
 
-    // ─── General section (Calidad + Sonido + Conexión) ───────────────────
+    // ─── General (calidad, idioma, conexión) ─────────────────────────────
+    //
+    // Ordered by how much of the experience each one changes, and by whether
+    // it is a control at all. Quality is the loudest switch in here and the
+    // most likely reason anyone opened this modal, so it goes first. Language
+    // is a preference: set once, rarely returned to. Connection is not a
+    // setting at all -- it is a read-only status -- so it goes last, where
+    // nothing that follows it is waiting to be clicked.
     _buildGeneral(container) {
-        const qHead = _el('div', 'fz-sound-heading')
-        qHead.textContent = t('settings.quality')
-        container.appendChild(qHead)
         this._buildQuality(container)
-        this._buildSound(container)
         this._buildLanguage(container)
         this._buildConnection(container)
+    }
+
+    // ─── Sonido (música + efectos) ───────────────────────────────────────
+    // The music player first: it is the one with something to look at, and
+    // the one people come here to use. The effects slider under it.
+    _buildAudio(container) {
+        this._buildSound(container)
+        this._buildSfx(container)
     }
 
     // ─── Conexión (leaderboard server status) ────────────────────────────
@@ -200,6 +223,15 @@ export default class SettingsModal {
     }
 
     _buildQuality(container) {
+        // Wrapped and headed like every other block in the modal. It used to
+        // be the exception -- a bare grid with a heading appended next to it
+        // by the caller -- which is why it sat tighter against what followed
+        // than the sections below did against each other.
+        const wrap = _el('div', 'fz-sound')
+        const heading = _el('div', 'fz-sound-heading')
+        heading.textContent = t('settings.quality')
+        wrap.appendChild(heading)
+
         const grid = _el('div', 'fz-cards')
         const make = (level, icon, title, desc) => {
             const card = createModeCard({ icon, title, desc, onSelect: () => this.quality.setLevel(level) })
@@ -208,18 +240,21 @@ export default class SettingsModal {
         }
         make(0, iconScenery, t('settings.qualityHigh'), t('settings.qualityHighDesc'))
         make(1, iconBolt, t('settings.qualityLight'), t('settings.qualityLightDesc'))
-        container.appendChild(grid)
+        wrap.appendChild(grid)
+        container.appendChild(wrap)
         this._syncQuality()
     }
 
-    // ─── Sonido sub-section ──────────────────────────────────────────────
+    // ─── Música sub-section ──────────────────────────────────────────────
     _buildSound(container) {
         const audio = this.experience.audio
         if (!audio) return
 
         const wrap = _el('div', 'fz-sound')
         const heading = _el('div', 'fz-sound-heading')
-        heading.textContent = t('settings.sound')
+        // "Música", not "Sonido": it shares a tab with the effects now, and
+        // a block called Sonido sitting inside a tab called Sonido says nothing.
+        heading.textContent = t('settings.music')
         wrap.appendChild(heading)
 
         // Now-playing preview card
