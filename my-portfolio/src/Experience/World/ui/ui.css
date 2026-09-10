@@ -365,17 +365,20 @@
     display: grid;
     place-items: center;
     border-radius: 50%;
-    border: 1.5px solid rgba(120, 185, 150, 0.42);
-    background: rgba(255, 255, 255, 0.6);
+    border: 1.5px solid var(--fz-fab-border);
+    background: var(--fz-fab-surface);
     color: var(--fz-ink);
     cursor: pointer;
-    box-shadow: var(--fz-shadow-soft);
-    backdrop-filter: blur(9px);
-    -webkit-backdrop-filter: blur(9px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        var(--fz-fab-lip),
+        var(--fz-fab-edge),
+        var(--fz-fab-cast);
     opacity: 0;
     transform: translateY(-6px);
     pointer-events: none;
-    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1.2, 0.36, 1),
+    transition: opacity 0.26s ease, transform 0.26s var(--fz-fab-ease),
+        box-shadow 0.2s var(--fz-fab-ease),
         background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
@@ -387,10 +390,27 @@
 
 /* Same fix as .fz-hud-help:hover — the red tint composited over white
    instead of a 14% wash that made the button more see-through than at rest. */
+/* The one button here that is not mint: leaving is the destructive action, so
+   it warms to red as you reach for it while keeping the same physical body. */
 .fz-hud-leave:hover {
-    background: rgba(255, 236, 236, 0.94);
-    border-color: rgba(255, 120, 120, 0.5);
+    background: linear-gradient(178deg, #ffffff 0%, #fff1f1 52%, #ffe3e3 100%);
+    border-color: rgba(255, 130, 130, 0.7);
     color: var(--fz-red);
+    transform: translateY(-2px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        inset 0 -3px 0 rgba(230, 120, 120, 0.22),
+        0 5px 0 rgba(206, 96, 96, 0.30),
+        0 12px 24px rgba(120, 40, 40, 0.20), 0 24px 46px rgba(120, 40, 40, 0.10);
+}
+
+.fz-hud-leave:active {
+    transform: translateY(2px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        inset 0 -3px 0 rgba(230, 120, 120, 0.22),
+        0 1px 0 rgba(206, 96, 96, 0.30),
+        var(--fz-fab-cast);
 }
 
 .fz-hud-leave:focus-visible {
@@ -660,17 +680,20 @@
     display: grid;
     place-items: center;
     border-radius: 50%;
-    border: 1.5px solid rgba(120, 185, 150, 0.42);
-    background: rgba(255, 255, 255, 0.6);
+    border: 1.5px solid var(--fz-fab-border);
+    background: var(--fz-fab-surface);
     color: var(--fz-green-500);
     cursor: pointer;
-    box-shadow: var(--fz-shadow-soft);
-    backdrop-filter: blur(9px);
-    -webkit-backdrop-filter: blur(9px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        var(--fz-fab-lip),
+        var(--fz-fab-edge),
+        var(--fz-fab-cast);
     opacity: 0;
     transform: translateY(-6px) scale(0.9);
     pointer-events: none;
-    transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1.2, 0.36, 1),
+    transition: opacity 0.22s ease, transform 0.22s var(--fz-fab-ease),
+        box-shadow 0.2s var(--fz-fab-ease),
         background 0.16s ease, border-color 0.16s ease;
 }
 
@@ -683,8 +706,23 @@
 /* Opaque, not a 16% tint over a 60% rest state — that made hover fade the
    button into the scene rather than light it up. Same mint, composited. */
 .fz-hud-help:hover {
-    background: rgba(226, 245, 236, 0.94);
-    border-color: var(--fz-green-400);
+    background: var(--fz-fab-surface-hot);
+    border-color: rgba(95, 185, 143, 0.75);
+    transform: translateY(-2px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        var(--fz-fab-lip),
+        var(--fz-fab-edge-hot),
+        var(--fz-fab-cast-hot);
+}
+
+.fz-hud-help:active {
+    transform: translateY(2px);
+    box-shadow:
+        var(--fz-fab-gloss),
+        var(--fz-fab-lip),
+        var(--fz-fab-edge-press),
+        var(--fz-fab-cast);
 }
 
 .fz-hud-help:focus-visible {

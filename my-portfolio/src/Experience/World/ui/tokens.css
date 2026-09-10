@@ -41,6 +41,45 @@
 
        So the geometry lives in one place now and every button takes a SLOT
        off it instead of hardcoding a top. Slot n = top + n * step. */
+    /* ── What a round button is MADE OF ──────────────────────────────
+       Every one of these used to be the same flat disc: 60% white with a
+       backdrop blur behind it and a hairline round the edge. Correct, legible,
+       and completely inert -- it read as a system chip dropped on top of the
+       island rather than as a thing belonging to it, and next to the chunky
+       pastel world it looked unfinished.
+
+       What replaced it is a physical object. Four of these values do that
+       work, and each earns its place:
+
+         GLOSS  a bright inset line along the top edge. One line, and the flat
+                disc becomes a curved, glazed surface catching the light.
+         LIP    an inset shade along the bottom, which is the same curve on the
+                far side -- without it the gloss reads as a scratch.
+         EDGE   a hard, un-blurred drop shadow of a few pixels. This is the
+                one that does the most: a shadow with no blur is not a shadow,
+                it is the button's own THICKNESS, so the thing stops being
+                printed on the screen and starts sitting above it.
+         CAST   the actual soft shadow, wide and faint, for the ground.
+
+       And the press comes for free: move the button down by EDGE's height and
+       shrink EDGE to nothing, and it has physically compressed. Nothing else
+       needs to animate.
+
+       The blur is gone on purpose. The surface is now near-opaque so it was
+       buying nothing visible, while costing a re-blur of everything behind it
+       on every frame -- over a moving 3D scene, on a phone. */
+    --fz-fab-surface: linear-gradient(178deg, #ffffff 0%, #f2fbf6 52%, #e6f6ee 100%);
+    --fz-fab-surface-hot: linear-gradient(178deg, #ffffff 0%, #eafaf1 45%, #d8f3e6 100%);
+    --fz-fab-border: rgba(95, 185, 143, 0.55);
+    --fz-fab-gloss: inset 0 1.5px 0 rgba(255, 255, 255, 0.95);
+    --fz-fab-lip: inset 0 -3px 0 rgba(86, 172, 132, 0.22);
+    --fz-fab-edge: 0 3px 0 rgba(64, 148, 108, 0.30);
+    --fz-fab-edge-hot: 0 5px 0 rgba(64, 148, 108, 0.34);
+    --fz-fab-edge-press: 0 1px 0 rgba(64, 148, 108, 0.30);
+    --fz-fab-cast: 0 8px 18px rgba(26, 76, 56, 0.18), 0 18px 36px rgba(26, 76, 56, 0.10);
+    --fz-fab-cast-hot: 0 12px 24px rgba(26, 76, 56, 0.22), 0 24px 46px rgba(26, 76, 56, 0.12);
+    --fz-fab-ease: cubic-bezier(0.22, 1.4, 0.36, 1);
+
     --fz-fab-size: 44px;
     --fz-fab-step: 56px;   /* the button plus a 12px gap */
     --fz-fab-top: max(18px, env(safe-area-inset-top, 0px));

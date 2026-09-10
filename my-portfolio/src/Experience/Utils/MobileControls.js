@@ -1,6 +1,11 @@
 import nipplejs from 'nipplejs'
 
-// Shared button look — rounded glass, soft shadow (matches the game UI).
+// Shared button look. Only the geometry lives here now -- the MATERIAL is in
+// style.css under .mc-btn, so these thumb buttons are made of exactly the same
+// thing as every other round button in the game instead of being a second,
+// slightly different answer to the same question. The blur is gone with it:
+// it sat over a moving 3D scene and re-blurred every frame, on a phone, behind
+// a surface that is opaque enough for it never to have shown.
 const BTN_BASE_CSS = `
     width: 64px;
     height: 64px;
@@ -10,10 +15,6 @@ const BTN_BASE_CSS = `
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 8px 18px rgba(39, 90, 70, 0.18);
-    transition: transform 0.14s ease, filter 0.14s ease;
 `
 
 const ICON_RUN = `
@@ -176,7 +177,12 @@ export default class MobileControls
             size: 120,
             threshold: 0.1,
             fadeTime: 200,
-            restOpacity: 0.5
+            // 0.5 was fine when the stick was two flat circles -- there was
+            // nothing there to dim. Now that it is a dish with a rim and a
+            // glazed thumb, halving its opacity at rest sands all of that off
+            // and it reads as washed out until you touch it. High enough to
+            // stay an object, low enough to stay out of the way.
+            restOpacity: 0.85
         })
 
         // Handle joystick events
@@ -256,38 +262,42 @@ export default class MobileControls
         // Sprint button (secondary, glass-pastel) — a "dash" icon.
         this.button1 = document.createElement('button')
         this.button1.id = 'action-button-1'
+        this.button1.className = 'mc-btn mc-btn--ghost'
         this.button1.setAttribute('aria-label', 'Correr')
         this.button1.innerHTML = ICON_RUN
-        this.button1.style.cssText = BTN_BASE_CSS + `
-            background: rgba(255, 255, 255, 0.55);
-            border: 2px solid rgba(120, 185, 150, 0.5);
-            color: #234b3a;
-        `
+        this.button1.style.cssText = BTN_BASE_CSS
 
         // Primary action button (filled green). Context-aware icon: a generic
         // "interact" in the world, the frisbee disc inside the minigame.
         this.button2 = document.createElement('button')
         this.button2.id = 'action-button-2'
+        this.button2.className = 'mc-btn mc-btn--primary'
         this.button2.setAttribute('aria-label', 'Acción')
         this.button2.innerHTML = ICON_INTERACT
-        this.button2.style.cssText = BTN_BASE_CSS + `
-            background: linear-gradient(168deg, #5fc594, #41a06e);
-            border: 2px solid rgba(255, 255, 255, 0.7);
-            color: #fff;
-        `
+        this.button2.style.cssText = BTN_BASE_CSS
 
+        // A CLASS, not inline styles. The pressed look is part of the
+        // button's material and belongs next to the rest of it -- and an
+        // inline transform written here would win against that material's own
+        // :active rule, so the two would have been fighting over the same
+        // property from different files.
         const press = (btn, key) => {
             btn.addEventListener('touchstart', (e) => {
                 e.preventDefault()
                 this.actions[key] = true
-                btn.style.transform = 'scale(0.9)'
-                btn.style.filter = 'brightness(1.08)'
+                btn.classList.add('is-pressed')
             })
             btn.addEventListener('touchend', (e) => {
                 e.preventDefault()
                 this.actions[key] = false
-                btn.style.transform = 'scale(1)'
-                btn.style.filter = 'none'
+                btn.classList.remove('is-pressed')
+            })
+            // A finger that slides off the button never fires touchend on it,
+            // and the button stayed lit and stayed DOWN for the rest of the
+            // session. Both of these are the same fix.
+            btn.addEventListener('touchcancel', () => {
+                this.actions[key] = false
+                btn.classList.remove('is-pressed')
             })
         }
         press(this.button1, 'button1')
