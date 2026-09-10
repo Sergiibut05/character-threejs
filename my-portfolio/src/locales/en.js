@@ -38,7 +38,7 @@ export default {
             title: 'About me',
             story: [
                 'I finished my higher diploma in **Multiplatform App Development** ' +
-                'at Málaga TechPark. I did the dual-track half at **Aliqindoi**, ' +
+                'at Málaga TechPark. I did my internship at **Aliqindoi**, ' +
                 'working on the company\'s real projects.',
 
                 'I am comfortable on both the **frontend and the backend**, and I ' +
@@ -199,8 +199,8 @@ export default {
             'are what I am drawn to: this 3D world is one of them.',
         fullBio: [
             'I work with **Angular, TypeScript and Kotlin**, and I am as comfortable ' +
-            'on the frontend as on the backend. I did the **dual-track half** of my ' +
-            'diploma at Aliqindoi, on the company\'s real projects from day one.',
+            'on the frontend as on the backend. I did my **internship** at ' +
+            'Aliqindoi, on the company\'s real projects from day one.',
             'I speak **Spanish and Ukrainian** natively, and hold a Cambridge-certified ' +
             '**C1 in English** (CAE, 190 points).',
             'I like **finishing things properly**: deployed, working and actually ' +
