@@ -29,8 +29,8 @@ export default {
 
         hero: {
             role: 'Desarrollador web y móvil · Málaga',
-            lede: 'Titulado en Desarrollo de Aplicaciones Multiplataforma, con 2 ' +
-                'estancias de prácticas en empresa desarrollando web y móvil. ' +
+            lede: 'Titulado en Desarrollo de Aplicaciones Multiplataforma, con ' +
+                'estancia de prácticas en empresa desarrollando web y móvil. ' +
                 'Trabajo con Angular, TypeScript y Kotlin, y busco mi primer ' +
                 'puesto a jornada completa.',
             enter: 'Entrar al mundo',
@@ -42,15 +42,15 @@ export default {
         about: {
             title: 'Sobre mí',
             story: [
-                'Terminé el grado superior de Desarrollo de Aplicaciones ' +
-                'Multiplataforma en el Parque Tecnológico de Málaga. La parte ' +
-                'dual la hice en Aliqindoi, donde trabajé en proyectos reales de ' +
-                'la empresa durante dos estancias.',
+                'Terminé el grado superior de **Desarrollo de Aplicaciones ' +
+                'Multiplataforma** en el Parque Tecnológico de Málaga. La parte ' +
+                'dual la hice en **Aliqindoi**, trabajando en proyectos reales ' +
+                'de la empresa.',
 
-                'Me manejo tanto en frontend como en backend, y me gusta rematar ' +
-                'las cosas: que se desplieguen, que funcionen y que se puedan ' +
-                'usar. Fuera del trabajo suelo estar aprendiendo algo nuevo, casi ' +
-                'siempre relacionado con gráficos o desarrollo de videojuegos.'
+                'Me manejo tanto en **frontend como en backend**, y me gusta ' +
+                '**rematar las cosas**: que se desplieguen, que funcionen y que ' +
+                'se puedan usar. Fuera del trabajo suelo estar aprendiendo algo ' +
+                'nuevo, casi siempre gráficos o desarrollo de videojuegos.'
             ],
             langsLabel: 'Idiomas',
             langsValue: 'Español y ucraniano nativos · Inglés C1 (Cambridge)',
@@ -247,14 +247,14 @@ export default {
             devicePad: 'Mando',
             deviceTouch: 'Táctil',
             tabGeneral: 'General',
-            tabSfx: 'Efectos',
+            tabSound: 'Sonido',
             tabControls: 'Controles',
             quality: 'Calidad',
             qualityHigh: 'Alta',
             qualityHighDesc: 'Máxima calidad visual',
             qualityLight: 'Ligera',
             qualityLightDesc: 'Mejor rendimiento',
-            sound: 'Sonido',
+            music: 'Música',
             noMusic: 'Sin música',
             prevTrack: 'Canción anterior',
             nextTrack: 'Siguiente canción',

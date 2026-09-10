@@ -24,8 +24,8 @@ export default {
 
         hero: {
             role: 'Web & mobile developer · Málaga, Spain',
-            lede: 'Qualified in Multiplatform App Development, with 2 company ' +
-                'internships building web and mobile. I work with Angular, ' +
+            lede: 'Qualified in Multiplatform App Development, with a company ' +
+                'internship building web and mobile. I work with Angular, ' +
                 'TypeScript and Kotlin, and I am looking for my first full-time ' +
                 'role.',
             enter: 'Enter the world',
@@ -37,14 +37,14 @@ export default {
         about: {
             title: 'About me',
             story: [
-                'I finished my higher diploma in Multiplatform App Development at ' +
-                'Málaga TechPark. I did the dual-track half at Aliqindoi, working ' +
-                'on the company\'s real projects across two placements.',
+                'I finished my higher diploma in **Multiplatform App Development** ' +
+                'at Málaga TechPark. I did the dual-track half at **Aliqindoi**, ' +
+                'working on the company\'s real projects.',
 
-                'I am comfortable on both the frontend and the backend, and I like ' +
-                'finishing things properly: deployed, working and actually usable. ' +
-                'Outside work I am usually learning something new, generally around ' +
-                'graphics or game development.'
+                'I am comfortable on both the **frontend and the backend**, and I ' +
+                'like **finishing things properly**: deployed, working and actually ' +
+                'usable. Outside work I am usually learning something new, ' +
+                'generally graphics or game development.'
             ],
             langsLabel: 'Languages',
             langsValue: 'Native Spanish and Ukrainian · English C1 (Cambridge)',
@@ -89,7 +89,7 @@ export default {
                         'node and every JOIN a cable routed at right angles between them.',
                         '**Two parsers, not one**: node-sql-parser handles it in the browser ' +
                         'and falls back to a Python sqlglot service only when a dialect ' +
-                        'defeats it — so the common case never pays for a round trip.',
+                        'defeats it. The common case never pays for a round trip.',
                         'A guided demo that **grows an e-commerce query step by step**, from ' +
                         'a single table to six JOINs and subqueries, so you can watch the ' +
                         'diagram react.',
@@ -101,8 +101,8 @@ export default {
                 volumine: {
                     tagline: '3D charts you embed anywhere with a link',
                     highlights: [
-                        'Six chart types in **three.js with hand-built geometry** — bevelled ' +
-                        'edges, real shadows and studio lighting — and no 3D charting ' +
+                        'Six chart types in **three.js with hand-built geometry**: bevelled ' +
+                        'edges, real shadows and studio lighting, and no 3D charting ' +
                         'library anywhere.',
                         '**The whole config travels inside the URL**, compressed, so a shared ' +
                         'chart needs no database at all: the free tier and the developer API ' +
@@ -194,20 +194,18 @@ export default {
        overview.* and are shared, not duplicated. */
     profile: {
         quickBio:
-            'Qualified in Multiplatform App Development (DAM) at Málaga TechPark. ' +
-            'I build web and mobile applications, and I love making interactive ' +
-            'experiences — like this 3D world you are walking around.',
+            'Qualified in **Multiplatform App Development** at Málaga TechPark. ' +
+            'I build **web and mobile** applications, and interactive experiences ' +
+            'are what I am drawn to: this 3D world is one of them.',
         fullBio: [
-            'I trained in the core technologies of web and mobile development: Java, ' +
-            'JavaScript, TypeScript and Kotlin as languages, with Angular, Ionic and ' +
-            'Android Studio as working environments, plus experience in relational ' +
-            '(MySQL) and non-relational (Firebase) databases. I did the dual-track ' +
-            'half at Aliqindoi, working on real projects from day one.',
-            'I hold a Cambridge-certified C1 in English (CAE, 190 points), speak ' +
-            'Ukrainian natively and Spanish as my mother tongue. I would describe ' +
-            'myself as curious, hard-working and always learning: I am driven by new ' +
-            'challenges, by working in a team, and by building things people enjoy ' +
-            'using.'
+            'I work with **Angular, TypeScript and Kotlin**, and I am as comfortable ' +
+            'on the frontend as on the backend. I did the **dual-track half** of my ' +
+            'diploma at Aliqindoi, on the company\'s real projects from day one.',
+            'I speak **Spanish and Ukrainian** natively, and hold a Cambridge-certified ' +
+            '**C1 in English** (CAE, 190 points).',
+            'I like **finishing things properly**: deployed, working and actually ' +
+            'usable. Outside work I am usually learning something new, generally ' +
+            'graphics or game development.'
         ],
 
         spokenGroup: 'Spoken languages',
@@ -218,9 +216,9 @@ export default {
             'straight in your browser. Here is what is under the hood.',
         btsBodies: [
             'Everything you see is drawn with Three.js, a library that talks directly ' +
-            'to your graphics card. The effects — the water, the fire, the swaying ' +
-            'grass — are made with TSL, a modern way of writing them in JavaScript ' +
-            'instead of the specialised code it used to take.',
+            'to your graphics card. The water, the fire and the swaying grass are made ' +
+            'with TSL, a modern way of writing them in JavaScript instead of the ' +
+            'specialised code it used to take.',
             'A physics engine is what lets the character walk, climb steps and not ' +
             'wander through walls.',
             'The music rotates between tracks with soft crossfades, and the sound ' +
@@ -259,8 +257,8 @@ export default {
 
         creditsTitle: 'Thanks',
         creditsBody:
-            'To Bruno Simon, for Three.js Journey — where I learnt much of what makes ' +
-            'this world work — and for his portfolio, the great inspiration behind ' +
+            'To Bruno Simon, for Three.js Journey, where I learnt much of what makes ' +
+            'this world work, and for his portfolio, the great inspiration behind ' +
             'this one. And to Isa Lousberg, for her beautiful low-poly models.'
     },
 
@@ -399,14 +397,14 @@ export default {
             devicePad: 'Gamepad',
             deviceTouch: 'Touch',
             tabGeneral: 'General',
-            tabSfx: 'Effects',
+            tabSound: 'Sound',
             tabControls: 'Controls',
             quality: 'Quality',
             qualityHigh: 'High',
             qualityHighDesc: 'Best it looks',
             qualityLight: 'Light',
             qualityLightDesc: 'Best it runs',
-            sound: 'Sound',
+            music: 'Music',
             noMusic: 'No music',
             prevTrack: 'Previous track',
             nextTrack: 'Next track',

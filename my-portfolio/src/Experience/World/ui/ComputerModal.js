@@ -2,6 +2,7 @@ import './profile.css'
 import Modal from './Modal.js'
 import { LINKS } from './profileData.js'
 import { getProfile } from './profileContent.js'
+import { richText } from './overviewContent.js'
 import { iconGithub, iconLinkedin, iconMail } from './icons.js'
 import { t } from '../../Utils/gameText.js'
 
@@ -104,10 +105,12 @@ export default class ComputerModal {
     // ─── Behind the scenes (fluid editorial flow) ────────────────────────
     _buildBts() {
         const { bts } = getProfile()
-        const intro = _el('p', 'fz-bts-intro')
-        intro.textContent = bts.intro
-        this.content.appendChild(intro)
 
+        // No intro paragraph. It said the tab was going to explain how the
+        // world is built, which is what the tab is called -- so it delayed the
+        // six sections that actually do the explaining by a paragraph of
+        // throat-clearing. `bts.intro` is still resolved for anyone who wants
+        // it back; nothing here reads it.
         for (const item of bts.sections) {
             this.content.appendChild(_btsSection(item))
         }
@@ -141,9 +144,17 @@ export default class ComputerModal {
         this.content.appendChild(h)
     }
 
+    /**
+     * Body copy, with the project's `**bold**` convention honoured.
+     *
+     * It was textContent, so the asterisks would have rendered literally and
+     * there was no way to emphasise anything -- which is half of why these
+     * paragraphs read as a wall. richText() escapes first and only then turns
+     * the markers into <strong>, so the copy still cannot inject markup.
+     */
     _paragraph(text) {
         const p = _el('p', 'fz-profile-text')
-        p.textContent = text
+        p.innerHTML = richText(text)
         this.content.appendChild(p)
     }
 

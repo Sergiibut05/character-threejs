@@ -115,15 +115,30 @@ a.fz-cert:focus-visible {
     border-radius: 2px;
 }
 
+/* WEIGHT 400, NOT 600 -- this is the whole reason this text was a slog.
+   Every word of the bio was set in semibold, which is heading weight. Set a
+   whole paragraph in it and nothing can stand out from anything else, because
+   there is nothing lighter for it to stand out FROM: the eye gets no rhythm,
+   finds no way in, and the page reads as one grey brick. It also left the
+   <strong> in these paragraphs with nowhere to go.
+   Body copy is 400. Bold is what 600 is for. */
 .fz-profile-text {
     font-family: var(--fz-font-body);
-    font-size: 17.5px;
-    font-weight: 600;
-    line-height: 1.65;
+    font-size: 17px;
+    font-weight: 400;
+    /* A touch looser: long measures need more air, and this one is not short. */
+    line-height: 1.72;
     color: var(--fz-ink);
 }
 
-.fz-profile-text + .fz-profile-text { margin-top: 10px; }
+.fz-profile-text strong {
+    font-weight: 700;
+    color: var(--fz-green-500);
+}
+
+/* 10px between paragraphs at this line height reads as one block with an
+   accident in it. A full line's worth is what makes them separate thoughts. */
+.fz-profile-text + .fz-profile-text { margin-top: 16px; }
 
 /* Social links row */
 .fz-profile-links {

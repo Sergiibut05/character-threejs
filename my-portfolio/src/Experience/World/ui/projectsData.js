@@ -37,7 +37,7 @@ export const PROJECTS = [
         // Wider crop, reads better as the overview's single hero image.
         overviewImage: '/models/carts/page2b.webp',
         highlights: [
-            'Seis tipos de gráfica en **three.js con geometría propia** —canto biselado, sombra real y luz de estudio—, sin ninguna librería de gráficas 3D.',
+            'Seis tipos de gráfica en **three.js con geometría propia**: canto biselado, sombra real y luz de estudio, sin ninguna librería de gráficas 3D.',
             '**La configuración entera viaja dentro de la URL** comprimida, así que una gráfica compartida no necesita base de datos: el plan gratuito y la API para desarrolladores salen de la misma decisión.',
             'La ruta del embed es **sagrada**: cero cookies, cero peticiones a terceros y un presupuesto de 149 KB de JS que **rompe el build** si se pasa.'
         ],
@@ -54,7 +54,7 @@ export const PROJECTS = [
         image2: '/models/carts/page3b.webp',
         highlights: [
             'La consulta se lee y se dibuja **mientras la escribes**: cada tabla es un nodo y cada JOIN un cable enrutado en ángulos rectos entre ellos.',
-            '**Dos parsers, no uno**: node-sql-parser resuelve en el navegador y, cuando un dialecto se le atraganta, cae a un servicio Python con sqlglot — asi el caso comun no paga una ida y vuelta al servidor.',
+            '**Dos parsers, no uno**: node-sql-parser resuelve en el navegador y, cuando un dialecto se le atraganta, cae a un servicio Python con sqlglot. Así el caso común no paga una ida y vuelta al servidor.',
             'Modo demo guiado que **hace crecer una consulta de e-commerce paso a paso**, de una sola tabla a seis JOINs y subconsultas, para que se vea el diagrama reaccionar.',
             'Cables iluminados por particulas, bloom y viñeteado con **shaders GLSL propios** sobre three.js.'
         ],

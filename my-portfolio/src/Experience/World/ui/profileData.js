@@ -96,21 +96,26 @@ export const CERTIFICATES = [
 ]
 
 // ─── Computer: about ─────────────────────────────────────────────────────
+// Written to be READ, not survived. The rules, since they are easy to lose:
+// short sentences, one idea each; the load-bearing noun in **bold** so the eye
+// has somewhere to land; and no sentence that is really a list wearing a coat.
+// The old first paragraph named ten technologies inside a single sentence --
+// nobody reads that, and the skills section right below already lists them
+// properly.
 export const ABOUT = {
     quickBio:
-        'Titulado en Desarrollo de Aplicaciones Multiplataforma (DAM) por el Parque ' +
-        'Tecnológico de Málaga. Programo aplicaciones web y móviles, y me apasiona crear ' +
-        'experiencias interactivas — como este mundo 3D que estás explorando.',
+        'Titulado en **Desarrollo de Aplicaciones Multiplataforma** por el Parque ' +
+        'Tecnológico de Málaga. Hago aplicaciones **web y móviles**, y me tiran las ' +
+        'experiencias interactivas: este mundo 3D es una de ellas.',
     fullBio: [
-        'Me he formado en las tecnologías clave del desarrollo web y móvil: Java, ' +
-        'JavaScript, TypeScript y Kotlin como lenguajes, con Angular, Ionic y Android Studio ' +
-        'como entornos de trabajo, y experiencia en bases de datos relacionales (MySQL) y ' +
-        'no relacionales (Firebase). La parte de FP Dual la hice en Aliqindoi, trabajando ' +
-        'en proyectos reales desde el primer día.',
-        'Tengo el C1 de inglés certificado por Cambridge (CAE, 190 puntos), hablo ucraniano ' +
-        'a nivel nativo y español como lengua materna. Me considero una persona curiosa, ' +
-        'trabajadora y en aprendizaje constante: me motiva enfrentarme a retos nuevos, ' +
-        'colaborar en equipo y construir cosas que la gente disfrute usando.'
+        'Trabajo con **Angular, TypeScript y Kotlin**, y me muevo igual en el ' +
+        'frontend que en el backend. La parte de **FP Dual** la hice en Aliqindoi, ' +
+        'en proyectos reales de la empresa desde el primer día.',
+        'Hablo **español y ucraniano** como lenguas maternas, y tengo el **C1 de ' +
+        'inglés** certificado por Cambridge (CAE, 190 puntos).',
+        'Me gusta **rematar las cosas**: que se desplieguen, que funcionen y que se ' +
+        'puedan usar. Fuera del trabajo casi siempre ando aprendiendo algo nuevo, ' +
+        'normalmente gráficos o desarrollo de videojuegos.'
     ]
 }
 
@@ -163,9 +168,9 @@ export const BEHIND_THE_SCENES = [
         icon: iconCube,
         title: 'Gráficos: Three.js y TSL',
         body: 'Todo lo que ves se dibuja con Three.js, una librería que habla directamente con ' +
-            'tu tarjeta gráfica. Los efectos — el agua, el fuego, la hierba meciéndose — están ' +
-            'hechos con TSL, una forma moderna de programar esos efectos escribiendo JavaScript ' +
-            'en lugar del código especializado de siempre.'
+            'tu tarjeta gráfica. El agua, el fuego y la hierba meciéndose están hechos con TSL, ' +
+            'una forma moderna de programar esos efectos escribiendo JavaScript en lugar del ' +
+            'código especializado de siempre.'
     },
     {
         icon: iconPhysics,
@@ -203,8 +208,8 @@ export const BEHIND_THE_SCENES = [
 export const BTS_CREDITS = {
     icon: iconHeart,
     title: 'Agradecimientos',
-    body: 'A Bruno Simon, por Three.js Journey — donde aprendí gran parte de lo que hace ' +
-        'funcionar este mundo — y por su portfolio, la gran inspiración detrás de este. ' +
+    body: 'A Bruno Simon, por Three.js Journey, donde aprendí gran parte de lo que hace ' +
+        'funcionar este mundo, y por su portfolio, la gran inspiración detrás de este. ' +
         'Y a Isa Lousberg, por sus preciosos modelos low-poly.',
     links: [
         { label: 'Three.js Journey', url: LINKS.threejsJourney },
