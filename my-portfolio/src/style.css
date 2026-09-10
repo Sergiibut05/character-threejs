@@ -1191,6 +1191,26 @@ body.is-in-world .map-fab
     transform: none;
 }
 
+/* The map was the only button in the set that did not move when you reached
+   for it, and the reason is the rule directly above.
+   `body.is-in-world .map-fab` and `.quality-fab:hover` have the SAME
+   specificity -- a class plus a class, since :hover counts as one -- so the
+   tie is broken by order, and the entrance rule is sixty lines further down.
+   It was quietly winning and setting transform back to none on every hover and
+   every press. Nothing else here has a state rule that also writes transform,
+   which is why nothing else lost the gesture.
+   Restated at the same weight, so the tie is no longer being decided by which
+   one happens to be later in the file. */
+body.is-in-world .map-fab:hover
+{
+    transform: translateY(-2px);
+}
+
+body.is-in-world .map-fab:active
+{
+    transform: translateY(2px);
+}
+
 /* ...except inside a minigame, where it hands slot 1 to the exit button.
    Not merely to stop them overlapping: WorldMap.canOpen() already refuses to
    open while a session is active, so during a game that button was a dead
