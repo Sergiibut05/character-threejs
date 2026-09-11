@@ -15,6 +15,7 @@ import GoalPost from './GoalPost.js'
 import Confetti from './Confetti.js'
 import Ball from './Ball.js'
 import StreetLamps from './StreetLamps.js'
+import HouseWindows from './HouseWindows.js'
 import ScoreboardScreen from './ScoreboardScreen.js'
 import ScoreboardInteractive from './ScoreboardInteractive.js'
 import Ground from './Ground.js'
@@ -204,6 +205,7 @@ export default class World {
         this.confetti = new Confetti()
         this.ball = new Ball()
         this.streetLamps = new StreetLamps() // pole lights (glow + fireflies at night)
+        this.houseWindows = new HouseWindows() // panes: black by day, lit at night
         // Live ranking screens. Both boards ship in InfoBoard.glb: the
         // pitch one ('scoreboard') and the beach one ('scoreboard.001'),
         // each painted with ITS OWN ranking.
@@ -530,6 +532,10 @@ export default class World {
         if (this.confetti) {
             this.confetti.update()
         }
+        if (this.houseWindows) {
+            this.houseWindows.update()
+        }
+
         if (this.streetLamps) {
             this.streetLamps.update()
         }
