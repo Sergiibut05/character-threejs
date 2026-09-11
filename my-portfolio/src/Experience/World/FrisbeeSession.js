@@ -278,7 +278,22 @@ export default class FrisbeeSession {
         if (prompt?.el) prompt.el.style.display = 'none'
 
         // Entry cinematic (pan + dog framing) before the first round.
-        await this._playEntrySequence()
+        //
+        // The thumb controls go away for its duration. There is nothing to
+        // drive during a camera pan, and on a phone the stick and the buttons
+        // sat right across the bottom of the one shot the activity opens with
+        // -- including under the "tap to skip" prompt. A tap anywhere skips it
+        // regardless, so nothing is lost by taking them off the screen.
+        //
+        // In a finally, because the intro has several ways out: skipping it,
+        // and leaving the activity part-way through. Either would otherwise
+        // strand the controls hidden for the rest of the session.
+        this.experience.mobileControls?.setVisible?.(false)
+        try {
+            await this._playEntrySequence()
+        } finally {
+            this.experience.mobileControls?.setVisible?.(true)
+        }
         if (!this.active) return // left during the intro
 
         if (!this.hud) this._buildHud()

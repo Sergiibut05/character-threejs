@@ -341,6 +341,34 @@ export default class MobileControls
         return this.isMobile
     }
 
+    /**
+     * Hide the whole control cluster for a moment -- a cinematic, say, where
+     * there is nothing to drive and the stick would just be sitting on top of
+     * the shot.
+     *
+     * A FLAG, not a direct write to style.display. update() runs every frame
+     * and decides that property from whether a modal is open, so anything set
+     * from outside would be overwritten on the very next frame. This is the
+     * second reason it can be hidden; update() now weighs both.
+     *
+     * Hiding also zeroes the movement, because display:none under a live touch
+     * cancels it without nipplejs ever seeing an 'end' -- and a stale vector
+     * left behind means the character walks off on his own when the controls
+     * come back. Same failure the buttons' touchcancel handler exists for.
+     */
+    setVisible(visible)
+    {
+        this._hidden = !visible
+        if (!visible) {
+            this.movement.x = 0
+            this.movement.y = 0
+            this.movement.angle = 0
+            this.movement.force = 0
+            this.actions.button1 = false
+            this.actions.button2 = false
+        }
+    }
+
     // Update method (called each frame)
     update()
     {
@@ -348,7 +376,7 @@ export default class MobileControls
         // any modal is open so they don't sit under it (plan §2).
         if (this.container) {
             const modalOpen = !!document.querySelector('.fz-modal-overlay.is-open')
-            const display = modalOpen ? 'none' : ''
+            const display = (this._hidden || modalOpen) ? 'none' : ''
             if (this.container.style.display !== display) {
                 this.container.style.display = display
             }
