@@ -805,6 +805,20 @@
     50% { transform: translate(-50%, -5px); }
 }
 
+/* On a touchscreen this has to clear the thumb controls, which it did not.
+   MobileControls puts the stick 60 px off the bottom and makes it 150 tall, so
+   the tallest thing down there reaches 210 px -- and this prompt sat at 48,
+   straight through the middle of it. The tap still skipped, because the
+   listener is on window in the capture phase and beats the stick to the event,
+   but the two were drawn on top of each other, which reads as a mistake
+   whether or not it behaves like one.
+   228 px clears the stick with room to breathe. */
+@media (hover: none) and (pointer: coarse) {
+    .fz-hint {
+        bottom: max(228px, calc(env(safe-area-inset-bottom) + 228px));
+    }
+}
+
 /* ─── Social area pill (focused network + open glyph) ─────────────────── */
 .fz-social-pill {
     position: fixed;
@@ -1614,7 +1628,7 @@
        thirds down the frame, so this rides just under his feet: you read it
        and he is already in the same glance. Kept as a percentage so it tracks
        him at any window shape instead of drifting with the viewport height. */
-    bottom: max(22vh, calc(env(safe-area-inset-bottom) + 34px));
+    bottom: max(26vh, calc(env(safe-area-inset-bottom) + 34px));
     transform: translate(-50%, 6px);
     z-index: 2400;
     padding: 8px 16px;
