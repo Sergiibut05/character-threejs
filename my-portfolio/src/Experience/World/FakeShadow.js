@@ -52,17 +52,29 @@ export default class FakeShadow {
         this.scene.add(this.characterMesh)
     }
 
-    createTreeShadows(treeRefs, radius = 1.0) {
+    /**
+     * @param {Array<THREE.Object3D>} treeRefs
+     * @param {number} radius
+     * @param {?function(number, number): (number|null)} groundYAt  world height
+     *   under (x, z), or null where it cannot be found. Without it the blob
+     *   lands on the tree's own origin -- see the note in the loop.
+     */
+    createTreeShadows(treeRefs, radius = 1.0, groundYAt = null) {
         if (!treeRefs || treeRefs.length === 0) return
 
         const geo = new THREE.PlaneGeometry(radius * 2, radius * 2)
         geo.rotateX(-Math.PI / 2)
 
+        // Same settings as the character's, deliberately -- this was asked for
+        // as "the shadow he has, a little bigger", and it was not: an extra
+        // opacity 0.7 on top of a texture that only reaches 0.38 alpha left the
+        // tree blobs at about a quarter opacity, faint enough to look like a
+        // smudge on the grass rather than a shadow. Size is the only thing that
+        // differs now.
         const mat = new THREE.MeshBasicMaterial({
             map: this.texture,
             transparent: true,
-            depthWrite: false,
-            opacity: 0.7
+            depthWrite: false
         })
         // No depth write means no say over ambient occlusion -- it abstains
         // rather than overriding what is behind it. See aoMask.js.
@@ -74,13 +86,30 @@ export default class FakeShadow {
 
         const matrix = new THREE.Matrix4()
 
+        let placed = 0
         for (let i = 0; i < treeRefs.length; i++) {
             const ref = treeRefs[i]
             ref.updateWorldMatrix(true, false)
             ref.matrixWorld.decompose(_pos, _quat, _scale)
-            matrix.makeTranslation(_pos.x, _pos.y + 0.02, _pos.z)
+
+            // ON THE GROUND, not on the tree's origin.
+            //
+            // A tree is planted with its origin pushed INTO the terrain so the
+            // trunk does not end in a visible seam -- measured between 8 and 66
+            // cm below the surface. Putting the blob there buries it, and a
+            // buried blob is simply never seen: which is why these existed for
+            // a long time and nobody could point at one.
+            //
+            // Where the height is unknown (trees beyond the collider mesh) it
+            // falls back to the old behaviour rather than guessing an offset.
+            // Guessing would float the shadow under some of them, and a shadow
+            // hovering off the ground is worse than no shadow at all.
+            const ground = groundYAt ? groundYAt(_pos.x, _pos.z) : null
+            if (ground != null) placed++
+            matrix.makeTranslation(_pos.x, (ground ?? _pos.y) + 0.02, _pos.z)
             mesh.setMatrixAt(i, matrix)
         }
+        this.treesPlacedOnGround = (this.treesPlacedOnGround || 0) + placed
 
         mesh.instanceMatrix.needsUpdate = true
         this.scene.add(mesh)

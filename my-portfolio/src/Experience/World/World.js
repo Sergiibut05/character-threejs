@@ -37,6 +37,12 @@ import BeachSession from './BeachSession.js'
 import FrisbeeMinigame from './FrisbeeMinigame.js'
 import FrisbeeSession from './FrisbeeSession.js'
 
+// Radius of the blob under each tree, in world units. The character's is
+// 0.55 and this is deliberately a step above it: same shadow, same soft
+// gradient, just wide enough to read as belonging to something with a
+// canopy rather than to somebody standing there.
+const TREE_SHADOW_RADIUS = 0.8
+
 export default class World {
     constructor() {
         this.experience = new Experience()
@@ -174,11 +180,9 @@ export default class World {
         // Bushes (standalone, ready for future reference models)
         this.bushes = new Bushes()
 
-        // Fake blob shadows: on low quality, and ALSO wherever the real
-        // shadow pipeline is unavailable (Android — see DeviceCaps.js).
-        if (this.experience.quality.isLow || !this.experience.quality.shadowsEnabled) {
-            this.setupFakeShadows()
-        }
+        // Blob shadows. Always built now -- what is INSIDE depends on the
+        // tier. See setupFakeShadows().
+        this.setupFakeShadows()
 
         this.experience.loadSpy?.mark('    mundo: arbustos + sombras')
         // Initialize raycaster for mouse interactions -- and then two dozen
@@ -372,15 +376,114 @@ export default class World {
         }
     }
 
+    /**
+     * Blob shadows, and the two halves are gated differently on purpose.
+     *
+     * THE TREES GET ONE ON EVERY TIER, including high. The sun's shadow map
+     * covers a fixed box around the camera, so a tree far enough out either
+     * falls off the edge of it or lands on texels coarse enough that its
+     * shadow stops being a shadow -- and a tree with nothing under it does not
+     * look like it is standing on the ground, it looks like it is hovering
+     * over it. The blob is what keeps the far half of the island planted.
+     *
+     * Where a real shadow IS being cast the two stack, and that is the one
+     * thing to watch here: if the near trees start reading as too dark, this
+     * is the knob, not the shadow map.
+     *
+     * THE CHARACTER only gets one where there is no real shadow to be had --
+     * low quality, or Android, where the pipeline is off entirely (see
+     * DeviceCaps.js). He is the thing the camera is closest to and the thing
+     * you look at most, so doubling up under him would show.
+     */
     setupFakeShadows() {
         this.fakeShadow = new FakeShadow(this.scene)
 
-        this.fakeShadow.createCharacterShadow(0.55)
+        const quality = this.experience.quality
+        const hasRealShadows = quality.shadowsEnabled && !quality.isLow
+        if (!hasRealShadows) this.fakeShadow.createCharacterShadow(0.55)
 
-        if (this.trees) {
-            for (const tree of this.trees) {
-                this.fakeShadow.createTreeShadows(tree.references, 1.0)
+        // The tree blobs are placed from update(), not from here and not from
+        // 'patioCollidersReady'. That event was the obvious hook and it is the
+        // wrong one: it arrives before Rapier has a world to cast into, so
+        // every ray came back empty and all 302 blobs silently took the
+        // fallback -- which is exactly the bug they were meant to fix, with a
+        // subscription in front of it. Asking each frame until the answer is
+        // usable has no such ordering to get wrong.
+        this._treeShadowTries = 0
+    }
+
+    /**
+     * Drop a blob under every tree, on the ground rather than on its origin.
+     * Called every frame until it succeeds; a no-op afterwards.
+     */
+    _placeTreeShadows() {
+        if (!this.trees || !this.fakeShadow) return
+
+        const groundYAt = this._makeGroundSampler()
+        // Rapier not up yet.
+        if (!groundYAt && this._treeShadowTries++ < 300) return
+
+        // A sampler existing is not the same as the FLOOR existing: the world
+        // can be up while the patio's colliders are still being built a slice
+        // at a time, and then every ray misses. Probing a few trees first
+        // separates "too early" from "these particular trees are past the edge
+        // of the collider mesh", which is a real and permanent answer for
+        // about a quarter of them.
+        if (groundYAt && this._treeShadowTries++ < 300 && !this._anyGroundUnder(groundYAt)) return
+
+        this._treeShadowsPlaced = true
+        for (const tree of this.trees) {
+            this.fakeShadow.createTreeShadows(tree.references, TREE_SHADOW_RADIUS, groundYAt)
+        }
+    }
+
+    /** Does the floor exist yet? Sampled, not assumed. */
+    _anyGroundUnder(groundYAt) {
+        for (const tree of this.trees) {
+            for (let i = 0; i < Math.min(8, tree.references.length); i++) {
+                const ref = tree.references[i]
+                ref.updateWorldMatrix(true, false)
+                const e = ref.matrixWorld.elements
+                if (groundYAt(e[12], e[14]) != null) return true
             }
+        }
+        return false
+    }
+
+    /**
+     * A downward ray that answers "how high is the ground here".
+     *
+     * Rapier rather than THREE.Raycaster, and the gap is not close: the floor
+     * is a single 69,842-triangle mesh, so three would test every one of them
+     * per ray -- around 21 million triangle tests for the island's trees, in
+     * JavaScript, on whatever phone is holding this. Rapier has a BVH over the
+     * same geometry and did all 302 in 1.3 ms.
+     *
+     * The tree colliders have to be excluded explicitly. Each tree carries a
+     * 5-unit capsule standing on its own base, so a ray dropped down the
+     * trunk's exact xz hits the tree before it ever reaches the floor -- it
+     * comes back with the top of the trunk, five metres up, and every blob
+     * ends up in the canopy.
+     */
+    _makeGroundSampler() {
+        const physics = this.physics
+        const RAPIER = physics?.RAPIER
+        if (!RAPIER || !physics.world) return null
+
+        const trunks = new Set()
+        for (const tree of this.trees) {
+            for (const c of tree.colliders || []) trunks.add(c.collider.handle)
+        }
+        const skipTrunks = (collider) => !trunks.has(collider.handle)
+
+        const FROM_Y = 60
+        const MAX_DIST = 200
+        return (x, z) => {
+            const ray = new RAPIER.Ray({ x, y: FROM_Y, z }, { x: 0, y: -1, z: 0 })
+            const hit = physics.world.castRay(
+                ray, MAX_DIST, true, undefined, undefined, undefined, undefined, skipTrunks
+            )
+            return hit ? FROM_Y - hit.timeOfImpact : null
         }
     }
 
@@ -532,6 +635,8 @@ export default class World {
         if (this.confetti) {
             this.confetti.update()
         }
+        if (!this._treeShadowsPlaced) this._placeTreeShadows()
+
         if (this.houseWindows) {
             this.houseWindows.update()
         }
