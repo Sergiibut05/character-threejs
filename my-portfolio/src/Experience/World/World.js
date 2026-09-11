@@ -41,7 +41,7 @@ import FrisbeeSession from './FrisbeeSession.js'
 // 0.55 and this is deliberately a step above it: same shadow, same soft
 // gradient, just wide enough to read as belonging to something with a
 // canopy rather than to somebody standing there.
-const TREE_SHADOW_RADIUS = 0.8
+const TREE_SHADOW_RADIUS = 1.05
 
 export default class World {
     constructor() {
