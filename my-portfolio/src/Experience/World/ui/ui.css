@@ -1607,7 +1607,14 @@
 .fz-movehint {
     position: fixed;
     left: 50%;
-    bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+    /* Up near the character, not down in the gutter.
+       It used to sit 34 px off the bottom edge, which is where a page puts a
+       cookie banner -- far from the thing it is talking about and in the strip
+       the eye has already learnt to skip. The character stands at roughly two
+       thirds down the frame, so this rides just under his feet: you read it
+       and he is already in the same glance. Kept as a percentage so it tracks
+       him at any window shape instead of drifting with the viewport height. */
+    bottom: max(22vh, calc(env(safe-area-inset-bottom) + 34px));
     transform: translate(-50%, 6px);
     z-index: 2400;
     padding: 8px 16px;

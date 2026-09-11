@@ -13,12 +13,23 @@ import { t as tr, onLocaleChange } from '../../Utils/gameText.js'
  * moment this page gets to impress anyone — it covers the island at the exact
  * second it appears, and people close it without reading. So this is not that.
  *
- * It is one quiet line at the bottom of the screen that:
+ * It is one quiet line just under the character that:
  *   - waits until the iris has finished, so it never competes with it,
  *   - says the minimum needed to be unstuck and nothing more,
- *   - LEAVES THE MOMENT ANY KEY IS PRESSED. If the player already knew, they
- *     never really see it; if they did not, it is there until they do,
- *   - gives up on its own after a while, so it can never become furniture.
+ *   - LEAVES WHEN THE CHARACTER ACTUALLY MOVES, and not before.
+ *
+ * That last one used to be "leaves the moment any key is pressed", with a nine
+ * second timeout behind it. Both were wrong for the person this exists for.
+ * Pressing a key is not the same as understanding: someone hunting for the
+ * controls presses something, the only instruction on screen vanishes, and
+ * they are back where they started with no way to ask again. And the timeout
+ * meant the tip could expire while they were still reading it -- the one
+ * visitor who needed it most is the slowest one, and they were the one it
+ * abandoned.
+ *
+ * So the exit condition is now the thing it is teaching. It goes when the
+ * character has covered some ground, which cannot happen by accident and
+ * cannot happen without the lesson having landed.
  *
  * Not shown on touch: the on-screen stick is already visible and says what it
  * is, and a phone screen has no room to spare.
@@ -26,18 +37,21 @@ import { t as tr, onLocaleChange } from '../../Utils/gameText.js'
 export default class MoveHint {
     /**
      * @param {object} [o]
-     * @param {number} [o.delay]    ms to wait before fading in
-     * @param {number} [o.timeout]  ms before it gives up and leaves by itself
+     * @param {number} [o.delay]     ms to wait before fading in
+     * @param {number} [o.distance]  metres the character must cover to dismiss it
      */
     constructor(o = {}) {
         this.delay = o.delay ?? 900
-        this.timeout = o.timeout ?? 9000
+        // Far enough that settling, a nudge from a collider or the last of the
+        // spawn drop cannot spend it; short enough that one step does.
+        this.distance = o.distance ?? 0.6
 
         this.el = null
         this._timers = []
         this._dismissed = false
         this._unsubLocale = null
-        this._onAnyKey = () => this.dismiss()
+        this._origin = null
+        this._onTick = () => this._checkMoved()
         this._onPointer = (e) => { if (e.pointerType === 'touch') this.dismiss() }
     }
 
@@ -56,14 +70,27 @@ export default class MoveHint {
 
         this._unsubLocale = onLocaleChange(() => this._render())
 
-        // Any key at all, not just the movement ones: pressing something and
-        // watching the tip disappear is itself the confirmation that the
-        // keyboard is what drives this.
-        window.addEventListener('keydown', this._onAnyKey, { once: true })
+        // A touch session means the on-screen stick has taken over and this
+        // line is about a keyboard nobody is holding.
         window.addEventListener('pointerdown', this._onPointer)
 
+        // Where he was standing when the tip went up, so "has he moved" is
+        // measured from here rather than from wherever he happens to be.
+        const character = window.experience?.world?.character
+        this._origin = character ? character.position.clone() : null
+        window.experience?.time?.on('tick', this._onTick)
+
         this._timers.push(setTimeout(() => this.el?.classList.add('is-visible'), this.delay))
-        this._timers.push(setTimeout(() => this.dismiss(), this.delay + this.timeout))
+    }
+
+    /** Gone once he has actually walked somewhere. */
+    _checkMoved() {
+        const character = window.experience?.world?.character
+        if (!character) return
+        // Physics starts after this can be built, so the first position worth
+        // measuring from may not have existed yet.
+        if (!this._origin) { this._origin = character.position.clone(); return }
+        if (this._origin.distanceTo(character.position) >= this.distance) this.dismiss()
     }
 
     _render() {
@@ -75,7 +102,7 @@ export default class MoveHint {
         if (this._dismissed) return
         this._dismissed = true
 
-        window.removeEventListener('keydown', this._onAnyKey)
+        window.experience?.time?.off('tick', this._onTick)
         window.removeEventListener('pointerdown', this._onPointer)
         this._unsubLocale?.()
         this._unsubLocale = null
