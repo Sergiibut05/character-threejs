@@ -888,9 +888,22 @@ export default class Environment {
         if (this._forceClouds) return 1
         if (!this.experience.quality.isHigh) return 0
         const world = this.experience.world
+
+        // The SESSION, not just the minigame's state.
+        //
+        // The frisbee's own state stays 'idle' through the whole entry
+        // cinematic -- it only advances once the pan is over and you are
+        // actually aiming -- so keying off it alone meant the sky was empty for
+        // the eight seconds the camera spends pointed at it, and the clouds
+        // rolled in afterwards, for the part of the activity where you are
+        // looking at a dog. Exactly backwards. The session goes active before
+        // the opening iris even closes, so by the time the pan starts they have
+        // had their second and a half to ease in behind it.
+        if (world?.frisbeeSession?.active) return 1
+        if (world?.beachSession?.active) return 1
+
         const frisbee = world?.frisbeeMinigame
         if (frisbee && frisbee.state !== 'idle') return 1
-        if (world?.beachSession?.active) return 1
         return 0
     }
 
