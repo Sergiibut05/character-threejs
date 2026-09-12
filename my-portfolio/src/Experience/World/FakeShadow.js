@@ -1,5 +1,26 @@
 import * as THREE from 'three'
 import { ignoreAO } from './aoMask.js'
+import { FX_NO_OCCLUDE_LAYER } from '../Renderer.js'
+
+/**
+ * A blob must never act as an outline occluder.
+ *
+ * The outline pass works out what is hidden by re-rendering the scene through
+ * `scene.overrideMaterial`, which REPLACES every material -- so a transparent
+ * quad with depthWrite:false comes out of that pass as a solid, depth-writing
+ * disc. The blob under the character is 1.1 units across, so standing on the
+ * house's entrance rug punched a hole in the rug's white edge far wider than
+ * his feet: the outline stopped either side of him and picked up again past
+ * the blob. Confirmed by hiding the blob, at which point the edge closes.
+ *
+ * This is the same trap the standing lamp's halo fell into, and the same fix
+ * (see FX_NO_OCCLUDE_LAYER in Renderer.js): on this layer the scene still
+ * draws it and the outline camera does not.
+ *
+ * Only bites on the tiers that HAVE blobs -- low quality, and Android, where
+ * the real shadow pipeline is off entirely.
+ */
+const hideFromOutline = (object) => object.layers.set(FX_NO_OCCLUDE_LAYER)
 
 function createShadowTexture(size = 64) {
     const canvas = document.createElement('canvas')
@@ -49,6 +70,7 @@ export default class FakeShadow {
 
         this.characterMesh = new THREE.Mesh(geo, mat)
         this.characterMesh.renderOrder = -1
+        hideFromOutline(this.characterMesh)
         this.scene.add(this.characterMesh)
     }
 
@@ -112,6 +134,7 @@ export default class FakeShadow {
         this.treesPlacedOnGround = (this.treesPlacedOnGround || 0) + placed
 
         mesh.instanceMatrix.needsUpdate = true
+        hideFromOutline(mesh)
         this.scene.add(mesh)
         this.treeMeshes.push(mesh)
     }
