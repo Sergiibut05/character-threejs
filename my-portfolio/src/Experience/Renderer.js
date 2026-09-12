@@ -446,7 +446,27 @@ export default class Renderer {
         })
 
         const { visibleEdge, hiddenEdge } = outlinePass
-        const occluderCut = hiddenEdge.mul(this.uEdgeSuppress).oneMinus().clamp(0.0, 1.0)
+
+        // The suppressor used to be a straight subtraction --
+        // `1 - hiddenEdge * strength` -- and it never finished the job. Both
+        // fields come out of the SAME half-resolution buffer after the same
+        // blur, so where an occluder crosses the edge the hidden field is
+        // spread thin (measured around 0.05) while the visible field bleeds in
+        // from the unoccluded stretch either side of the occluder at nearly
+        // full strength. Subtracting 0.05 x 1.6 removes 8% of it. Standing on
+        // the entrance rug, its white edge carried straight across the
+        // character's hips and hands; cranking the slider to its 4.0 maximum
+        // barely moved it, which is what gives the game away -- there is
+        // nothing there to scale.
+        //
+        // So: a threshold, not a scale. ANY hidden edge in the neighbourhood
+        // kills the visible one outright. The knee is low because the values
+        // are low, and `uEdgeSuppress` still works as the knob -- it just
+        // moves where the cut lands instead of how deep it goes.
+        const CUT_KNEE = float(0.08)
+        const occluderCut = smoothstep(
+            float(0.0), CUT_KNEE, hiddenEdge.mul(this.uEdgeSuppress)
+        ).oneMinus()
         const outlineColor = visibleEdge.mul(occluderCut).mul(visibleEdgeColor).mul(edgeStrength)
 
         // The outline is UI drawn over the world, so it is added after the
