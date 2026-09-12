@@ -10,6 +10,7 @@ import Experience from '../Experience.js'
 import { fbm, colorRamp } from './TSL/NoiseNodes.js'
 import { dayNightTint } from './DayNight.js'
 import { withAOMask } from './aoMask.js'
+import { FX_NO_OCCLUDE_LAYER } from '../Renderer.js'
 
 export default class Grass {
     constructor(options = {}) {
@@ -314,6 +315,23 @@ export default class Grass {
 
         this.mesh = new THREE.InstancedMesh(this.geometry, this.material, this.count)
         this.mesh.frustumCulled = false
+
+        // Grass must never act as an outline occluder.
+        //
+        // The outline pass re-renders the scene through scene.overrideMaterial,
+        // which throws THIS material away -- and with it every trick that makes
+        // grass look the way it does. In that pass there is no alpha cutout, so
+        // each blade is a solid opaque quad; no view-radius fade, so all 10.000
+        // of them draw out to the horizon; and no cull disc, so the blades that
+        // part around the player's feet are back, at full size, right where his
+        // outline is. The result is a field of invisible depth-writing cards
+        // over the whole lawn, chewing holes out of the outline of anything
+        // standing on it.
+        //
+        // Same fix as the lamp halo and the blob shadows: on this layer the
+        // scene still draws the grass and the outline camera cannot see it.
+        // Nothing else is lost -- grass casts no shadow and is never raycast.
+        this.mesh.layers.set(FX_NO_OCCLUDE_LAYER)
 
         const dummy = new THREE.Object3D()
         const colorVariants = new Float32Array(this.count)
