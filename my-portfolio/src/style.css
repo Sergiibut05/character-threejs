@@ -158,23 +158,35 @@ a
     height: 46px;
     transform: scale(var(--lc-scale, 1));
     will-change: transform;
-    background: #ffffff;
+    /* OPAQUE, with the distance carried by the colour instead of an alpha.
+       These were white at 0.7-0.9 opacity, and once a cycle the moon passes
+       right behind the small one: 30% of a bright white disc came through as
+       a hard-edged circle, which reads as the moon being in FRONT of the
+       cloud. The paint order was never wrong -- the sun/moon pair sits above
+       the sky layers and below the clouds -- the cloud simply was not opaque
+       enough to hide anything behind it.
+       The alpha was doing two jobs, and only one of them was wanted: it tinted
+       the cloud toward whatever sky it crossed, and it made the cloud
+       see-through. --lc-tint keeps the first as a neutral off-white, which
+       recedes against every sky in the cycle rather than just the blue one.
+       Day and sunset are indistinguishable from before; at night the veil over
+       the whole scene does the darkening the alpha used to. */
+    background: var(--lc-tint, #ffffff);
     border-radius: 999px;
-    opacity: 0.9;
     box-shadow: 0 10px 26px rgba(120, 150, 170, 0.16);
 }
 .loading-cloud::before,
 .loading-cloud::after {
     content: '';
     position: absolute;
-    background: #ffffff;
+    background: var(--lc-tint, #ffffff);
     border-radius: 50%;
 }
 .loading-cloud::before { width: 58px; height: 58px; top: -26px; left: 22px; }
 .loading-cloud::after  { width: 42px; height: 42px; top: -16px; left: 66px; }
-.loading-cloud.lc1 { top: 18%; --lc-scale: 0.9; animation: loading-drift 42s linear infinite; }
-.loading-cloud.lc2 { top: 32%; --lc-scale: 0.6; opacity: 0.7; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
-.loading-cloud.lc3 { top: 11%; --lc-scale: 1.1; opacity: 0.8; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
+.loading-cloud.lc1 { top: 18%; --lc-scale: 0.9; --lc-tint: #ffffff; animation: loading-drift 42s linear infinite; }
+.loading-cloud.lc2 { top: 32%; --lc-scale: 0.6; --lc-tint: #f4f7fa; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
+.loading-cloud.lc3 { top: 11%; --lc-scale: 1.1; --lc-tint: #f9fbfc; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
 
 /* THE WHOLE POINT OF THIS FILE'S ANIMATIONS BEING WHAT THEY ARE.
    Only `transform` and `opacity` can be animated by the compositor, and only a
