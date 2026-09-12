@@ -41,6 +41,10 @@ const SVG = {
     dashRing: `<svg class="ov-dash" aria-hidden="true" focusable="false"><rect/></svg>`
 }
 
+/** One dash plus one gap, in px. Must match `stroke-dasharray: 12 9` on
+ *  .ov-dash rect, and the distance ov-dash-march travels in one loop. */
+const DASH_PERIOD = 21
+
 const el = (tag, cls, html) => {
     const n = document.createElement(tag)
     if (cls) n.className = cls
@@ -227,6 +231,7 @@ export default class Overview {
 
         this.sections = Array.from(this.main.querySelectorAll('.ov-section[id]'))
         this._observeReveals()
+        this._observeDashRings()
         this._syncExploreButtons()
         this._mountPortrait()
         this._mountDog()
@@ -582,6 +587,16 @@ export default class Overview {
         toggle.type = 'button'
         toggle.setAttribute('aria-expanded', 'false')
         toggle.setAttribute('aria-controls', 'ov-cert-rest')
+        // The inner box clips while the track grows; open, that clip is what
+        // sliced the first row's border on hover and flattened the last row's
+        // shadow. Drop it, but only once the opening has finished.
+        let settleTimer = null
+        const settle = () =>
+            more.classList.toggle('is-settled', more.classList.contains('is-open'))
+        more.addEventListener('transitionend', (e) => {
+            if (e.target === more && e.propertyName === 'grid-template-rows') settle()
+        })
+
         toggle.addEventListener('click', () => {
             const open = toggle.getAttribute('aria-expanded') === 'true'
             toggle.setAttribute('aria-expanded', String(!open))
@@ -589,8 +604,17 @@ export default class Overview {
             // Collapsed, the row is 0fr AND visibility:hidden, so the rows stay
             // out of the accessibility tree and out of the tab order.
             more.classList.toggle('is-open', !open)
+            // Clip again before it starts collapsing, whichever way we go.
+            more.classList.remove('is-settled')
+            clearTimeout(settleTimer)
+            // Reduced motion drops the transition entirely, so transitionend
+            // never arrives; this is the only path to settled in that case.
+            settleTimer = setTimeout(settle, 460)
             toggle.querySelector('.ov-cert-toggle-text').textContent =
                 open ? c.path.certsMore : c.path.certsLess
+            // "y algunos más" and "ocultar" are not the same width, so the
+            // perimeter just changed and the ring has to be re-divided.
+            this._fitDashRing(toggle.querySelector('.ov-dash rect'))
         })
 
         block.append(toggle, more)
@@ -856,6 +880,61 @@ export default class Overview {
         this.main.style.opacity = '1'
     }
 
+    // ═══ Dashed rings ═════════════════════════════════════════════════════
+    /**
+     * Make each ring's perimeter a whole number of dashes.
+     *
+     * A rect's dash pattern starts at the top-left and runs the whole way
+     * round, so unless the perimeter divides exactly by the 21px period the
+     * last dash before the start point is cut short. That leaves a permanent
+     * stub-and-double-gap at the top-left corner -- a fixed defect in the
+     * outline that the marching animation slides past without ever fixing,
+     * since moving by exactly one period puts the same broken join back.
+     *
+     * `pathLength` is the fix: it tells the dash maths to treat the perimeter
+     * as that many units regardless of its real size. Rounded to the nearest
+     * whole number of periods, the pattern closes on itself perfectly and each
+     * dash is at most a few percent off 21px, which is not a difference the
+     * eye has anything to compare against.
+     *
+     * A ResizeObserver rather than a one-off: the button is measured before the
+     * webfont lands, and it changes width again every time its label swaps
+     * between "y algunos más" and "ocultar".
+     */
+    _fitDashRing(rect) {
+        // Measure the geometry, never a length we already remapped.
+        rect.removeAttribute('pathLength')
+        const length = rect.getTotalLength?.() ?? 0
+        if (!length) return
+        const periods = Math.max(4, Math.round(length / DASH_PERIOD))
+        rect.setAttribute('pathLength', periods * DASH_PERIOD)
+    }
+
+    /** Fit every ring now, without waiting on a frame. The ResizeObserver
+     *  below is the right tool for later changes, but it delivers on the
+     *  rendering steps, and a backgrounded tab does not run those -- the same
+     *  reason open() flushes layout by hand instead of double-rAF. */
+    _fitDashRings() {
+        this.main?.querySelectorAll('.ov-dash rect')
+            .forEach((rect) => this._fitDashRing(rect))
+    }
+
+    _observeDashRings() {
+        this._dashRo?.disconnect()
+        if (typeof ResizeObserver === 'undefined') return
+        this._dashRo = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const rect = entry.target.querySelector('.ov-dash rect')
+                if (rect) this._fitDashRing(rect)
+            }
+        })
+        // The host element, not the <svg>: the ring is pinned to it with inset,
+        // and an HTML box is the case every ResizeObserver handles well.
+        this.main.querySelectorAll('.ov-dash').forEach((svg) => {
+            if (svg.parentElement) this._dashRo.observe(svg.parentElement)
+        })
+    }
+
     // ═══ Reveal / scroll ══════════════════════════════════════════════════
     _observeReveals() {
         this._io?.disconnect()
@@ -982,6 +1061,9 @@ export default class Overview {
         // this with a double rAF instead would stall for seconds whenever the
         // tab is throttled, and the page would sit invisible.
         void this.el.offsetHeight
+        // Layout is settled here, so the rings can be measured for real -- at
+        // build time the root is still [hidden] and every perimeter is 0.
+        this._fitDashRings()
         this.el.classList.add('is-open')
 
         document.addEventListener('keydown', this._onKeyDown)
@@ -1052,6 +1134,7 @@ export default class Overview {
     destroy() {
         this._io?.disconnect()
         this._dogIo?.disconnect()
+        this._dashRo?.disconnect()
         this.viewport?.dispose()
         this.dogPortrait?.dispose()
         if (this._onSourceLoaded) this.resources?.off('sourceLoaded', this._onSourceLoaded)

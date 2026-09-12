@@ -1329,6 +1329,14 @@ body.ov-page {
     min-height: 0;
     overflow: hidden;
 }
+/* The clip above is only needed WHILE the track grows from 0fr; once the rows
+   are out it is the thing cutting them. The first row's 2px hover lift pushed
+   its green border past the top of the clip and the border came out sliced,
+   and the last row's drop shadow was cut off flat along the bottom. So the
+   clip is dropped once the opening has finished -- .is-settled is added on
+   transitionend, and removed the moment it starts closing again, because
+   without it the rows spill out of the collapsing box. */
+.ov-cert-rest.is-settled .ov-cert-rest-inner { overflow: visible; }
 
 /* ═══ Skills — an editorial spec sheet, not a row of boxes ════════════════ */
 .ov-skills { display: grid; gap: 0; }
