@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Source of /static/cv.pdf. Edit here, then regenerate:
+
+    chrome.exe --headless=new --disable-gpu --no-pdf-header-footer
+               --virtual-time-budget=8000
+               --print-to-pdf="..\..\static\cv.pdf" "cv.html"
+
+  --no-pdf-header-footer is the flag that drops the date, the title and the
+  URL a browser stamps on a printed page. Printing by hand works too, but the
+  same two boxes have to be unticked in the dialog every time.
+
+  The page is laid out for A4 and the print block redefines the whole --t-*
+  scale in pt. Those tokens, not `body { font-size }`, are what decides the
+  page count: everything on the page reads its size from them, and they are in
+  rem, which answers to the root font size rather than to body's.
+
+  This file is also published as an Artifact for review. Keep the two in step.
+-->
+<title>Sergii Butrii CV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+
+<style>
+/* ── Tokens ───────────────────────────────────────────────────────────────
+   Ink on paper. The neutrals carry a faint cool cast so they sit with the
+   institutional blue instead of fighting it. Every colour is declared here,
+   in the bare :root, before any theme block redefines it. */
+:root {
+    --paper:      #ffffff;
+    --ground:     #eceef1;
+    --ink:        #14171c;
+    --ink-soft:   #474e59;
+    --ink-faint:  #79818e;
+    --rule:       #d7dce3;
+    --rule-soft:  #e8ebef;
+    --accent:     #1b4d8f;
+    --flag:       #a3341f;
+
+    --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --sans:  'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+    /* Type scale — 1.2 minor third off a 10.5pt body, the size a two-page
+       A4 CV actually wants. */
+    --t-xs:   0.75rem;
+    --t-sm:   0.8125rem;
+    --t-base: 0.9375rem;
+    --t-md:   1.0625rem;
+    --t-lg:   1.3125rem;
+    --t-xl:   2rem;
+}
+:root:not([data-theme="light"]) {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --paper:      #171a1f;
+        --ground:     #0e1013;
+        --ink:        #e7e9ec;
+        --ink-soft:   #aeb5bf;
+        --ink-faint:  #848c97;
+        --rule:       #333941;
+        --rule-soft:  #262b31;
+        --accent:     #7cb2f0;
+        --flag:       #e8917c;
+    }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #171a1f;
+    --ground:     #0e1013;
+    --ink:        #e7e9ec;
+    --ink-soft:   #aeb5bf;
+    --ink-faint:  #848c97;
+    --rule:       #333941;
+    --rule-soft:  #262b31;
+    --accent:     #7cb2f0;
+    --flag:       #e8917c;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--t-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── The sheet ─────────────────────────────────────────────────────────────
+   Sized to an A4 text block (210mm less 15mm margins), so what you see is
+   what prints. Single column, no sidebar, on purpose: a two-column CV is the
+   single most common reason a parser scrambles the reading order. */
+.sheet {
+    max-width: 180mm;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 40px 64px;
+}
+.paper {
+    background: var(--paper);
+    padding: 44px clamp(20px, 5vw, 48px) 48px;
+    border: 1px solid var(--rule-soft);
+    box-shadow: 0 1px 2px rgba(20, 23, 28, 0.04), 0 12px 32px -20px rgba(20, 23, 28, 0.28);
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────────*/
+.name {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+.headline {
+    margin: 6px 0 0;
+    font-size: var(--t-md);
+    font-weight: 400;
+    color: var(--ink-soft);
+}
+.contact {
+    margin: 16px 0 0;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-size: var(--t-sm);
+    color: var(--ink-soft);
+}
+.contact span { display: inline-flex; gap: 6px; }
+.contact .k {
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: var(--t-xs);
+    align-self: center;
+}
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+a:hover { border-bottom-color: currentColor; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+/* The one thing that must not be sent by accident. */
+.todo {
+    color: var(--flag);
+    font-weight: 600;
+    border-bottom: 1px dashed currentColor;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────*/
+section { margin-top: 30px; }
+h2 {
+    margin: 0 0 14px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+.summary { margin: 0; max-width: 68ch; color: var(--ink-soft); }
+
+/* ── Entries ──────────────────────────────────────────────────────────────
+   Title and dates share a baseline row. Two flex children on one line is
+   still one line of text to a parser; it is full-height columns that break
+   them. Below ~480px the row stacks so the dates never squeeze the title. */
+.entries { display: flex; flex-direction: column; gap: 20px; }
+.entry { break-inside: avoid; }
+.entry-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 16px;
+}
+.entry-title {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: 1.3;
+}
+.dates {
+    font-size: var(--t-sm);
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.org {
+    margin: 2px 0 0;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: var(--t-base);
+    color: var(--ink-soft);
+}
+.meta { margin: 2px 0 0; font-size: var(--t-sm); color: var(--ink-faint); }
+.links { margin: 3px 0 0; font-size: var(--t-sm); display: flex; flex-wrap: wrap; gap: 3px 12px; }
+
+ul.points {
+    margin: 8px 0 0;
+    padding-left: 1.1em;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 72ch;
+}
+ul.points li { padding-left: 0.2em; }
+ul.points li::marker { color: var(--ink-faint); }
+
+/* ── Label / value rows (skills, languages) ───────────────────────────────*/
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 4px 20px; align-items: baseline; }
+.row dt {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+.row dd { margin: 0; }
+dl { margin: 0; }
+
+/* ── Certifications ───────────────────────────────────────────────────────*/
+.certs { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.certs li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px; }
+.certs .issuer { color: var(--ink-faint); font-size: var(--t-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── Screen-only furniture ────────────────────────────────────────────────*/
+.toolbar {
+    max-width: 180mm;
+    margin: 0 auto;
+    padding: 24px 16px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 18px;
+    font-size: var(--t-sm);
+    color: var(--ink-faint);
+}
+.toolbar strong { color: var(--ink-soft); font-weight: 600; }
+kbd {
+    font-family: var(--sans);
+    font-size: var(--t-xs);
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink-soft);
+}
+.plain {
+    max-width: 180mm;
+    margin: 28px auto 64px;
+    padding-inline: 16px;
+}
+.plain summary {
+    cursor: pointer;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+}
+.plain summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.plain-note { margin: 8px 0 10px; font-size: var(--t-sm); color: var(--ink-faint); max-width: 68ch; }
+.copy {
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 5px;
+    padding: 6px 14px;
+    cursor: pointer;
+}
+.copy:hover { background: var(--ink-soft); border-color: var(--ink-soft); }
+.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+pre.text {
+    margin: 10px 0 0;
+    padding: 16px;
+    background: var(--paper);
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--t-xs);
+    line-height: 1.55;
+    color: var(--ink-soft);
+    white-space: pre;
+}
+
+@media (max-width: 520px) {
+    .row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .entry-head { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ── Print: A4, ink on paper, no furniture ────────────────────────────────*/
+@page { size: A4; margin: 15mm; }
+@media print {
+    :root {
+        --paper: #ffffff; --ground: #ffffff;
+        --ink: #000000; --ink-soft: #23272d; --ink-faint: #4c525a;
+        --rule: #9aa1aa; --rule-soft: #c4c9cf;
+        --accent: #123a6d; --flag: #8c2a16;
+
+        /* The whole scale in pt. Everything on the page reads its size from
+           these, so this is the one place that decides the page count. */
+        --t-xs:   7.2pt;
+        --t-sm:   8pt;
+        --t-base: 9pt;
+        --t-md:  10pt;
+        --t-lg:  12pt;
+        --t-xl:  17pt;
+    }
+    body { background: #fff; line-height: 1.34; }
+    .sheet { max-width: none; margin: 0; padding: 0; }
+    .paper { border: 0; box-shadow: none; padding: 0; }
+    .toolbar, .plain { display: none !important; }
+    a { color: var(--ink); border-bottom: 0; }
+
+    /* Vertical rhythm, compressed. Same proportions as the screen, less air. */
+    .contact { margin-top: 9pt; padding-top: 7pt; }
+    section { margin-top: 10pt; break-inside: auto; }
+    h2 { margin-bottom: 7pt; padding-bottom: 3pt; break-after: avoid; }
+    .entries { gap: 8pt; }
+    ul.points { margin-top: 4pt; gap: 1.5pt; }
+    .rows { gap: 4pt; }
+    .certs { gap: 3pt; }
+    .summary, ul.points { max-width: none; }
+
+    .entry, .certs li, .row { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="toolbar no-print">
+    <span><strong>Print or save as PDF:</strong> <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>P</kbd>. The layout is set for A4.</span>
+    <span>Single column, standard headings, real text: built to survive a CV parser.</span>
+</div>
+
+<div class="sheet">
+<article class="paper">
+
+    <header>
+        <h1 class="name">Sergii Butrii</h1>
+        <p class="headline">Web &amp; Mobile Developer · Angular, TypeScript, AI Integration</p>
+        <div class="contact">
+            <span><span class="k">Location</span> Málaga, Spain</span>
+            <span><span class="k">Email</span> <a href="mailto:sergiibutrii5@gmail.com">sergiibutrii5@gmail.com</a></span>
+            <span><span class="k">Phone</span> <a href="tel:+34633872015">+34 633 87 20 15</a></span>
+            <span><span class="k">Portfolio</span> <a href="https://sergii-butrii.com/">sergii-butrii.com</a></span>
+            <span><span class="k">LinkedIn</span> <a href="https://www.linkedin.com/in/sergii-butrii-4b0729346/">linkedin.com/in/sergii-butrii</a></span>
+            <span><span class="k">GitHub</span> <a href="https://github.com/Sergiibut05">github.com/Sergiibut05</a></span>
+        </div>
+    </header>
+
+    <section>
+        <h2>Professional Summary</h2>
+        <p class="summary">Web and mobile developer based in Málaga, Spain, qualified in Multiplatform Application Development (Spanish Higher VET diploma, EQF level 5) and currently specialising in Artificial Intelligence and Big Data. Most recently five months on a two-person product team at Aliqindoi building ConneXIA, a natural-language data assistant, in Angular SSR, with AI integrated into both the product and the team's own workflow. Comfortable across the stack, from Angular and TypeScript to Node.js, PostgreSQL and Kotlin on Android, and self-taught in real-time 3D graphics. Native Spanish and Ukrainian, C1 English, looking for a first full-time developer role.</p>
+    </section>
+
+    <section>
+        <h2>Professional Experience</h2>
+        <div class="entries">
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Software Developer</h3>
+                    <span class="dates">January 2026 – May 2026</span>
+                </div>
+                <p class="org">Aliqindoi, Málaga, Spain</p>
+                <p class="meta">Second placement, dual vocational training programme · ConneXIA product team</p>
+                <ul class="points">
+                    <li>Built the web application for <b>ConneXIA</b>, a natural-language data assistant that lets non-technical users query a database by asking questions instead of writing SQL. Angular SSR, which I picked up for this project, with Angular Material, Tailwind CSS, DaisyUI and TanStack Query.</li>
+                    <li>Integrated AI into both the product and the team's own workflow: n8n flows for the product's AI features, and agents, rules, skills and MCP servers used daily to raise development throughput.</li>
+                    <li>Worked as one of two developers on the product, in Scrum ceremonies (daily stand-ups, sprint planning, demos and retrospectives), tracked in Jira and documented in Confluence.</li>
+                    <li>Benchmarked AI model performance across interfaces and context (inside the application against direct MCP access), and automated recurring team tasks and AI-assisted documentation with n8n, Puppeteer and Pencil.</li>
+                </ul>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Software Developer</h3>
+                    <span class="dates">March 2025 – June 2025</span>
+                </div>
+                <p class="org">Aliqindoi, Málaga, Spain</p>
+                <p class="meta">First placement, dual vocational training programme</p>
+                <ul class="points">
+                    <li>Onboarding placement onto the company's stack: Angular, Ionic and Firebase for applications, and WordPress with WooCommerce, Divi and Gravity Forms for client sites.</li>
+                    <li>Took ownership of updating the company's own landing page in WordPress, the placement's main hands-on deliverable.</li>
+                </ul>
+            </div>
+
+        </div>
+    </section>
+
+    <section>
+        <h2>Selected Projects</h2>
+        <div class="entries">
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Volumine: embeddable 3D charts</h3>
+                    <span class="dates">2026</span>
+                </div>
+                <p class="meta"><a href="https://volumine.app">volumine.app</a> · Next.js, React, TypeScript, Three.js, Supabase, PostgreSQL, Stripe, Tailwind CSS, Playwright</p>
+                <ul class="points">
+                    <li>Six chart types built from hand-authored Three.js geometry, with bevelled edges, real shadows and studio lighting, and no 3D charting library.</li>
+                    <li>The entire chart configuration is compressed into the URL, so a shared chart needs no database at all; the free tier and the developer API both follow from that one decision.</li>
+                    <li>The embed route ships zero cookies and zero third-party requests, under a 149 KB JavaScript budget the build enforces and fails on.</li>
+                </ul>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">BookMatch: book marketplace, web and Android</h3>
+                    <span class="dates">2025 – 2026</span>
+                </div>
+                <p class="meta"><a href="https://bookmatch.club">bookmatch.club</a> <a href="https://github.com/Sergiibut05/BookMatch-Proyecto-Intermodular">github.com/Sergiibut05/BookMatch-Proyecto-Intermodular</a> · Angular, TypeScript, Express, Prisma, PostgreSQL, Firebase, Stripe, Kotlin, Docker · Final course project</p>
+                <ul class="points">
+                    <li>Deployed full-stack platform with a catalogue of roughly 1,000 books, shopping cart, Stripe payments and a user-to-user swap module.</li>
+                    <li>Angular front end over an Express/Prisma API on PostgreSQL, with Firebase authentication and a native Android client written in Kotlin.</li>
+                    <li>Discussion forums with comments and voting, AI-driven recommendations via n8n, GA4 analytics and CI/CD deployment.</li>
+                </ul>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">SQL → 3D ER: queries as live 3D diagrams</h3>
+                    <span class="dates">2026</span>
+                </div>
+                <p class="meta"><a href="https://sql-prototype.vercel.app">sql-prototype.vercel.app</a> <a href="https://github.com/Sergiibut05/sql-prototype">github.com/Sergiibut05/sql-prototype</a> · Angular, TypeScript, Three.js, GLSL, d3-force-3d, FastAPI, Python, Vercel</p>
+                <ul class="points">
+                    <li>Parses and redraws the diagram as the query is typed: every table becomes a node and every JOIN a cable routed at right angles between them.</li>
+                    <li>Two parsers rather than one: node-sql-parser resolves in the browser and falls back to a Python sqlglot service only for dialects it cannot handle, so the common case never pays for a round trip.</li>
+                    <li>Particle-lit cables, bloom and vignette written as custom GLSL shaders on top of Three.js.</li>
+                </ul>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">3D Portfolio: an interactive 3D world that runs in a browser</h3>
+                    <span class="dates">2026</span>
+                </div>
+                <p class="meta"><a href="https://sergii-butrii.com/">sergii-butrii.com</a> <a href="https://github.com/Sergiibut05/character-threejs">github.com/Sergiibut05/character-threejs</a> · Three.js r183, WebGPU, TSL, GLSL, Rapier, Firebase, Howler.js, Blender, Vite</p>
+                <ul class="points">
+                    <li>A small island you can walk around, drawn in real time by the graphics card through a rendering pipeline I wrote on WebGPU in TSL: lighting, shadows, ambient occlusion, outlines, bloom and depth of field.</li>
+                    <li>Rapier physics for walking, climbing steps and colliding with the terrain, and instanced grass and trees with distance culling, so the scene stays smooth as it fills up.</li>
+                    <li>Built to work on cheap phones and not only good ones: adaptive quality tiers, Draco-compressed glTF models, and a loading screen animated entirely on the compositor so it keeps moving while the browser is busy. That more than halved the wait on a low-end Android.</li>
+                </ul>
+            </div>
+
+        </div>
+    </section>
+
+    <section>
+        <h2>Education</h2>
+        <div class="entries">
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Specialisation Course in Artificial Intelligence and Big Data</h3>
+                    <span class="dates">2026 – Present</span>
+                </div>
+                <p class="org">CPIFP Alan Turing with Accenture, Málaga TechPark, Spain</p>
+                <p class="meta">Spanish <i>Curso de Especialización de Grado Superior</i> (CE IABD), run by the Regional Government of Andalusia together with Accenture, with classes at Accenture's Building I+D6. Machine learning, AI programming and big data systems.</p>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Higher VET Diploma in Multiplatform Application Development</h3>
+                    <span class="dates">2024 – 2026</span>
+                </div>
+                <p class="org">CPIFP Alan Turing, Málaga TechPark, Spain</p>
+                <p class="meta">Spanish <i>Técnico Superior</i> (CFGS DAM), EQF level 5. Dual track: study at the college combined with placements at a company.</p>
+            </div>
+
+            <div class="entry">
+                <div class="entry-head">
+                    <h3 class="entry-title">Upper Secondary Education, Science and Technology track</h3>
+                    <span class="dates">2022 – 2024</span>
+                </div>
+                <p class="org">IES Capellanía, Alhaurín de la Torre, Spain</p>
+            </div>
+
+        </div>
+    </section>
+
+    <section>
+        <h2>Technical Skills</h2>
+        <dl class="rows">
+            <div class="row"><dt>Languages</dt><dd>Java, JavaScript, TypeScript, Kotlin, Python, SQL, HTML, CSS, GLSL</dd></div>
+            <div class="row"><dt>Front end</dt><dd>Angular, Angular SSR, Angular Material, React, Next.js, Ionic, Tailwind CSS, DaisyUI, Bootstrap, TanStack Query, Vite</dd></div>
+            <div class="row"><dt>Back end &amp; data</dt><dd>Node.js, Express, Prisma, FastAPI, PostgreSQL, MySQL, Firebase, Supabase</dd></div>
+            <div class="row"><dt>AI &amp; automation</dt><dd>n8n, AI agents, MCP (Model Context Protocol), AI model benchmarking, Puppeteer, Pencil</dd></div>
+            <div class="row"><dt>Mobile</dt><dd>Kotlin, Android Studio, Ionic</dd></div>
+            <div class="row"><dt>Graphics &amp; 3D</dt><dd>Three.js, WebGPU, TSL, GLSL, Rapier, Blender</dd></div>
+            <div class="row"><dt>CMS</dt><dd>WordPress, WooCommerce, Divi, Gravity Forms</dd></div>
+            <div class="row"><dt>Tooling &amp; process</dt><dd>Git, Docker, CI/CD, Jira, Confluence, Scrum, Playwright, Stripe, GA4, Figma</dd></div>
+        </dl>
+    </section>
+
+    <section>
+        <h2>Languages</h2>
+        <p class="summary">Spanish (native) · Ukrainian (native) · English C1 (Cambridge C1 Advanced, 190 points)</p>
+    </section>
+
+    <section>
+        <h2>Certifications</h2>
+        <ul class="certs">
+            <li><span>Three.js Journey</span><span class="issuer">Bruno Simon · 2026</span></li>
+            <li><span>C1 Advanced (CAE), 190 points</span><span class="issuer">Cambridge English · 2025</span></li>
+            <li><span>Modern JavaScript: Mastering the Language</span><span class="issuer">DevTalles · 2025</span></li>
+            <li><span>Angular: Fundamentals, Advanced Concepts, Firebase and Angular</span><span class="issuer">OpenWebinars · 2025</span></li>
+            <li><span>JavaScript: Async, Prototypes and Classes · Git · Bootstrap 5 · WooCommerce</span><span class="issuer">OpenWebinars · 2025</span></li>
+        </ul>
+    </section>
+
+</article>
+</div>
+
+<details class="plain no-print">
+    <summary>Plain-text version, for application forms that ask you to paste</summary>
+    <p class="plain-note">Online forms strip formatting and often parse worse than a PDF. Paste this instead: same content, no markup, no special characters a parser can choke on.</p>
+    <button class="copy" id="copy-btn" type="button">Copy plain text</button>
+    <pre class="text" id="plain-text">SERGII BUTRII
+Web &amp; Mobile Developer | Angular, TypeScript, AI Integration
+Malaga, Spain | +34 633 87 20 15 | sergiibutrii5@gmail.com
+Portfolio: https://sergii-butrii.com/
+LinkedIn: https://www.linkedin.com/in/sergii-butrii-4b0729346/
+GitHub: https://github.com/Sergiibut05
+
+PROFESSIONAL SUMMARY
+Web and mobile developer based in Malaga, Spain, qualified in Multiplatform
+Application Development (Spanish Higher VET diploma, EQF level 5) and currently
+specialising in Artificial Intelligence and Big Data. Most recently five months
+on a two-person product team at Aliqindoi building ConneXIA, a natural-language
+data assistant, in Angular SSR, with AI integrated into both the product and
+the team's own workflow. Comfortable across the stack, from Angular and
+TypeScript to Node.js, PostgreSQL and Kotlin on Android, and self-taught in
+real-time 3D graphics. Native Spanish and Ukrainian, C1 English, looking for a
+first full-time developer role.
+
+PROFESSIONAL EXPERIENCE
+
+Software Developer
+Aliqindoi, Malaga, Spain
+January 2026 - May 2026
+Second placement, dual vocational training programme - ConneXIA product team
+- Built the web application for ConneXIA, a natural-language data assistant
+  that lets non-technical users query a database by asking questions instead
+  of writing SQL. Angular SSR, which I picked up for this project, with
+  Angular Material, Tailwind CSS, DaisyUI and TanStack Query.
+- Integrated AI into both the product and the team's own workflow: n8n flows
+  for the product's AI features, and agents, rules, skills and MCP servers
+  used daily to raise development throughput.
+- Worked as one of two developers on the product, in Scrum ceremonies (daily
+  stand-ups, sprint planning, demos and retrospectives), tracked in Jira and
+  documented in Confluence.
+- Benchmarked AI model performance across interfaces and context (inside the
+  application against direct MCP access), and automated recurring team tasks
+  and AI-assisted documentation with n8n, Puppeteer and Pencil.
+
+Software Developer
+Aliqindoi, Malaga, Spain
+March 2025 - June 2025
+First placement, dual vocational training programme
+- Onboarding placement onto the company's stack: Angular, Ionic and Firebase
+  for applications, and WordPress with WooCommerce, Divi and Gravity Forms for
+  client sites.
+- Took ownership of updating the company's own landing page in WordPress, the
+  placement's main hands-on deliverable.
+
+SELECTED PROJECTS
+
+Volumine: embeddable 3D charts (2026)
+Next.js, React, TypeScript, Three.js, Supabase, PostgreSQL, Stripe,
+Tailwind CSS, Playwright. https://volumine.app
+- Six chart types built from hand-authored Three.js geometry, with bevelled
+  edges, real shadows and studio lighting, and no 3D charting library.
+- The entire chart configuration is compressed into the URL, so a shared chart
+  needs no database at all; the free tier and the developer API both follow
+  from that one decision.
+- The embed route ships zero cookies and zero third-party requests, under a
+  149 KB JavaScript budget the build enforces and fails on.
+
+BookMatch: book marketplace, web and Android (2025-2026)
+Angular, TypeScript, Express, Prisma, PostgreSQL, Firebase, Stripe, Kotlin,
+Docker. Final course project. https://bookmatch.club
+- Deployed full-stack platform with a catalogue of roughly 1,000 books,
+  shopping cart, Stripe payments and a user-to-user swap module.
+- Angular front end over an Express/Prisma API on PostgreSQL, with Firebase
+  authentication and a native Android client written in Kotlin.
+- Discussion forums with comments and voting, AI-driven recommendations via
+  n8n, GA4 analytics and CI/CD deployment.
+
+SQL to 3D ER: queries as live 3D diagrams (2026)
+Angular, TypeScript, Three.js, GLSL, d3-force-3d, FastAPI, Python, Vercel.
+https://sql-prototype.vercel.app
+- Parses and redraws the diagram as the query is typed: every table becomes a
+  node and every JOIN a cable routed at right angles between them.
+- Two parsers rather than one: node-sql-parser resolves in the browser and
+  falls back to a Python sqlglot service only for dialects it cannot handle,
+  so the common case never pays for a round trip.
+- Particle-lit cables, bloom and vignette written as custom GLSL shaders on
+  top of Three.js.
+
+3D Portfolio: an interactive 3D world that runs in a browser (2026)
+Three.js r183, WebGPU, TSL, GLSL, Rapier, Firebase, Howler.js, Blender, Vite.
+https://sergii-butrii.com/
+- A small island you can walk around, drawn in real time by the graphics
+  card through a rendering pipeline I wrote on WebGPU in TSL: lighting,
+  shadows, ambient occlusion, outlines, bloom and depth of field.
+- Rapier physics for walking, climbing steps and colliding with the terrain,
+  and instanced grass and trees with distance culling, so the scene stays
+  smooth as it fills up.
+- Built to work on cheap phones and not only good ones: adaptive quality
+  tiers, Draco-compressed glTF models, and a loading screen animated
+  entirely on the compositor so it keeps moving while the browser is busy.
+  That more than halved the wait on a low-end Android.
+
+EDUCATION
+
+Specialisation Course in Artificial Intelligence and Big Data
+CPIFP Alan Turing with Accenture, Malaga TechPark, Spain
+2026 - Present
+Spanish Curso de Especializacion de Grado Superior (CE IABD), run by the
+Regional Government of Andalusia together with Accenture, with classes at
+Accenture's Building I+D6. Machine learning, AI programming and big data
+systems.
+
+Higher VET Diploma in Multiplatform Application Development
+CPIFP Alan Turing, Malaga TechPark, Spain
+2024 - 2026
+Spanish Tecnico Superior (CFGS DAM), EQF level 5. Dual track: study at the
+college combined with placements at a company.
+
+Upper Secondary Education, Science and Technology track
+IES Capellania, Alhaurin de la Torre, Spain
+2022 - 2024
+
+TECHNICAL SKILLS
+Languages: Java, JavaScript, TypeScript, Kotlin, Python, SQL, HTML, CSS, GLSL
+Front end: Angular, Angular SSR, Angular Material, React, Next.js, Ionic,
+  Tailwind CSS, DaisyUI, Bootstrap, TanStack Query, Vite
+Back end and data: Node.js, Express, Prisma, FastAPI, PostgreSQL, MySQL,
+  Firebase, Supabase
+AI and automation: n8n, AI agents, MCP (Model Context Protocol), AI model
+  benchmarking, Puppeteer, Pencil
+Mobile: Kotlin, Android Studio, Ionic
+Graphics and 3D: Three.js, WebGPU, TSL, GLSL, Rapier, Blender
+CMS: WordPress, WooCommerce, Divi, Gravity Forms
+Tooling and process: Git, Docker, CI/CD, Jira, Confluence, Scrum, Playwright,
+  Stripe, GA4, Figma
+
+LANGUAGES
+Spanish: Native
+Ukrainian: Native
+English: C1 (Cambridge C1 Advanced, 190 points)
+
+CERTIFICATIONS
+Three.js Journey - Bruno Simon, 2026
+C1 Advanced (CAE), 190 points - Cambridge English, 2025
+Modern JavaScript: Mastering the Language - DevTalles, 2025
+Angular: Fundamentals, Advanced Concepts, Firebase and Angular - OpenWebinars,
+  2025
+JavaScript: Async, Prototypes and Classes; Git; Bootstrap 5; WooCommerce -
+  OpenWebinars, 2025
+</pre>
+</details>
+
+<script>
+(function () {
+    var btn = document.getElementById('copy-btn');
+    var pre = document.getElementById('plain-text');
+    if (!btn || !pre) return;
+    btn.addEventListener('click', function () {
+        var text = pre.textContent;
+        var done = function (msg) {
+            btn.textContent = msg;
+            setTimeout(function () { btn.textContent = 'Copy plain text'; }, 2200);
+        };
+        // Clipboard access can be refused outright in a sandboxed frame, so
+        // selecting the text is the fallback: the reader can still press Ctrl+C.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                done('Copied');
+            }).catch(function () {
+                selectAll();
+                done('Selected. Press Ctrl/⌘ + C');
+            });
+        } else {
+            selectAll();
+            done('Selected. Press Ctrl/⌘ + C');
+        }
+        function selectAll() {
+            try {
+                var range = document.createRange();
+                range.selectNodeContents(pre);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } catch (e) { /* nothing else to offer */ }
+        }
+    });
+})();
+</script>
+
+</body>
+</html>
