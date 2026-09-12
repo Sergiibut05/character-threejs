@@ -103,7 +103,15 @@ const DESTINATIONS = [
         labelKey: 'map.beach',
         // On the sand, facing the sea (+Z).
         x: 1.65, y: 0.21, z: 40.0, yaw: 0,
-        pin: { x: 1.65, z: 42.44 }
+        // Pushed west of where the fit puts it, on purpose and by hand.
+        // The `pin` is DRAWING ONLY -- travel uses the x/z above -- so moving
+        // it costs nothing but its agreement with the illustration, and the
+        // illustration is what the reader is looking at. The fit lands this
+        // one 42 units south of any landmark it was built from, which is
+        // further extrapolation than it was ever checked over; on the redrawn
+        // art that put the marker off the edge of the sand. ~32 px west at
+        // 1024, which is about a pin's width.
+        pin: { x: -1.35, z: 42.44 }
     }
 ]
 
