@@ -1,5 +1,6 @@
 import './audio.css'
 import { iconMusic } from './icons.js'
+import { t, onLocaleChange } from '../../Utils/gameText.js'
 
 /**
  * MusicToast — "Ahora suena…" notification (top-right). Slides in with the
@@ -17,17 +18,28 @@ export default class MusicToast {
         this.el.innerHTML = `
             <div class="fz-toast-cover"></div>
             <div class="fz-toast-body">
-                <span class="fz-toast-kicker">Ahora suena</span>
+                <span class="fz-toast-kicker"></span>
                 <span class="fz-toast-title"></span>
             </div>`
         document.body.appendChild(this.el)
 
         this.coverEl = this.el.querySelector('.fz-toast-cover')
+        this.kickerEl = this.el.querySelector('.fz-toast-kicker')
         this.titleEl = this.el.querySelector('.fz-toast-title')
         this._timer = null
+
+        // The kicker is written on every show(), not once here: the toast is
+        // built at boot, and a catalog is loaded asynchronously, so a string
+        // resolved in the constructor would be resolved against nothing. The
+        // subscription is for the rarer case of switching language while a
+        // toast is still on screen.
+        this._relabel = () => { this.kickerEl.textContent = t('music.nowPlaying') }
+        this._relabel()
+        this._offLocale = onLocaleChange(this._relabel)
     }
 
     show({ title, cover } = {}) {
+        this._relabel()
         this.titleEl.textContent = title || ''
         this._setCover(cover)
 
@@ -58,6 +70,7 @@ export default class MusicToast {
 
     destroy() {
         if (this._timer) clearTimeout(this._timer)
+        this._offLocale?.()
         this.el?.remove()
     }
 }

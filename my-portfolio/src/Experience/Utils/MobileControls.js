@@ -1,4 +1,5 @@
 import nipplejs from 'nipplejs'
+import { t } from './gameText.js'
 
 // Shared button look. Only the geometry lives here now -- the MATERIAL is in
 // style.css under .mc-btn, so these thumb buttons are made of exactly the same
@@ -272,7 +273,7 @@ export default class MobileControls
         this.button2 = document.createElement('button')
         this.button2.id = 'action-button-2'
         this.button2.className = 'mc-btn mc-btn--primary'
-        this.button2.setAttribute('aria-label', 'Acción')
+        this.button2.setAttribute('aria-label', t('common.action'))
         this.button2.innerHTML = ICON_INTERACT
         this.button2.style.cssText = BTN_BASE_CSS
 

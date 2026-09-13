@@ -131,6 +131,7 @@ export default {
             saveRecord: 'Guardar récord',
             howToPlay: 'Cómo jugar',
             leaveGame: 'Salir del minijuego',
+            action: 'Acción',
             competitive: 'Competitivo',
             free: 'Libre'
         },
@@ -192,6 +193,14 @@ export default {
             go: '¡A jugar!',
             perfect: '¡Perfecto!',
             record: 'récord {n}',
+            hudTouches: 'toques',
+            wind: 'Viento',
+            // Los signos de apertura son parte de la frase, no del código: en
+            // inglés no existen, y envolver una etiqueta traducida entre '¡' y
+            // '!' desde JavaScript deja "¡Beach ball!" en la versión inglesa.
+            touchesFlash: '{n} toques',
+            ballFlash: '¡{name}!',
+            milestone: '¡{n}!',
             widerCourt: 'Pista más ancha',
             tutorial: {
                 title: 'Ponte debajo de la pelota',
@@ -228,6 +237,10 @@ export default {
             bridge: 'El puente',
             social: 'Zona social',
             beach: 'La playa'
+        },
+
+        music: {
+            nowPlaying: 'Ahora suena'
         },
 
         settings: {

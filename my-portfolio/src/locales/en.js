@@ -281,6 +281,7 @@ export default {
             saveRecord: 'Save score',
             howToPlay: 'How to play',
             leaveGame: 'Leave the minigame',
+            action: 'Action',
             competitive: 'Ranked',
             free: 'Practice'
         },
@@ -342,6 +343,11 @@ export default {
             go: 'Go!',
             perfect: 'Perfect!',
             record: 'best {n}',
+            hudTouches: 'touches',
+            wind: 'Wind',
+            touchesFlash: '{n} touches',
+            ballFlash: '{name}!',
+            milestone: '{n}!',
             widerCourt: 'Wider court',
             tutorial: {
                 title: 'Get under the ball',
@@ -378,6 +384,10 @@ export default {
             bridge: 'The bridge',
             social: 'Social corner',
             beach: 'The beach'
+        },
+
+        music: {
+            nowPlaying: 'Now playing'
         },
 
         settings: {
