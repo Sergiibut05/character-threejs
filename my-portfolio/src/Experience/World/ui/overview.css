@@ -914,6 +914,14 @@ body.ov-page {
     min-height: 230px;
     background: linear-gradient(160deg, var(--fz-green-100), var(--fz-green-50));
 }
+/* A <picture> is an inline box with no height of its own, so the img's
+   `height: 100%` below would resolve against nothing and the cover fill would
+   collapse. Make it the block the img used to be a direct child of. */
+.ov-project-media picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
 .ov-project-media img {
     width: 100%;
     height: 100%;

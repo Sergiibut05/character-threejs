@@ -186,6 +186,9 @@ export function getContent() {
                     // The card is one wide image, so a project can name a
                     // better-cropped shot than the one baked onto its 3D stand.
                     image: p.overviewImage || p.image,
+                    // Optional second crop for the desktop layout only, where
+                    // the media well is a tall column rather than a banner.
+                    imageWide: p.overviewImageWide || null,
                     highlights: tp.highlights,
                     stack: p.stack,
                     links: tp.links

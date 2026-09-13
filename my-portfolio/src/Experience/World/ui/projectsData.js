@@ -52,6 +52,10 @@ export const PROJECTS = [
         tagline: 'Escribe una consulta SQL y se convierte en un diagrama entidad-relación en 3D',
         image: '/models/carts/page3.webp',
         image2: '/models/carts/page3b.webp',
+        // Solo para escritorio. Ahí la tarjeta va a dos columnas y el hueco de
+        // la imagen es alto; por debajo de 900px se convierte en una banda
+        // ancha y baja, que es la forma para la que está recortada `image`.
+        overviewImageWide: '/models/carts/page3-wide.webp',
         highlights: [
             'La consulta se lee y se dibuja **mientras la escribes**: cada tabla es un nodo y cada JOIN un cable enrutado en ángulos rectos entre ellos.',
             '**Dos parsers, no uno**: node-sql-parser resuelve en el navegador y, cuando un dialecto se le atraganta, cae a un servicio Python con sqlglot. Así el caso común no paga una ida y vuelta al servidor.',

@@ -447,11 +447,35 @@ export default class Overview {
             const media = el('div', 'ov-project-media')
             if (p.image) {
                 const img = new Image()
-                img.src = p.image
                 img.alt = p.title
                 img.loading = 'lazy'
                 img.decoding = 'async'
-                media.appendChild(img)
+
+                if (p.imageWide) {
+                    // Two crops, one download. <picture> lets the browser choose
+                    // BEFORE it fetches; the same thing done with matchMedia
+                    // either downloads both or downloads the wrong one and then
+                    // swaps it out in front of the reader.
+                    //
+                    // The query is the projects grid's own breakpoint: at 900px
+                    // and below the card drops to a single column and the media
+                    // becomes a short wide banner, which is the shape `image` is
+                    // cropped for. Above it the well is a tall column, where the
+                    // wider shot has room to be itself.
+                    const picture = document.createElement('picture')
+                    const source = document.createElement('source')
+                    source.media = '(min-width: 901px)'
+                    source.srcset = p.imageWide
+                    picture.append(source, img)
+                    media.appendChild(picture)
+                } else {
+                    media.appendChild(img)
+                }
+
+                // Last, and only once the <source> is already its sibling: an
+                // img starts fetching the moment it has a src, and a src set
+                // before that would be the one that loads.
+                img.src = p.image
             }
 
             const body = el('div', 'ov-project-body')
