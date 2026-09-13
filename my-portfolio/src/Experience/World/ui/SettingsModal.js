@@ -138,6 +138,12 @@ export default class SettingsModal {
     // is a preference: set once, rarely returned to. Connection is not a
     // setting at all -- it is a read-only status -- so it goes last, where
     // nothing that follows it is waiting to be clicked.
+    //
+    // Language was tried first, on the argument that someone who cannot read
+    // the modal has no use for anything else in it. Read on the page it lost
+    // to the one above: the two quality cards are the tall, loud thing people
+    // come here for, and a language row above them pushes them down for
+    // everyone who was never going to switch.
     _buildGeneral(container) {
         this._buildQuality(container)
         this._buildLanguage(container)
@@ -214,11 +220,6 @@ export default class SettingsModal {
             nav.appendChild(b)
         }
         wrap.appendChild(nav)
-
-        const hint = _el('div', 'fz-conn-hint')
-        hint.textContent = t('settings.languageDesc')
-        wrap.appendChild(hint)
-
         container.appendChild(wrap)
     }
 
