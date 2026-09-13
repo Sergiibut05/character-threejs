@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import Experience from '../Experience.js'
-import { t } from '../Utils/gameText.js'
+import { t, onLocaleChange } from '../Utils/gameText.js'
 import WindLines from './WindLines.js'
 import CourtBounds from './CourtBounds.js'
 import BeachBallVariants from './BeachBallVariants.js'
@@ -209,7 +209,7 @@ export default class BeachMinigame {
         this.hud.className = 'fz-beach-hud'
         this.hud.innerHTML =
             '<span class="fz-beach-count">0</span>' +
-            '<span class="fz-beach-label">toques</span>' +
+            `<span class="fz-beach-label">${t('beach.hudTouches')}</span>` +
             '<span class="fz-beach-best"></span>'
         document.body.appendChild(this.hud)
         this.hudCount = this.hud.querySelector('.fz-beach-count')
@@ -224,7 +224,7 @@ export default class BeachMinigame {
         this.windEl = document.createElement('div')
         this.windEl.className = 'fz-beach-wind'
         this.windEl.innerHTML =
-            '<span class="fz-beach-wind-label">Viento</span>' +
+            `<span class="fz-beach-wind-label">${t('beach.wind')}</span>` +
             '<span class="fz-beach-wind-arrow">' +
             '<svg viewBox="0 0 32 16" width="34" height="17" aria-hidden="true">' +
             '<path d="M2 8h22M18 2l7 6-7 6" fill="none" stroke="currentColor" ' +
@@ -240,7 +240,7 @@ export default class BeachMinigame {
         this.exitBtn = document.createElement('button')
         this.exitBtn.type = 'button'
         this.exitBtn.className = 'fz-hud-leave'
-        this.exitBtn.setAttribute('aria-label', 'Salir del minijuego')
+        this.exitBtn.setAttribute('aria-label', t('common.leaveGame'))
         this.exitBtn.innerHTML = `<span class="fz-hud-leave-icon">${iconExit}</span>`
         this.exitBtn.addEventListener('click', () => this.onExitClick?.())
         document.body.appendChild(this.exitBtn)
@@ -252,6 +252,18 @@ export default class BeachMinigame {
         this.helpBtn.className = 'fz-hud-help'
         this.helpBtn.setAttribute('aria-label', t('common.howToPlay'))
         this.helpBtn.innerHTML = `<span class="fz-hud-help-icon">${iconHelp}</span>`
+        // The two HUD words are written once here, so a language switch mid
+        // rally would leave them behind. Same subscribe-and-relabel the Hud and
+        // the hints use.
+        this._relabelHud = () => {
+            const touches = this.hud?.querySelector('.fz-beach-label')
+            const wind = this.windEl?.querySelector('.fz-beach-wind-label')
+            if (touches) touches.textContent = t('beach.hudTouches')
+            if (wind) wind.textContent = t('beach.wind')
+            this.exitBtn?.setAttribute('aria-label', t('common.leaveGame'))
+        }
+        this._unsubLocale = onLocaleChange(this._relabelHud)
+
         this.helpBtn.addEventListener('click', () => this.onHelpClick?.())
         document.body.appendChild(this.helpBtn)
 
@@ -547,14 +559,14 @@ export default class BeachMinigame {
         if (this.mode === 'competitivo') {
             // One miss ends it — the session takes over from here.
             this.state = 'over'
-            this._showFlash(`${this.touches} toques`, 'is-miss')
+            this._showFlash(t('beach.touchesFlash', { n: this.touches }), 'is-miss')
             this.onRallyEnd?.(this.touches)
             return
         }
 
         this.state = 'missed'
         this._missTimer = 1.1
-        this._showFlash(`${this.touches} toques`, 'is-miss')
+        this._showFlash(t('beach.touchesFlash', { n: this.touches }), 'is-miss')
     }
 
     /** 0 → 1 over the opening touches, so the wind arrives gradually. */
@@ -585,10 +597,26 @@ export default class BeachMinigame {
     // ── Frame ──
     update() {
         if (!this._ready) { this._tryInit(); if (!this._ready) return }
-        // BEFORE the idle guard: the whole point is that the game is over and
-        // the player is walking away from the court.
-        this._releasePendingCourt()
-        if (this.state === 'idle') return
+
+        // Idle is the ONLY state that gives the colliders back, and it is the
+        // one stop() leaves behind: the game is over and the player is walking
+        // off the court.
+        //
+        // This call used to sit ABOVE the guard, which meant it also ran on
+        // every frame of every rally. _releasePendingCourt hands back every
+        // collider the player is not standing inside at that instant, so: you
+        // spawn on the ball prop, its box is the one thing that survives the
+        // first frames, you step off it once and it is solid again — in the
+        // middle of the run, for the rest of the match. One free pass through
+        // it and then a wall, which is exactly the symptom.
+        //
+        // 'over' and 'missed' hold the suspension too. The results panel offers
+        // "play again", and replay() restarts the rally without re-suspending
+        // anything, so anything given back here would stay given back.
+        if (this.state === 'idle') {
+            this._releasePendingCourt()
+            return
+        }
         // Frozen while the tutorial is up: the ball is already in the air by
         // then, and reading a panel should not cost you the rally.
         if (this.paused) return
@@ -697,7 +725,7 @@ export default class BeachMinigame {
         if (!this._swapDone && p >= 0.5) {
             this._swapDone = true
             const label = this.balls.shuffle()
-            if (label) this._showFlash(`¡${label}!`, 'is-milestone')
+            if (label) this._showFlash(t('beach.ballFlash', { name: label }), 'is-milestone')
         }
 
         // 1 → 0 → 1, with a springy overshoot on the way back in.
@@ -870,7 +898,7 @@ export default class BeachMinigame {
         // A clean, central touch is the skilful one — call it out.
         if (announced) { /* a milestone flash already fired */ }
         else if (centred > 0.72) this._showFlash(t('beach.perfect'), 'is-perfect')
-        else if (this.touches % 10 === 0) this._showFlash(`¡${this.touches}!`, 'is-milestone')
+        else if (this.touches % 10 === 0) this._showFlash(t('beach.milestone', { n: this.touches }), 'is-milestone')
 
         // Arms only — the hop that used to go with it read as a weird jump.
         character.playBump?.()
@@ -993,6 +1021,8 @@ export default class BeachMinigame {
         // the world back with a hole where the ball prop's collider was.
         this._releaseCourt?.()
         this._releaseCourt = null
+        this._unsubLocale?.()
+        this._unsubLocale = null
         clearTimeout(this._flashTimer)
         clearTimeout(this._bannerTimer)
         this.hud?.remove()
