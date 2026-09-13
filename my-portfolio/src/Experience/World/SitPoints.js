@@ -36,6 +36,20 @@ const STAND_STEP = 0.24
  *  as one motion rather than a teleport followed by an animation. */
 const EXIT_TIME = 0.42
 
+/** Seconds the sit-down slide takes. Matches SIT_BLEND_TIME in Character.js:
+ *  the body reaching the seat and the legs folding onto it are the same event
+ *  and have to end on the same frame. */
+const ENTER_TIME = 0.38
+
+/** Signed turn from `from` to `to`, always the short way round. Without this,
+ *  swinging from -175° to 175° takes the 350° lap instead of the 10° one. */
+function shortestTurn(from, to) {
+    let d = (to - from) % (Math.PI * 2)
+    if (d > Math.PI) d -= Math.PI * 2
+    if (d < -Math.PI) d += Math.PI * 2
+    return d
+}
+
 /** Probe stride and reach when hunting for the seat's front edge. */
 const STEP = 0.05
 const MAX_PERCH = 0.20
@@ -110,6 +124,7 @@ export default class SitPoints {
         this.nearest = null       // the point currently offered
 
         this._hipOffset = null    // hip height above character.position, measured once
+        this._enter = null        // in-progress sit-down slide
         this._exit = null         // in-progress stand-up slide
         this._prevMobileB = false
         this._prevPadA = false
@@ -217,7 +232,7 @@ export default class SitPoints {
                 fwd: state.adelante, lat: state.lateral,
                 up: state.altura, yaw: state.giro * Math.PI / 180
             }
-            if (this.active === p) { this._standInstant(); this._sit(p) }
+            if (this.active === p) { this._standInstant(); this._sit(p, true) }
         }
 
         const folder = ui.addFolder('Asientos (sit points)')
@@ -239,7 +254,7 @@ export default class SitPoints {
         folder.add(state, 'altura', -0.3, 0.3, 0.005).name('Altura').onChange(apply)
         folder.add(state, 'giro', -180, 180, 1).name('Giro (°)').onChange(apply)
 
-        folder.add({ sentar: () => { const p = current(); if (p) { this._standInstant(); this._sit(p) } } }, 'sentar')
+        folder.add({ sentar: () => { const p = current(); if (p) { this._standInstant(); this._sit(p, true) } } }, 'sentar')
             .name('Sentarse aquí')
 
         folder.add({
@@ -265,6 +280,7 @@ export default class SitPoints {
     _standInstant() {
         const character = this.experience.world?.character
         if (!character) return
+        this._enter = null
         this._exit = null
         this.active = null
         character.setSitting(false)
@@ -507,7 +523,21 @@ export default class SitPoints {
         return this._hipOffset
     }
 
-    _sit(point) {
+    /**
+     * Sit down — as a short move, the mirror of _stand().
+     *
+     * This used to be a teleport. One frame you were stood beside the log, the
+     * next you were on it, facing a way you never turned; the legs then folded
+     * over their own blend on top of that, so the fold read as something that
+     * happened AFTER you arrived rather than as the act of sitting down. And
+     * standing up already eased, so the two halves did not match.
+     *
+     * @param {object} point the seat
+     * @param {boolean} [instant] skip the slide. The debug panel re-seats on
+     *   every slider drag, and a preview that lags 0.38s behind the slider is
+     *   not a preview.
+     */
+    _sit(point, instant = false) {
         if (this._blocked()) return
         const character = this.experience.world?.character
         if (!character || character.movementLocked) return
@@ -515,12 +545,11 @@ export default class SitPoints {
         const hipOffset = this._hipHeight(character)
         if (hipOffset === null) return
 
-        // teleportTo() takes the FLOOR height and adds the capsule offset itself,
-        // so work backwards from where the hips have to end up.
         const tune = point.tune
         const yaw = point.yaw + (tune?.yaw || 0)
+        // Where the capsule centre has to end up for the hips to land on the
+        // seat surface.
         const targetY = point.seatTopY + SIT_SINK + (tune?.up || 0) - hipOffset
-        const groundY = targetY - character.capsuleCenterY - 0.15
 
         const seat = point.seatPos || point.position
         let x = seat.x
@@ -530,9 +559,27 @@ export default class SitPoints {
             z += Math.cos(yaw) * tune.fwd - Math.sin(yaw) * tune.lat
         }
 
-        character.teleportTo(x, groundY, z, yaw)
-        character.setSitting(true, point.recline)
+        // Claimed before the move, not after: `active` is what gives the seat
+        // the interact key (see seated.js), and for the length of the slide the
+        // press that started it must not reach anything else.
         this.active = point
+        character.setSitting(true, point.recline)
+
+        if (instant) {
+            // teleportTo() takes the FLOOR height and adds the capsule offset
+            // and a settle margin itself, so work backwards through both.
+            character.teleportTo(x, targetY - character.capsuleCenterY - 0.15, z, yaw)
+            this._enter = null
+            return
+        }
+
+        this._enter = {
+            from: character.position.clone(),
+            to: new THREE.Vector3(x, targetY, z),
+            fromYaw: character.container.rotation.y,
+            turn: shortestTurn(character.container.rotation.y, yaw),
+            t: 0
+        }
     }
 
     /**
@@ -551,6 +598,7 @@ export default class SitPoints {
     forceStand() {
         if (!this.active) return false
         this.active = null
+        this._enter = null  // both slides, in or out
         this._exit = null   // cancel any slide already in flight
         this.experience.world?.character?.setSitting(false)
         return true
@@ -572,6 +620,10 @@ export default class SitPoints {
 
         const point = this.active
         this.active = null
+        // Stood up mid-sit: the slide in stops where it got to, and the slide
+        // out starts from there. Leaving it running would have both writing the
+        // character's position in the same frame, last one wins.
+        this._enter = null
         character.setSitting(false)
         character.movementLocked = true    // released when the exit finishes
 
@@ -631,6 +683,31 @@ export default class SitPoints {
         return seatHit ?? below ?? null
     }
 
+    /** Drive the easing started by _sit(). */
+    _updateEnter(character, dt) {
+        const enter = this._enter
+        enter.t = Math.min(1, enter.t + dt / ENTER_TIME)
+
+        // Ease-in-out, where the exit is ease-out. Standing up is a push off the
+        // seat, so it is quickest at the start; sitting down begins from a
+        // standstill, so it has to accelerate as well as settle.
+        const t = enter.t
+        const e = t * t * (3 - 2 * t)
+
+        character.position.lerpVectors(enter.from, enter.to, e)
+        character.verticalVelocity = 0
+        character.rigidBody?.setTranslation({
+            x: character.position.x, y: character.position.y, z: character.position.z
+        }, true)
+        character.container.position.copy(character.position)
+        character.container.rotation.y = enter.fromYaw + enter.turn * e
+        character.previousPosition.copy(character.position)
+
+        if (enter.t >= 1) this._enter = null
+        // movementLocked stays on: it belongs to being seated now, and _stand()
+        // is what hands it back.
+    }
+
     /** Drive the easing started by _stand(). */
     _updateExit(character, dt) {
         const exit = this._exit
@@ -667,9 +744,9 @@ export default class SitPoints {
         const character = this.experience.world?.character
         if (!character) return
 
-        if (this._exit) {
-            this._updateExit(character, Math.min(this.experience.time.delta * 0.001, 0.05))
-        }
+        const slideDt = Math.min(this.experience.time.delta * 0.001, 0.05)
+        if (this._enter) this._updateEnter(character, slideDt)
+        else if (this._exit) this._updateExit(character, slideDt)
 
         // At most one seat may glow, and none at all while you are sat on one.
         // The outline is an invitation — "sit on THIS one" — so a cluster of

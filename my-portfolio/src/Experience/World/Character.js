@@ -53,6 +53,12 @@ const SIT_ANKLE = 0.18   // tips the toes down, the way a dangling foot rests
 const RECLINE_EXTEND_THIGH = 1.15
 const RECLINE_STRAIGHTEN_SHIN = 1.80
 
+// Seconds the legs take to fold or unfold. Matched to SitPoints' ENTER_TIME so
+// the body arriving on the seat and the legs folding onto it are one motion
+// with one duration, instead of a slide that finishes while the legs are still
+// moving.
+const SIT_BLEND_TIME = 0.38
+
 // Rendered-height filter. FACTOR is the fraction of the gap closed in one
 // 60 fps frame; SNAP is the jump above which it is a real step, not noise,
 // and lands at once. See _syncVisualPosition().
@@ -621,33 +627,48 @@ export default class Character {
         this._sitBind = bind
     }
 
-    _sitBone(bone, name, extraX = 0, extraZ = 0, overwrite) {
+    /**
+     * Blend one bone from wherever the clip just left it toward its seated pose.
+     *
+     * `offX`/`offZ` are the FULL seated offsets, not pre-scaled by the blend:
+     * k does all the blending here, and that is the whole point.
+     *
+     * The old version had two modes. While folding it ADDED a scaled offset on
+     * top of the clip; at k >= 0.999 it switched to writing bind + offset
+     * outright, to freeze out the idle clip's loop hitch. Those two expressions
+     * are not the same number — they differ by exactly the clip's own deviation
+     * on that bone — so the last frame of sitting down snapped the legs and hips
+     * by that difference, and the first frame of standing up snapped them back.
+     * That is the leg twitch at the moment of sitting.
+     *
+     * Lerping toward the same destination the whole way is continuous by
+     * construction: k = 0 is the clip untouched, k = 1 is the seated pose alone
+     * (so the loop hitch is still frozen out), and nothing jumps in between.
+     */
+    _sitBone(bone, name, offX, offZ, k) {
         if (!bone) return
-        if (overwrite) {
-            const rest = this._sitBind?.[name]
-            if (!rest) return
-            bone.rotation.set(rest.rx + extraX, rest.ry, rest.rz + extraZ)
-        } else {
-            bone.rotation.x += extraX
-            if (extraZ) bone.rotation.z += extraZ
-        }
+        const rest = this._sitBind?.[name]
+        if (!rest) return
+        const lerp = THREE.MathUtils.lerp
+        bone.rotation.x = lerp(bone.rotation.x, rest.rx + offX, k)
+        bone.rotation.y = lerp(bone.rotation.y, rest.ry, k)
+        bone.rotation.z = lerp(bone.rotation.z, rest.rz + offZ, k)
     }
 
     /**
      * Layered after mixer.update — see update().
      *
-     * While fully seated the idle clip's loop hitch (a one-frame pop in the
-     * hips/legs) is very visible, so those bones are overwritten from the bind
-     * rest + sit offsets. During the sit/stand blend they stay additive so the
-     * fold still eases instead of snapping. Torso/arms/head keep the idle clip
-     * either way, which is the breathing that keeps the pose alive.
+     * Every bone here is blended from the clip's pose toward the seated one by
+     * the same k, so the fold is one continuous motion from standing to seated
+     * with no mode change along the way (see _sitBone). Torso, arms and head
+     * keep the idle clip untouched, which is the breathing that keeps the pose
+     * alive rather than frozen.
      */
     _applySitPose(dt) {
         const target = this.isSitting ? 1 : 0
         if (this._sitBlend === target && target === 0) return
 
-        // ~0.3 s to fold or unfold.
-        const step = dt / 0.3
+        const step = dt / SIT_BLEND_TIME
         this._sitBlend += THREE.MathUtils.clamp(target - this._sitBlend, -step, step)
         if (Math.abs(target - this._sitBlend) < 0.001) this._sitBlend = target
         if (this._sitBlend <= 0) return
@@ -671,38 +692,44 @@ export default class Character {
         const B = this._sitBones
         if (!B.lUpLeg && !B.rUpLeg) return
 
-        const k = this._sitBlend
+        // Smoothstep, not the raw ramp. Linear means the legs leave a standstill
+        // at full speed and stop dead on arrival; eased, they take off and
+        // settle, which is what a body folding into a seat actually does.
+        const t = this._sitBlend
+        const k = t * t * (3 - 2 * t)
+
         const rec = this._sitRecline
         // Negative X on the thigh swings the leg FORWARD — the same sign
         // playKick() strikes with.
-        const thigh = -(SIT_THIGH + rec * RECLINE_EXTEND_THIGH) * k
-        const shin = Math.min(0, SIT_SHIN + rec * RECLINE_STRAIGHTEN_SHIN) * k
-        const splay = SIT_SPLAY * k
-        const ankle = SIT_ANKLE * k
-        const overwrite = k >= 0.999
+        const thigh = -(SIT_THIGH + rec * RECLINE_EXTEND_THIGH)
+        const shin = Math.min(0, SIT_SHIN + rec * RECLINE_STRAIGHTEN_SHIN)
 
         // Hips is the root of the skeleton, so tipping it back carries torso,
         // head AND legs together — which is exactly how a body settles into a
-        // sloped seat. Overwriting also freezes the idle hip bob that caused
-        // the seated loop glitch.
+        // sloped seat. Blending its position toward the bind pose too is what
+        // retires the idle hip bob, and doing it over the same k is what stops
+        // that retirement from happening in a single frame.
         if (B.hips) {
-            if (overwrite) {
-                const rest = this._sitBind?.mixamorigHips
-                if (rest) {
-                    B.hips.rotation.set(rest.rx + rec * k, rest.ry, rest.rz)
-                    B.hips.position.set(rest.px, rest.py, rest.pz)
-                }
-            } else if (rec) {
-                B.hips.rotation.x += rec * k
+            const rest = this._sitBind?.mixamorigHips
+            if (rest) {
+                const lerp = THREE.MathUtils.lerp
+                B.hips.rotation.x = lerp(B.hips.rotation.x, rest.rx + rec, k)
+                B.hips.rotation.y = lerp(B.hips.rotation.y, rest.ry, k)
+                B.hips.rotation.z = lerp(B.hips.rotation.z, rest.rz, k)
+                B.hips.position.set(
+                    lerp(B.hips.position.x, rest.px, k),
+                    lerp(B.hips.position.y, rest.py, k),
+                    lerp(B.hips.position.z, rest.pz, k)
+                )
             }
         }
 
-        this._sitBone(B.lUpLeg, 'mixamorigLeftUpLeg', thigh, splay, overwrite)
-        this._sitBone(B.rUpLeg, 'mixamorigRightUpLeg', thigh, -splay, overwrite)
-        this._sitBone(B.lLeg, 'mixamorigLeftLeg', shin, 0, overwrite)
-        this._sitBone(B.rLeg, 'mixamorigRightLeg', shin, 0, overwrite)
-        this._sitBone(B.lFoot, 'mixamorigLeftFoot', ankle, 0, overwrite)
-        this._sitBone(B.rFoot, 'mixamorigRightFoot', ankle, 0, overwrite)
+        this._sitBone(B.lUpLeg, 'mixamorigLeftUpLeg', thigh, SIT_SPLAY, k)
+        this._sitBone(B.rUpLeg, 'mixamorigRightUpLeg', thigh, -SIT_SPLAY, k)
+        this._sitBone(B.lLeg, 'mixamorigLeftLeg', shin, 0, k)
+        this._sitBone(B.rLeg, 'mixamorigRightLeg', shin, 0, k)
+        this._sitBone(B.lFoot, 'mixamorigLeftFoot', SIT_ANKLE, 0, k)
+        this._sitBone(B.rFoot, 'mixamorigRightFoot', SIT_ANKLE, 0, k)
     }
 
     /**
