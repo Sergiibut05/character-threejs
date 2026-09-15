@@ -4,6 +4,25 @@ import { keyboardTaken } from '../Utils/keyboardOwners.js'
 import { socialAreaOwnsArrows } from './SocialArea.js'
 
 /**
+ * The character's albedo at full night.
+ *
+ * Everything else in the world is graded by the day/night tint from
+ * `Environment`, and the stylised props ignore the scene lights altogether.
+ * The character does neither: it is a plain MeshLambertMaterial, so the only
+ * thing colouring it is the lighting, and after dark every one of those lights
+ * is blue -- ambient, hemisphere and the moon all at once. It came out
+ * noticeably cooler than the world it was standing in, which reads as the one
+ * object in the frame that got the wrong grade.
+ *
+ * Multiplying an albedo cannot ADD warmth, and it does not need to: pulling
+ * the blue channel down is precisely "one shade less blue". Red is left at 1
+ * so nothing gets darker, only less cold.
+ */
+const NIGHT_NEUTRAL = new THREE.Color('#fff0dd')
+const _white = new THREE.Color(1, 1, 1)
+const _neutral = new THREE.Color()
+
+/**
  * Physical key positions that drive the character, mapped to the four
  * directions the movement code already speaks. Keyed by KeyboardEvent.code, so
  * it is the same key under the same finger on every layout.
@@ -246,15 +265,43 @@ export default class Character {
         this.atlas.repeat.set(0.5, 0.5)
         this.atlas.offset.copy(this._uvOpen)
 
+        // Kept so the night neutraliser can reach them without a traverse
+        // every frame. Today this is a single mesh, hence a single material,
+        // but the atlas is applied per-mesh so the list is the honest shape.
+        this._skinMaterials = []
+        this._nightNeutral = -1
+
         this.model.traverse((child) => {
             if (!child.isMesh) return
             child.castShadow = true
             child.receiveShadow = true
 
-            child.material = new THREE.MeshLambertMaterial({
+            const material = new THREE.MeshLambertMaterial({
                 map: this.atlas
             })
+            this._skinMaterials.push(material)
+            child.material = material
         })
+    }
+
+    /**
+     * Take the blue back out of the character after dark. See NIGHT_NEUTRAL.
+     *
+     * Rides `nightFactor` straight off the environment, so it arrives and
+     * leaves with the darkness and daylight is untouched. The early out is
+     * what keeps this honest as a per-frame call: the factor only moves while
+     * the cycle is running, and a whole day takes six minutes, so in practice
+     * this writes a colour a few dozen times and returns immediately the rest.
+     */
+    _updateNightNeutral() {
+        if (!this._skinMaterials?.length) return
+
+        const night = this.experience.world?.environment?.skyNightFactor?.value ?? 0
+        if (Math.abs(night - this._nightNeutral) < 0.01) return
+        this._nightNeutral = night
+
+        _neutral.copy(_white).lerp(NIGHT_NEUTRAL, night)
+        for (const material of this._skinMaterials) material.color.copy(_neutral)
     }
 
     // ─── Animations ─────────────────────────────────────────────────────
@@ -941,6 +988,10 @@ export default class Character {
     // ─── Main update ────────────────────────────────────────────────────
 
     update() {
+        // Ahead of every early return below: the grade has to keep up with the
+        // sky even while the character is frozen behind a modal.
+        this._updateNightNeutral()
+
         // Clamp to 50 ms: after a real hitch (GC, shader compile, tab switch)
         // an unclamped dt would make the capsule leap a big step in one frame.
         const dt = Math.min(this.time.delta * 0.001, 0.05)

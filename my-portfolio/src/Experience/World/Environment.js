@@ -140,7 +140,7 @@ const CYCLE_STOPS = [
     { name: 'Midnight', t: 0.00, top: '#0a1230', bottom: '#1a2348', sun: '#223052', diskInt: 0.0, haloInt: 0.0,
       sunLight: '#8a98cf', sunLightInt: 0.45, amb: '#41507f', ambInt: 0.62,
       hemiSky: '#37456f', hemiGround: '#222a44', hemiInt: 0.55, moonInt: 0.60, nightFactor: 1.00,
-      tint: '#666f8f', tintStrength: 1.0 },
+      tint: '#666f8f', tintStrength: 0.87 },
     // --- First light (pre-dawn) ---
     { name: 'First light', t: 0.20, top: '#23305e', bottom: '#6a5078', sun: '#ffb27a', diskInt: 0.12, haloInt: 0.18,
       sunLight: '#9a8fbe', sunLightInt: 0.65, amb: '#535878', ambInt: 0.62,
@@ -175,12 +175,12 @@ const CYCLE_STOPS = [
     { name: 'Dusk', t: 0.82, top: '#2e3360', bottom: '#8a5a78', sun: '#ff9a66', diskInt: 0.30, haloInt: 0.35,
       sunLight: '#9a86b6', sunLightInt: 0.60, amb: '#5a5e84', ambInt: 0.58,
       hemiSky: '#48548e', hemiGround: '#5e5366', hemiInt: 0.52, moonInt: 0.28, nightFactor: 0.55,
-      tint: '#685f77', tintStrength: 0.96 },
+      tint: '#685f77', tintStrength: 0.87 },
     // --- Night falls ---
     { name: 'Night', t: 0.90, top: '#0c1430', bottom: '#1a2346', sun: '#223052', diskInt: 0.0, haloInt: 0.0,
       sunLight: '#8a98cf', sunLightInt: 0.45, amb: '#41507f', ambInt: 0.60,
       hemiSky: '#37456f', hemiGround: '#222a44', hemiInt: 0.54, moonInt: 0.50, nightFactor: 0.95,
-      tint: '#394b8e', tintStrength: 0.93 }
+      tint: '#394b8e', tintStrength: 0.87 }
 ]
 
 export default class Environment {
@@ -206,7 +206,7 @@ export default class Environment {
         // Tunable params (exposed in the GUI)
         this.params = {
             litTintScale: 0.0,
-            nightBrightness: 3.0,
+            nightBrightness: 6.0,
             sunAzimuthDeg: 180,
             moonAzimuthDeg: 180,
             sunArcTilt: 0.45
@@ -1016,7 +1016,7 @@ export default class Environment {
         // --- Per-phase grading tint (Bruno-style, but simple) ---
         const tints = f.addFolder('Phase tints')
         tints.close()
-        tints.add(this.params, 'nightBrightness', 0.5, 3.0, 0.05).name('Night light boost')
+        tints.add(this.params, 'nightBrightness', 0.5, 8.0, 0.05).name('Night light boost')
             .onChange(() => this._applyTimeOfDay(this.timeOfDay))
         tints.add(this.params, 'litTintScale', 0, 1, 0.01).name('Lit surfaces tint amount')
             .onChange(() => this._applyTimeOfDay(this.timeOfDay))
