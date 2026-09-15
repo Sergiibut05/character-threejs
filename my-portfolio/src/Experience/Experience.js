@@ -455,6 +455,12 @@ export default class Experience {
         const holeSize = isMobile ? 0.14 : 0.075
         const shrinkSize = isMobile ? 0.10 : 0.058
 
+        // Let the frame rate settle before any of that starts. See
+        // _waitForSteadyFrames(): the iris is still shut, so this waits in the
+        // same black the transition is about to open out of, and it costs a few
+        // frames on a machine that is ready and up to 1.5 s on one that is not.
+        await this._waitForSteadyFrames()
+
         await this.animateValue(0.0, holeSize, 420, (v) => this.renderer.setIrisTransitionSize(v))
         await this.waitMs(1000)
         await this.animateValue(holeSize, shrinkSize, 150, (v) => this.renderer.setIrisTransitionSize(v))
@@ -553,25 +559,129 @@ export default class Experience {
         })
     }
 
+    /**
+     * Ease a value from `from` to `to`, driven by FRAMES rather than by the
+     * clock.
+     *
+     * It used to take `start` at the moment it was called and then measure
+     * against performance.now(). Both halves of that were a problem, and
+     * together they are what made the opening iris jump.
+     *
+     * The first half: the clock started before the first frame existed. Every
+     * millisecond between the call and the first requestAnimationFrame counted
+     * as animation that had already happened -- so when the first real frame of
+     * the island cost 300 ms of pipeline compilation, a 420 ms open began life
+     * at t = 0.7 and the hole appeared already part-open, which is exactly the
+     * "it snaps to a small circle" report. It was intermittent because it
+     * depended on whether that stall landed before or after the call.
+     *
+     * The second half: even once running, a single slow frame advanced the
+     * animation by however long it took. One 200 ms hitch mid-open moved the
+     * iris half its remaining travel in one step.
+     *
+     * So the clock now starts on the first frame and advances by clamped frame
+     * deltas. A frame longer than MAX_STEP is treated as a hitch rather than as
+     * elapsed time: the animation advances by at most that much, and the
+     * transition simply takes a little longer in real time instead of skipping.
+     * Same clamp, and the same reasoning, as the one in Character.update().
+     *
+     * The trade is deliberate and it is the one that was asked for: on a slow
+     * machine the intro lasts marginally longer, and in exchange it never
+     * teleports.
+     */
     animateValue(from, to, duration, onUpdate) {
         return new Promise((resolve) => {
-            const start = performance.now()
+            const MAX_STEP = 50
 
-            const tick = () => {
-                const elapsed = performance.now() - start
+            let elapsed = 0
+            let last = null
+            let done = false
+
+            // A hidden tab stops firing rAF, and an animation that advances by
+            // frames has no frames there. Measuring the wall clock used to hide
+            // this: it would snap to the end on return. Now it is explicit --
+            // land on the final value and let the await chain carry on, so
+            // coming back to the tab shows the world rather than a transition
+            // parked halfway, or worse a promise that never settles.
+            const finish = () => {
+                if (done) return
+                done = true
+                document.removeEventListener('visibilitychange', onVisibility)
+                onUpdate(to)
+                resolve()
+            }
+            const onVisibility = () => { if (document.hidden) finish() }
+            document.addEventListener('visibilitychange', onVisibility)
+
+            if (document.hidden) { finish(); return }
+
+            const tick = (now) => {
+                if (done) return
+                // The first callback only starts the clock and plants the
+                // starting value. Whatever happened before it -- the call
+                // itself, any stall behind it -- is time the animation never
+                // sees.
+                if (last === null) {
+                    last = now
+                    onUpdate(from)
+                    requestAnimationFrame(tick)
+                    return
+                }
+
+                elapsed += Math.min(now - last, MAX_STEP)
+                last = now
+
                 const t = Math.min(elapsed / duration, 1)
                 const eased = t < 0.5
                     ? 2 * t * t
                     : 1 - Math.pow(-2 * t + 2, 2) / 2
 
-                const value = from + (to - from) * eased
-                onUpdate(value)
+                onUpdate(from + (to - from) * eased)
 
-                if (t < 1) {
-                    requestAnimationFrame(tick)
-                } else {
-                    resolve()
+                if (t < 1) requestAnimationFrame(tick)
+                else finish()
+            }
+
+            requestAnimationFrame(tick)
+        })
+    }
+
+    /**
+     * Hold until the renderer is actually keeping up.
+     *
+     * Clamping the steps stops the iris from teleporting, but a transition that
+     * plays over four 250 ms frames is still not an animation. The first frames
+     * after the boot screen comes down are the worst ones in the session --
+     * whatever warmUpBehindIris() did not manage to pay for lands here -- so the
+     * cheapest fix is to not start during them.
+     *
+     * `frames` consecutive deltas under `budget` is the signal that the steady
+     * state has arrived. The whole wait happens with the iris shut, so the
+     * screen is solid black throughout and there is nothing to see stalling.
+     *
+     * The timeout is not a formality: on a machine that never reaches the
+     * budget this would otherwise never resolve, and a slightly choppy intro is
+     * a great deal better than an intro that never begins.
+     */
+    _waitForSteadyFrames({ frames = 3, budget = 34, timeout = 1500 } = {}) {
+        return new Promise((resolve) => {
+            // Nothing to wait for if nothing is painting. Same reasoning as the
+            // hidden-tab exit in animateValue().
+            if (document.hidden) { resolve(); return }
+
+            const t0 = performance.now()
+            let last = null
+            let good = 0
+
+            const tick = (now) => {
+                if (last !== null) {
+                    if (now - last <= budget) good++
+                    else good = 0
                 }
+                last = now
+
+                if (good >= frames || performance.now() - t0 > timeout) resolve()
+                else requestAnimationFrame(tick)
             }
 
             requestAnimationFrame(tick)

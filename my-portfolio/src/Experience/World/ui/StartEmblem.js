@@ -40,6 +40,29 @@ export default class StartEmblem {
             </div>`
         this.labelEl = this.el.querySelector('.fz-emblem-label')
         this.glyphEl = this.el.querySelector('.fz-emblem-glyph')
+
+        // Born hidden and parked off-screen.
+        //
+        // The element is `position: fixed; top: 0; left: 0` and gets placed
+        // every frame by a transform, so between being appended here and the
+        // first update() that positions it there is a window where it sits in
+        // the top-left corner of the screen at full opacity. Normally that
+        // window is a single frame and nobody sees it. During the world intro
+        // it is not: those are the most expensive frames of the session, and
+        // the emblem showed up as a logo flashing in the corner just as the
+        // iris began to open.
+        //
+        // Two guards, because there are two ways in. The class covers the gap
+        // before any caller arrives at all. `_placed` covers the caller that
+        // asks to be shown before it has said where -- ActivityPrompt does
+        // exactly that, setVisible(true) runs a few lines above setPosition(),
+        // which is harmless when both land in the same frame and is precisely
+        // the flash when the first one lands alone.
+        this.el.classList.add('is-hidden')
+        this.el.style.transform = 'translate3d(-9999px, -9999px, 0)'
+        this._placed = false
+        this._wantVisible = false
+
         document.body.appendChild(this.el)
 
         this._active = false
@@ -80,9 +103,24 @@ export default class StartEmblem {
         this.el.classList.toggle('is-active', on)
     }
 
-    setVisible(on) { this.el.classList.toggle('is-hidden', !on) }
+    /** Honoured only once the emblem knows where it is. See the constructor. */
+    setVisible(on) {
+        this._wantVisible = on
+        this.el.classList.toggle('is-hidden', !(on && this._placed))
+    }
+
     setOpacity(o) { this.el.style.opacity = `${o}` }
-    setPosition(x, y) { this.el.style.transform = `translate3d(${x}px, ${y}px, 0)` }
+
+    setPosition(x, y) {
+        this.el.style.transform = `translate3d(${x}px, ${y}px, 0)`
+        // First real position of the session: release whatever visibility was
+        // asked for before it was known, in this same frame, so the reveal
+        // costs nothing and still never happens at the origin.
+        if (!this._placed) {
+            this._placed = true
+            if (this._wantVisible) this.el.classList.remove('is-hidden')
+        }
+    }
 
     press() {
         this.el.classList.remove('is-pressed')
