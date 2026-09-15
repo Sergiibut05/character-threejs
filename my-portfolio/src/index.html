@@ -60,30 +60,96 @@
 
     <!-- Cloud transition overlay (slides in after orbit, contains loading UI) -->
     <div class="cloud-transition" id="cloud-transition">
+        <!--
+          One hour, and a subject in it.
+
+          This used to be a 30-second day/night cycle: three sky gradients
+          cross-fading, a sun and moon orbiting a pivot below the horizon, a
+          night veil, a star field, and three hills changing colour with the
+          light. It was a lot of machinery for a screen whose job is to hold
+          somebody for four seconds, and the cost was the composition: a
+          palette that has to work at eight different hours is tuned to be
+          acceptable at all of them and right at none.
+
+          Fixing golden hour buys the frame back. The sun can sit where it
+          rims the roof, the hills can be graded against a sky that is not
+          moving, and the title can be the document's own forest green instead
+          of the lighter one it needed to survive a night that no longer
+          happens.
+
+          What is left moving is the clouds and the sway of the hills, which
+          were always the only two animations worth having here: both are pure
+          `transform`, so the compositor runs them while the main thread is
+          busy parsing glTF and compiling shaders -- which is the entire
+          reason this screen exists.
+        -->
         <div class="loading-scene" aria-hidden="true">
-            <span class="sky-layer sky-day"></span>
-            <span class="sky-layer sky-sunset"></span>
-            <span class="sky-layer sky-night"></span>
-            <div class="loading-celestial">
-                <span class="loading-sun"></span>
-                <span class="loading-moon"></span>
-            </div>
+            <span class="sky-layer sky-golden"></span>
+            <span class="loading-sun"></span>
             <span class="loading-cloud lc1"></span>
             <span class="loading-cloud lc2"></span>
             <span class="loading-cloud lc3"></span>
-            <span class="loading-nightveil"></span>
-            <span class="loading-stars"></span>
             <svg class="loading-waves" viewBox="0 0 1440 320" preserveAspectRatio="none" aria-hidden="true">
-                <path class="wave wave-3" d="M-200,150 C140,95 380,162 720,120 C1060,80 1300,150 1640,112 L1640,320 L-200,320 Z"/>
-                <path class="wave wave-2" d="M-200,212 C160,256 430,166 720,206 C1020,246 1260,180 1640,226 L1640,320 L-200,320 Z"/>
-                <path class="wave wave-1" d="M-200,252 C120,208 350,300 640,262 C940,222 1250,300 1640,256 L1640,320 L-200,320 Z"/>
+<!--
+                  The crests moved up, all three of them.
+
+                  They were bunched into the bottom fifth of this box, which
+                  left the far sage hill owning most of the band and the gold
+                  reduced to a strip along the very bottom. At this hour the
+                  ground in front is the biggest surface in the picture and the
+                  one the light is actually landing on; a sliver of it reads as
+                  a mistake rather than as a field. Roughly a fifth of the
+                  frame each now, which also gives the house somewhere to
+                  stand.
+                -->
+                <path class="wave wave-3" d="M-200,58 C140,18 380,84 720,44 C1060,10 1300,74 1640,38 L1640,320 L-200,320 Z"/>
+                <path class="wave wave-2" d="M-200,128 C160,172 430,86 720,124 C1020,162 1260,98 1640,142 L1640,320 L-200,320 Z"/>
+                <path class="wave wave-1" d="M-200,196 C120,152 350,242 640,206 C940,168 1250,244 1640,200 L1640,320 L-200,320 Z"/>
             </svg>
+
+            <!--
+              The house and the dog.
+
+              Artwork, not markup. This was 90 lines of hand-plotted SVG and
+              the shapes were only ever an approximation: a shiba read as a
+              squirrel until the ears were moved twice, and the striped wall
+              was six rectangles pretending to be siding. Two cropped webps
+              are 40 KB, look like the models they came from, and stop being a
+              thing anybody has to maintain with a calculator.
+
+              Cropped to their own alpha bounds on the way in, which is what
+              lets `align-items: flex-end` put both of them on the same ground
+              line. Uncropped they carried 5% and 3.1% of transparent padding
+              under their feet, so aligning the BOXES left the dog hovering.
+
+              eager + fetchpriority, because this is the first thing on screen
+              and it is 40 KB: lazy here would mean the frame assembling in
+              front of the reader.
+            -->
+            <div class="loading-home">
+                <span class="lh-fig lh-fig--house">
+                    <span class="lh-shadow"><img class="lh-cast" src="/images/house.webp" alt="" aria-hidden="true"></span>
+                    <img class="lh-house" src="/images/house.webp" alt=""
+                         width="516" height="354" decoding="async" fetchpriority="high">
+                </span>
+                <span class="lh-fig lh-fig--dog">
+                    <span class="lh-shadow"><img class="lh-cast" src="/images/dog.webp" alt="" aria-hidden="true"></span>
+                    <img class="lh-dog" src="/images/dog.webp" alt=""
+                         width="420" height="451" decoding="async" fetchpriority="high">
+                </span>
+            </div>
         </div>
         <div class="cloud-transition-content">
             <!-- Not an <h1>: the page's one h1 is in .static-copy below, where it can
                  carry the name and the role instead of the word "Portfolio".
-                 Styling is by class, so the tag makes no visual difference. -->
-            <p class="cloud-title">Sergii's Portfolio</p>
+                 Styling is by class, so the tag makes no visual difference.
+
+                 "Sergii's Portfolio" was the name of a folder. The name plus
+                 the line underneath it is the same thing this page already
+                 tells a crawler in its og:description, and that line was
+                 always the better one: it says what the button does. -->
+            <p class="cloud-title">Sergii Butrii</p>
+            <p class="cloud-sub">A portfolio you can walk around</p>
             <div class="cloud-actions">
                 <button class="cloud-btn" id="loading-enter-btn" disabled>
                     <span class="cloud-btn-fill" id="progress-fill"></span>

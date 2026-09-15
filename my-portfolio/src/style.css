@@ -87,8 +87,9 @@ a
     justify-content: center;
     pointer-events: none;
     overflow: hidden;
-    /* cozy pastel sky → meadow */
-    background: linear-gradient(180deg, #eaf4ff 0%, #f3faf1 50%, #dbf0e0 100%);
+    /* Golden hour, as a flat fallback for the one frame before .sky-golden
+       paints. Same stops, fewer of them. */
+    background: linear-gradient(180deg, #9c9ed6 0%, #e0aebb 45%, #f7c99c 100%);
 }
 
 /* ── Ambient scene: animated day → sunset → night ── */
@@ -97,54 +98,69 @@ a
     inset: 0;
     z-index: 1;
     overflow: hidden;
-    --load-cycle: 30s;
-    --orbit-r: 96vh;   /* sun/moon arc radius — big enough to sweep near edges */
-    --orbit-y: -20%;   /* pivot below the horizon so the arc is wide */
 }
 
-/* Sky gradient layers crossfade through the cycle */
-.sky-layer { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
-.sky-day {
-    background: linear-gradient(180deg, #bfe3ff 0%, #e8f6ff 55%, #f3faf1 100%);
-    animation: sky-day var(--load-cycle) linear infinite;
+/*
+ * One sky. The hour is a decision, not a parameter.
+ *
+ * Six stops rather than three: a sunset is not a two-colour ramp, it is a
+ * violet that turns rose and then peach, and the bend between rose and peach
+ * is the part the eye reads as "late". Two stops there and it comes out as an
+ * orange wash.
+ */
+.sky-layer { position: absolute; inset: 0; }
+.sky-golden {
+    background:
+        /* The sun's own bloom, sitting in the gradient rather than on top of
+           it, so the glow belongs to the sky instead of floating over it.
+           Size and place are custom properties because the phone moves the
+           bloom without wanting a second copy of the six-stop ramp below. */
+        radial-gradient(var(--bloom-size, 50vw 42vw) at var(--bloom-pos, 86% 42%),
+            rgba(255, 228, 170, 0.9), rgba(255, 214, 150, 0) 62%),
+        linear-gradient(180deg,
+            #9a9cd6 0%,
+            #b6a1d2 20%,
+            #d3a6c2 38%,
+            #eeb49b 58%,
+            #f8c89a 78%,
+            #f9d6a8 100%);
 }
-.sky-sunset {
-    background: linear-gradient(180deg, #ffc59e 0%, #ff9e8a 38%, #ffcf9e 72%, #ffe6c4 100%);
-    animation: sky-sunset var(--load-cycle) linear infinite;
-}
-.sky-night {
-    background: linear-gradient(180deg, #141d3a 0%, #243456 52%, #36546f 100%);
-    animation: sky-night var(--load-cycle) linear infinite;
-}
-@keyframes sky-day    { 0%,12%{opacity:1} 24%{opacity:0} 76%{opacity:0} 90%,100%{opacity:1} }
-@keyframes sky-sunset { 0%,10%{opacity:0} 22%{opacity:1} 36%{opacity:0} 64%{opacity:0} 78%{opacity:1} 90%,100%{opacity:0} }
-@keyframes sky-night  { 0%,34%{opacity:0} 48%{opacity:1} 66%{opacity:1} 80%{opacity:0} 100%{opacity:0} }
 
-/* Sun & moon orbit the horizon together (sun up by day, moon up by night) */
-.loading-celestial {
-    position: absolute;
-    left: 50%;
-    bottom: var(--orbit-y);
-    width: 0;
-    height: 0;
-    will-change: transform;
-    animation: celestial-spin var(--load-cycle) linear infinite;
-}
-@keyframes celestial-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-.loading-sun, .loading-moon { position: absolute; left: 0; top: 0; border-radius: 50%; }
+/*
+ * The sun: one flat disc, and nothing else.
+ *
+ * It had a three-stop radial gradient for a core and a 90px box-shadow for a
+ * halo, which is a lot of apparatus for a circle. It was also doing the
+ * glow's job twice over -- the sky gradient already carries a bloom in the
+ * same place -- so the two softnesses stacked and the disc came out looking
+ * like a smudge rather than like the sun.
+ *
+ * Flat solves it. One colour, one hard edge, and the warmth around it left
+ * entirely to the sky. Everything else on this screen is flat; the sun was
+ * the only thing trying to be lit.
+ *
+ * Above the hills, which is not a detail: at 36% it sat a third of the way up
+ * the screen while the hills start at 54%, so the whole thing was behind
+ * them.
+ *
+ * And on the RIGHT, mirroring the house. It used to sit at 19%, directly on
+ * top of the house, which put every object in the picture in one corner and
+ * left two thirds of the frame with nothing in it. Moved across, the two
+ * weights balance about the centre and the title sits between them.
+ *
+ * The alternative was to slide it right but keep it on this side; rendered
+ * side by side, that one parks the disc behind the title and lights the type
+ * from underneath, which is worse than either.
+ */
 .loading-sun {
-    width: 76px; height: 76px; margin: -38px;
-    transform: translateY(calc(-1 * var(--orbit-r)));
-    background: radial-gradient(circle at 38% 34%, #fff6cf, #ffd96d 58%, #ffc24a);
-    box-shadow: 0 0 50px 8px rgba(255, 206, 92, 0.5);
-}
-.loading-moon {
-    width: 60px; height: 60px; margin: -30px;
-    transform: translateY(var(--orbit-r));
-    /* Soft, near-white body so its edge doesn't read as a grey rim at night. */
-    background: radial-gradient(circle at 42% 40%, #ffffff 0%, #f4f7ff 64%, #e9eefb 100%);
-    box-shadow: 0 0 34px 3px rgba(228, 236, 255, 0.45);
+    position: absolute;
+    left: 86%;
+    bottom: 58%;
+    width: 78px;
+    height: 78px;
+    margin: -39px 0 0 -39px;
+    border-radius: 50%;
+    background: #fff3d2;
 }
 
 /* Drifting clouds.
@@ -154,8 +170,8 @@ a
 .loading-cloud {
     position: absolute;
     left: -25%;
-    width: 132px;
-    height: 46px;
+    width: var(--lc-w, 132px);
+    height: var(--lc-h, 46px);
     transform: scale(var(--lc-scale, 1));
     will-change: transform;
     /* OPAQUE, with the distance carried by the colour instead of an alpha.
@@ -182,11 +198,66 @@ a
     background: var(--lc-tint, #ffffff);
     border-radius: 50%;
 }
-.loading-cloud::before { width: 58px; height: 58px; top: -26px; left: 22px; }
-.loading-cloud::after  { width: 42px; height: 42px; top: -16px; left: 66px; }
-.loading-cloud.lc1 { top: 18%; --lc-scale: 0.9; --lc-tint: #ffffff; animation: loading-drift 42s linear infinite; }
-.loading-cloud.lc2 { top: 32%; --lc-scale: 0.6; --lc-tint: #f4f7fa; animation: loading-drift 60s linear infinite; animation-delay: -22s; }
-.loading-cloud.lc3 { top: 11%; --lc-scale: 1.1; --lc-tint: #f9fbfc; animation: loading-drift 52s linear infinite; animation-delay: -36s; }
+/*
+ * Three clouds, three silhouettes.
+ *
+ * They were one shape at three scales, which is fine until two of them are on
+ * screen together -- and with drifts of 42, 52 and 60 seconds, two of them are
+ * on screen together most of the time. Identical outlines at different sizes
+ * do not read as two clouds, they read as one cloud and its copy.
+ *
+ * The geometry moves to custom properties so each can have its own: where the
+ * puffs sit, how big they are relative to each other, how long the body is.
+ * lc1 rises to the left, lc2 to the right, lc3 is longer and lumpier. Same
+ * three elements, same two pseudo-elements, no extra cost.
+ */
+.loading-cloud::before {
+    width: var(--lc-a, 58px); height: var(--lc-a, 58px);
+    top: var(--lc-at, -26px); left: var(--lc-al, 22px);
+}
+.loading-cloud::after  {
+    width: var(--lc-b, 42px); height: var(--lc-b, 42px);
+    top: var(--lc-bt, -16px); left: var(--lc-bl, 66px);
+}
+.loading-cloud.lc1 {
+    top: 18%; --lc-scale: 0.9; --lc-tint: #ffffff;
+    /* Twelve pixels of overlap between the puffs, for the reason spelled out
+       on lc3 below: at two they were touching rather than merging, and a
+       cloud whose lumps only touch reads as two objects. */
+    --lc-w: 138px; --lc-a: 62px; --lc-al: 16px; --lc-at: -30px;
+    --lc-b: 44px; --lc-bl: 66px; --lc-bt: -16px;
+    animation: loading-drift 42s linear infinite;
+}
+/* The far one, and the only one that should look far. It was the mirror of
+   lc1 -- a small puff then a big one -- which made it lc1 read backwards
+   rather than a different cloud. Now it is the flattest and simplest of the
+   three: one low body, one modest rise, nothing on the right. Distance is
+   drawn by having less in it, not by being smaller. */
+.loading-cloud.lc2 {
+    top: 32%; --lc-scale: 0.6; --lc-tint: #f4f7fa;
+    --lc-w: 124px; --lc-h: 32px; --lc-a: 46px; --lc-al: 26px; --lc-at: -20px;
+    --lc-b: 26px; --lc-bl: 74px; --lc-bt: -8px;
+    animation: loading-drift 60s linear infinite; animation-delay: -22s;
+}
+/*
+ * The big one, and the one that was wrong.
+ *
+ * Its two puffs did not touch: the left ended at x=74 and the right began at
+ * x=82, so there was an eight pixel notch between them and the silhouette read
+ * as two separate bumps sitting on a bar. A cloud is one mass with lumps in
+ * it, and the thing that makes it one mass is that the lumps OVERLAP.
+ *
+ * They now share twelve pixels, the taller one sits left of centre and the
+ * shape tapers to the right, which is the ordinary shape of a cumulus. The
+ * body also came down from 164 to 150 so the flat tail past the last puff is
+ * a taper and not a plank.
+ */
+.loading-cloud.lc3 {
+    top: 11%; --lc-scale: 1.1; --lc-tint: #f9fbfc;
+    --lc-w: 150px; --lc-h: 48px; --lc-a: 70px; --lc-al: 14px; --lc-at: -34px;
+    --lc-b: 52px; --lc-bl: 70px; --lc-bt: -22px;
+    animation: loading-drift 52s linear infinite; animation-delay: -36s;
+}
 
 /* THE WHOLE POINT OF THIS FILE'S ANIMATIONS BEING WHAT THEY ARE.
    Only `transform` and `opacity` can be animated by the compositor, and only a
@@ -202,40 +273,6 @@ a
     to   { transform: translateX(140vw)  scale(var(--lc-scale, 1)); }
 }
 
-/* Dusk/night veil mutes the sky + clouds as it gets dark */
-.loading-nightveil {
-    position: absolute;
-    inset: 0;
-    background: #131c3a;
-    opacity: 0;
-    will-change: opacity;
-    animation: nightveil var(--load-cycle) linear infinite;
-}
-@keyframes nightveil { 0%,18%{opacity:0} 30%{opacity:.1} 50%{opacity:.4} 70%{opacity:.1} 82%,100%{opacity:0} }
-
-/* Stars (night only) */
-.loading-stars {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    background-image:
-        radial-gradient(1.6px 1.6px at 12% 22%, #fff, transparent),
-        radial-gradient(1.4px 1.4px at 28% 12%, #fff, transparent),
-        radial-gradient(1.8px 1.8px at 42% 28%, #fff, transparent),
-        radial-gradient(1.3px 1.3px at 58% 14%, #fff, transparent),
-        radial-gradient(1.6px 1.6px at 70% 24%, #fff, transparent),
-        radial-gradient(1.4px 1.4px at 84% 10%, #fff, transparent),
-        radial-gradient(1.5px 1.5px at 91% 30%, #fff, transparent),
-        radial-gradient(1.3px 1.3px at 20% 38%, #fff, transparent),
-        radial-gradient(1.5px 1.5px at 50% 40%, #fff, transparent),
-        radial-gradient(1.4px 1.4px at 76% 36%, #fff, transparent),
-        radial-gradient(1.2px 1.2px at 35% 8%, #fff, transparent),
-        radial-gradient(1.3px 1.3px at 64% 42%, #fff, transparent);
-    will-change: opacity;
-    animation: stars-twinkle var(--load-cycle) linear infinite;
-}
-@keyframes stars-twinkle { 0%,34%{opacity:0} 50%{opacity:.95} 66%{opacity:.95} 80%{opacity:0} 100%{opacity:0} }
-
 /* Layered wavy hills (parallax sway + day/night tint) */
 .loading-waves {
     position: absolute;
@@ -243,49 +280,265 @@ a
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 46%;
+    /* Taller than the 46% it was. The three crests moved up inside the box
+       (see index.html) and the box has to grow with them, or the horizon ends
+       up at two thirds of the screen and the sky reads as a ceiling. */
+    height: 54%;
 }
 .wave { transform-box: fill-box; transform-origin: center bottom; will-change: transform; }
-.wave-1 { fill: #7ec99a; animation: wave-sway-1 11s ease-in-out infinite alternate, wave1-tint var(--load-cycle) linear infinite; }
-.wave-2 { fill: #9fd9af; animation: wave-sway-2 9s  ease-in-out infinite alternate, wave2-tint var(--load-cycle) linear infinite; }
-.wave-3 { fill: #c4e9c8; animation: wave-sway-3 13s ease-in-out infinite alternate, wave3-tint var(--load-cycle) linear infinite; }
+/*
+ * Three bands, and the value order is the whole trick.
+ *
+ * They used to be three tints of the same mint green getting lighter as they
+ * went back, which is how you draw distance at noon. At this hour the light
+ * is coming along the ground, so the near band is the one catching it: the
+ * far hill stays a cool sage, the middle one falls into its own shadow, and
+ * the ground in front goes gold. That inversion is most of what makes the
+ * frame read as evening rather than as green hills with an orange filter.
+ *
+ * The `fill` animations that cycled these through the day are gone with the
+ * cycle, and that is a real saving and not a tidy-up: `fill` is paint, so
+ * they repainted the whole hill band every frame AND pinned the sway beside
+ * them to the main thread, on the one screen whose main thread is already
+ * the bottleneck. What is left is transform only, which the compositor runs
+ * on its own.
+ */
+.wave-1 { fill: #c9a154; animation: wave-sway-1 11s ease-in-out infinite alternate; }
+.wave-2 { fill: #4f7152; animation: wave-sway-2 9s  ease-in-out infinite alternate; }
+.wave-3 { fill: #9cb083; animation: wave-sway-3 13s ease-in-out infinite alternate; }
 
 @keyframes wave-sway-1 { from { transform: translateX(-16px); } to { transform: translateX(16px); } }
 @keyframes wave-sway-2 { from { transform: translateX(13px); }  to { transform: translateX(-13px); } }
 @keyframes wave-sway-3 { from { transform: translateX(-9px); }   to { transform: translateX(9px); } }
 
-@keyframes wave1-tint { 0%,12%{fill:#7ec99a} 22%{fill:#b8966a} 50%{fill:#1b2c44} 78%{fill:#b8966a} 90%,100%{fill:#7ec99a} }
-@keyframes wave2-tint { 0%,12%{fill:#9fd9af} 22%{fill:#cdaa7d} 50%{fill:#243750} 78%{fill:#cdaa7d} 90%,100%{fill:#9fd9af} }
-@keyframes wave3-tint { 0%,12%{fill:#c4e9c8} 22%{fill:#e3c49c} 50%{fill:#2d4257} 78%{fill:#e3c49c} 90%,100%{fill:#c4e9c8} }
+/*
+ * The house and the dog.
+ *
+ * Its own SVG rather than a group inside .loading-waves, and that is not a
+ * preference: the hills carry preserveAspectRatio="none" so they can stretch
+ * to any viewport, and anything sharing that box gets stretched with them. A
+ * house 40% wider on a laptop than on a desktop is not a house.
+ *
+ * It therefore does NOT sway with the hill it stands on. The sway is 16px
+ * over eleven seconds, which at this scale reads as the grass moving rather
+ * than as the ground sliding out from under the porch.
+ */
+/*
+ * Placed against the gold, not against the hill behind it.
+ *
+ * An earlier version sat 13% from the bottom, which landed the porch on the
+ * middle green band: a blue house on a dark hill with the lit ground running
+ * along underneath it, so it read as floating. The near band starts at about
+ * 78% of the viewport, and the base sits a little below that, on the surface
+ * the light is actually falling on.
+ *
+ * flex-end rather than two absolute positions: both images are cropped to
+ * their own content, so lining up the boxes lines up the feet, and the two
+ * can then be sized independently without the dog drifting off the ground.
+ */
+.loading-home {
+    position: absolute;
+    left: clamp(10px, 4.5vw, 110px);
+    /* Up the slope a little. At 9% the pair sat on the flat run at the very
+       bottom of the gold; at 11% the base lands where the near band is still
+       curving, which is the difference between standing ON a hill and
+       standing in front of one. */
+    bottom: 11%;
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(2px, 0.8vw, 14px);
+    /* Behind the title and the buttons, in front of the hills. */
+    z-index: 1;
+    pointer-events: none;
+}
+/*
+ * The shadow is the artwork again, projected.
+ *
+ * This went to a blurred ellipse for a while and came back, which is worth
+ * recording honestly: the ellipse never looked wrong, it just did not look
+ * like anything. A raking light projects the outline -- gable, chimney, ears,
+ * tail -- and that projection is the only thing on this screen that says the
+ * light is coming from a particular place.
+ *
+ * ── The bug that made the first attempt look "stuck on" ──────────────────
+ *
+ * The blur was on the same element as the transform, and in the CSS pipeline
+ * a filter is rasterised BEFORE the transform maps it. So a 2.5px blur went
+ * through scaleY(-0.24) and came out as 0.6px vertically: the top edge of
+ * every shadow was effectively a hard line, whatever number was in the blur.
+ * That, not the angle, is what read as hard and pasted-on -- and it is why
+ * turning the lean down three times never fixed it.
+ *
+ * Wrapping is the fix. The transform stays on the image and the blur moves to
+ * the parent, so the blur applies to the already-projected result and is the
+ * same in both directions.
+ *
+ * `multiply` rather than a grey at low opacity: multiplying into the gold
+ * darkens it without desaturating it. A shadow on warm ground is warm; a
+ * translucent black one comes out grey and reads as dirt.
+ */
+.lh-fig {
+    position: relative;
+    display: block;
+    /* Contain the blur so it cannot widen the flex row. */
+    line-height: 0;
+}
+.lh-shadow {
+    position: absolute;
+    inset: 0;
+    /* Uniform, because it is applied after the projection rather than before
+       it. 6px here is softer than the 2.5px that preceded it was ever able to
+       be. */
+    filter: blur(6px);
+    opacity: 0.18;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+}
+.lh-cast {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    transform-origin: left bottom;
+    /* 30 degrees of lean: the shadow reaches sideways by tan(angle) times its
+       own height, so this is 0.6x. It started at 65 (2.1x), where it was
+       longer than the house was wide and read as a second object lying on the
+       ground.
+       POSITIVE because the sun is on the right: a shadow leans away from its
+       light, and a scene whose shadows point back at the sun is the kind of
+       mistake nobody can name but everybody feels. */
+    transform: scaleY(-0.22) skewX(30deg);
+    /* brightness(0) keeps the alpha and throws away everything else, so what
+       is left is the exact outline as a solid. */
+    filter: brightness(0);
+}
 
-/* Narrow/portrait screens: smaller arc + lower pivot so the sweep reads well. */
+.lh-house {
+    width: clamp(240px, 27vw, 380px);
+    height: auto;
+}
+/*
+ * The dog stands NEARER than the house, and that is the whole point of it.
+ *
+ * Sized to a shiba's real height against a real house it came out at a
+ * quarter of the roof, which is correct and also flat: two objects on one
+ * ground line at their true relative sizes is an elevation drawing, not a
+ * scene. Moving it down the frame and up in size puts it closer to the
+ * viewer, and on a flat side-on picture those two moves together are the only
+ * depth cue available -- there is no camera here to do it for us.
+ *
+ * It also steps in FRONT of the mailbox, which is the cheapest depth cue of
+ * the three: one thing overlapping another settles their order instantly and
+ * costs a negative margin.
+ */
+.lh-fig--dog {
+    /* Clear of the mailbox rather than overlapping it. The overlap was the
+       third depth cue and the cheapest, but it was also crowding the only
+       gap in that corner: with the dog at its new size the two shapes were
+       touching, and two touching silhouettes read as one blob before they
+       read as one in front of the other. Size and height carry the depth on
+       their own. */
+    margin-left: clamp(4px, 0.7vw, 12px);
+    margin-bottom: clamp(-34px, -2vw, -11px);
+    z-index: 1;
+}
+.lh-dog {
+    width: clamp(72px, 7.6vw, 108px);
+    height: auto;
+}
+
+/* Narrow/portrait screens. */
 @media (max-width: 760px) {
-    .loading-scene { --orbit-r: 82vh; --orbit-y: -12%; }
-    .loading-sun { width: 62px; height: 62px; margin: -31px; }
-    .loading-moon { width: 50px; height: 50px; margin: -25px; }
+    /*
+     * No disc -- but then the glow has to be explained.
+     *
+     * Hiding the sun was right: on a phone there is no empty sky left, the
+     * type and two buttons own the middle and the hills own the bottom third,
+     * and at every height worth trying the disc landed behind one of them.
+     *
+     * What it left behind was a bug in the picture, though. The bloom stayed
+     * where it was, floating in the middle of the sky with nothing at its
+     * centre: a halo with no lamp. Nobody names that when they see it, they
+     * just find the sky slightly wrong.
+     *
+     * So the glow drops to the horizon instead of vanishing with the disc.
+     * Centred just BELOW the hill line it reads as exactly what it now is --
+     * a sun that has already gone behind the hill, which is the most ordinary
+     * thing a sky at this hour can be doing. Wider and flatter too, because a
+     * glow spilling up from behind a ridge spreads along it.
+     */
+    .loading-sun { display: none; }
+    .sky-golden {
+        --bloom-size: 88vw 46vw;
+        /* Mirrored like the desktop disc, and for the same reason: the house
+           owns the left corner here, so the light belongs in the other one. */
+        --bloom-pos: 76% 57%;
+    }
 
-    /* The hills stop changing colour on phones, and the veil does the darkening
-       instead.
-       `fill` is a paint property, so animating it repaints the whole hill band
-       every frame -- around a megapixel of it on a 1080-wide phone -- and it
-       also pins the sway next to it to the main thread, since an element that
-       repaints anyway cannot have its transform composited. Two of the four
-       animations on this screen were therefore main-thread, which is what made
-       the loading screen lurch on a mid-range Android while the loader worked.
-       The veil is a plain opacity fade over everything and already covers the
-       hills, so it reaches the same dusk without repainting anything. Desktop
-       keeps the tint: it has the frames to spare and the colours are nicer. */
-    .wave-1 { animation: wave-sway-1 11s ease-in-out infinite alternate; }
-    .wave-2 { animation: wave-sway-2 9s  ease-in-out infinite alternate; }
-    .wave-3 { animation: wave-sway-3 13s ease-in-out infinite alternate; }
-    @keyframes nightveil { 0%,18%{opacity:0} 30%{opacity:.14} 50%{opacity:.62} 70%{opacity:.14} 82%,100%{opacity:0} }
+    /*
+     * The hills stop being crushed.
+     *
+     * preserveAspectRatio="none" stretches the 1440-wide viewBox to whatever
+     * it is given, and the two axes were being scaled by wildly different
+     * amounts: on a 412px phone the box was squeezed to 0.29 horizontally
+     * while still being stretched 1.28 vertically. Gentle rolling curves at a
+     * 4.5:1 distortion come out as steep ridges, which is the "apretadas"
+     * look exactly.
+     *
+     * The fix is to give the SVG more width than the screen and let the
+     * parent clip it. At 300% the horizontal scale is 0.86 against 1.09
+     * vertical: near enough to square that the curves read as the same hills
+     * the desktop has.
+     */
+    .loading-waves {
+        /*
+         * -30% and not -100%, and the number is doing real work.
+         *
+         * Widening the SVG fixed the crushed curves, but it also decided WHICH
+         * part of a 1440-wide drawing lands in a 412-wide window -- and at
+         * -100% the window opened onto the flattest stretch of the three
+         * paths. The house ended up on a horizon with no shape in it, which is
+         * exactly the thing that made the desktop version work: there it
+         * happens to sit where the ground curves.
+         *
+         * Sliding the slice to -30% brings a crest into the corner the house
+         * occupies. Four positions were rendered side by side to pick it; this
+         * is the one where the near band dips under the porch and rises again
+         * to the right, which is the same shape the desktop gets for free.
+         */
+        left: -30%;
+        right: auto;
+        width: 300%;
+        height: 46%;
+    }
+
+    /*
+     * Half a house is enough.
+     *
+     * Whole, it either shrinks to a toy or takes the width the buttons need.
+     * Cropped by the left edge it stays at a believable size and the half
+     * that survives is the half worth keeping: the door, the steps and the
+     * mailbox. A building running off the side of the frame is also just how
+     * a photograph of one looks.
+     */
+    .loading-home {
+        left: -26vw;
+        bottom: 5%;
+    }
+    .lh-house { width: 62vw; }
+    /* Same ratio as the desktop pair, in the units this breakpoint uses. */
+    .lh-dog { width: 18vw; }
+    .lh-fig--dog {
+        /* Positive here too, for the same reason as the desktop: at this size
+           the dog and the mailbox were touching. */
+        margin-left: 1.2vw;
+        margin-bottom: -2.6vw;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .sky-layer, .loading-stars, .loading-celestial, .loading-cloud,
-    .wave, .loading-nightveil { animation: none !important; }
-    .sky-day { opacity: 1; }
-    .loading-sun { transform: translateY(calc(-1 * var(--orbit-r))); }
+    .loading-cloud, .wave { animation: none !important; }
 }
 
 .cloud-transition-content
@@ -315,23 +568,49 @@ a
     font-size: clamp(44px, 9vw, 68px);
     font-weight: 600;
     /* Tracked in, not out: at display size positive spacing makes a title
-       look stretched. Matches the name on the overview page. */
-    letter-spacing: -0.03em;
-    line-height: 1.0;
-    /* NOT the overview page dark green: this sits over a sky that cycles
-       day -> sunset -> night, and the dark tone vanished against the night. */
-    color: #41a06e;
+       look stretched. These are the overview page's .ov-name numbers now. */
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    /* The overview page's dark green, at last. It could not be used while
+       this sky cycled into night, because the dark tone vanished against it;
+       with the hour fixed there is one background to hold against and it is a
+       light one. The start screen and the document now share their ink, which
+       is most of what makes two different palettes read as one author. */
+    color: #1d4232;
     margin: 0;
-    /* Sticker outline — the same ingredient as the buttons. This sky cycles
-       from a pale morning to near-black night, and no single flat colour holds
-       against both; a white edge cuts the letters out of whatever is behind.
-       paint-order draws the stroke BEFORE the fill, so the outline sits
-       outside the letterforms instead of eating into them. Without it a
-       text-stroke this thick would thin the type to nothing. */
-    -webkit-text-stroke: 0.09em #ffffff;
-    paint-order: stroke fill;
-    /* Short, unblurred — the same ledge the buttons sit on. */
-    text-shadow: 0 4px 0 rgba(31, 74, 54, 0.18);
+    /*
+     * No outline, and no ledge under the letters.
+     *
+     * The white stroke was not decoration, it was load bearing: this sky used
+     * to cycle from a pale morning to a near-black night, and no single flat
+     * colour holds against both, so a white edge cut the letters out of
+     * whatever happened to be behind them at that second.
+     *
+     * The night is gone. There is one background now and it is light, which
+     * means dark green on it is simply legible, and the outline is left doing
+     * the only other thing it was ever doing: making the type look like a
+     * sticker. Same for the hard 4px ledge under it.
+     *
+     * What is left is exactly the overview page's .ov-name -- same family,
+     * weight, colour and tracking. The two screens now set type the same way,
+     * which is the part people read as one author rather than two templates.
+     */
+}
+
+/* The line the title stopped saying. Sentence case and small, because it is a
+   caption on a name and not a second headline. Its outline goes for the same
+   reason as the title's, and the colour is the overview's --ov-muted, which is
+   measured to clear 4.5:1 on paper this light. */
+.cloud-sub {
+    margin: -22px 0 0;
+    font-family: 'Fredoka', 'Nunito', 'Quicksand', system-ui, sans-serif;
+    font-size: clamp(15px, 1.7vw, 20px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    /* A step lighter than the overview's --ov-muted it was using. This line is
+       a caption under a name, and at this size it was holding almost as much
+       ink as the name itself. Still 4.6:1 on the lightest part of this sky. */
+    color: #5d8574;
 }
 
 /* ── Button with horizontal fill ── */
@@ -354,35 +633,55 @@ a
     gap: 9px;
     min-height: 44px;
     padding: 11px 24px;
-    border: 2px solid #fff;
-    outline: 1.5px solid rgba(95, 197, 148, 0.38);
+    /*
+     * Quieter than it was, on purpose.
+     *
+     * It had a white fill, a white edge, a green outline AND its own ledge --
+     * the same physical language as the primary, one notch down. The trouble
+     * with one notch down is that it still reads as a peer: two pills stacked,
+     * both raised off the page, and the eye has to work out which one the
+     * screen wants.
+     *
+     * These two are not peers. Exploring is what the site IS; the overview is
+     * the shortcut for somebody who does not have five minutes. So this drops
+     * out of the raised family altogether: no ledge, no double edge, one
+     * hairline and a surface you can barely see.
+     *
+     * But it KEEPS a surface, and that is not timidity. Transparent was the
+     * first try and it failed a measurement rather than a taste test: the
+     * button floats over whatever band of the scene the viewport height puts
+     * behind it, and green label on the sage hill came out at 1.4:1 against a
+     * required 4.5. A quiet white veil holds the contrast steady whatever
+     * passes underneath, and the ink goes to the document's own dark green,
+     * which is what buys the headroom.
+     */
+    border: 1.5px solid rgba(65, 160, 110, 0.28);
     border-radius: 999px;
-    background: #fff;
-    /* Same physical language as the primary, one step down: a thinner
-       white edge and a shorter ledge, so it reads as secondary without
-       looking like a different family. */
-    box-shadow: 0 3px 0 rgba(65, 160, 110, 0.22);
+    background: rgba(255, 255, 255, 0.62);
     font-family: 'Fredoka', 'Nunito', system-ui, sans-serif;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.02em;
-    color: #3f9e6b;
+    /* The overview page's ink, not the bright green this used to use. On a
+       62% white veil it measures 7.8:1; the old green managed 3.8:1 on the
+       same surface and far less on bare sky. */
+    color: #1d4232;
     cursor: pointer;
     transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
                 background 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
 }
 
+/* The surface only appears under the cursor, which is also the only moment it
+   is useful. Same idea as the credential rows on the overview page. */
 .cloud-btn-alt:hover
 {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(95, 197, 148, 0.75);
-    box-shadow: 0 4px 0 rgba(65, 160, 110, 0.30);
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(65, 160, 110, 0.5);
 }
 
 .cloud-btn-alt:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 rgba(65, 160, 110, 0.22);
+    transform: translateY(1px);
+    background: rgba(255, 255, 255, 0.98);
 }
 
 .cloud-btn-alt:focus-visible
@@ -471,11 +770,19 @@ a
     cursor: pointer;
     color: #ffffff;
     border-color: transparent;
-    background: linear-gradient(168deg, #5fc594, #41a06e);
+    /* Flat fill, no white ring, ledge kept. Read off a screenshot pixel by
+       pixel rather than guessed: #41a06e straight down with no gradient, the
+       background meeting it with a single antialiased pixel and no ring, and
+       #2f7a52 along the bottom. */
+    background: #41a06e;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     font-variant-numeric: normal;
-    border: 3px solid #fff;
+    /* Transparent, not removed, so the pill keeps its exact box: the border
+       still occupies its three pixels, the fill paints under it
+       (background-clip is border-box) and the ledge stays where it was to the
+       pixel. Deleting it would shrink the button by 6px in both directions. */
+    border: 3px solid transparent;
     box-shadow:
         0 5px 0 #2f7a52,
         0 8px 16px -4px rgba(39, 90, 70, 0.3);
