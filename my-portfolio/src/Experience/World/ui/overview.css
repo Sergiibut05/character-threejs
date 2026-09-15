@@ -18,6 +18,13 @@
     --ov-muted: #4a7263;
     --ov-faint: #6d9384;
     --ov-line: rgba(65, 160, 110, 0.16);
+    /* The dashed variant of --ov-line, and deliberately darker than it.
+       A dash pattern that is on four pixels out of every nine lays down less
+       than half the ink of a solid rule, so at the same alpha it disappears
+       next to one. This is the tone that makes the two read as the same
+       weight, which is the whole point: the difference between them should be
+       the pattern, not the emphasis. */
+    --ov-tick: rgba(65, 160, 110, 0.3);
     --ov-card: #ffffff;
     /* Flat warm paper, not a cold mint gradient. The blue-to-green wash this
        replaced is the single thing that made the page read as a SaaS template:
@@ -64,6 +71,77 @@
         0 2px 4px rgba(39, 90, 70, 0.12),
         0 22px 44px -12px rgba(39, 90, 70, 0.26);
 
+    /*
+     * Elevation, as three steps and not as twenty hand-tuned shadows.
+     *
+     * Every one of these is the same recipe at a different height, which is
+     * the only reason the page reads as one material:
+     *
+     *   a 1px inner highlight along the TOP edge     the lit side of a curve
+     *   a tight, almost unblurred contact shadow     what stops it floating
+     *   a wide, very faint ambient shadow            the room it sits in
+     *
+     * Raising something means moving the contact shadow down and spreading the
+     * ambient one, never making either darker. Darker reads as a heavier
+     * shadow; further reads as a higher object, and that is the whole trick.
+     */
+    --ov-e1:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 1px 2px rgba(39, 90, 70, 0.08),
+        0 3px 8px -4px rgba(39, 90, 70, 0.12);
+    --ov-e2:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 1px 2px rgba(39, 90, 70, 0.08),
+        0 8px 18px -8px rgba(39, 90, 70, 0.20);
+    --ov-e3:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 2px 4px rgba(39, 90, 70, 0.07),
+        0 24px 44px -20px rgba(39, 90, 70, 0.28),
+        0 60px 90px -60px rgba(39, 90, 70, 0.30);
+    /* The front card, which is a bigger object than anything else on the page
+       and has to be lit like one: four layers rather than three, so the
+       shadow has a near edge AND a far one instead of a single soft halo. */
+    --ov-e-card:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.96),
+        0 1px 2px rgba(39, 90, 70, 0.06),
+        0 10px 20px -12px rgba(39, 90, 70, 0.18),
+        0 34px 60px -28px rgba(39, 90, 70, 0.26),
+        0 80px 120px -70px rgba(31, 78, 60, 0.38);
+
+    /* A hairline that is warm rather than grey, so the edge of a white card
+       against warm paper does not read as a cut-out. */
+    --ov-edge: rgba(65, 130, 100, 0.16);
+    /*
+     * Two weights of line, because they do two jobs.
+     *
+     * --ov-line is a hairline INSIDE a component, where it sits against a
+     * surface and only has to be perceptible. --ov-rule is structural: a
+     * margin rule, a block divider, the underline of a column heading. Those
+     * are load bearing, they sit on bare paper, and at 0.16 alpha they simply
+     * were not there — the margin rule beside the About facts was measured on
+     * screen and could not be seen at all.
+     */
+    --ov-rule: rgba(56, 122, 94, 0.26);
+    --ov-surface: linear-gradient(178deg, #ffffff 0%, #fbfdf9 60%, #f4faf5 100%);
+
+    /*
+     * Motion, as three durations. Not because three is a magic number, but
+     * because this page had eleven and the difference between 0.42s and 0.45s
+     * is not a decision anybody can perceive — it is just drift.
+     *
+     *   hover   the surface answering the cursor. Anything slower feels sticky.
+     *   move    something on the page changing state.
+     *   stage   the one big move: a whole card travelling across the section.
+     *           It is allowed to take its time BECAUSE it is the only one.
+     */
+    --ov-dur-hover: 0.2s;
+    --ov-dur-move: 0.42s;
+    --ov-dur-stage: 0.86s;
+    /* Almost all of the travel happens early and the last tenth of the
+       distance takes a third of the time. That long tail is the whole
+       difference between a slide and a weight coming to rest. */
+    --ov-ease-stage: cubic-bezier(0.16, 1, 0.24, 1);
+
 
     /*
      * In the document flow, NOT a fixed overlay with its own scrollbar.
@@ -101,6 +179,11 @@
 }
 
 .ov-root.is-open { opacity: 1; }
+
+/* Lenis writes the native scroll position every frame and does NOT clear this
+   property itself. Left on, the browser would ease toward its own target while
+   Lenis wrote a different one, once per frame. */
+html.lenis { scroll-behavior: auto; }
 
 /*
  * Hand the document its scrollbar back for as long as the overview is open.
@@ -144,11 +227,30 @@ body.ov-page {
    here that hides itself (the CV button, the extra certificates) relies on it. */
 .ov-root [hidden] { display: none !important; }
 
+/*
+ * The focus ring, and specifically NOT its border-radius.
+ *
+ * This rule used to set `border-radius: 6px`, which does not round the
+ * OUTLINE -- it rounds the ELEMENT. So every pill-shaped control changed
+ * shape the moment it was focused: the back button, a 44px-radius pill, came
+ * out as a rounded rectangle with the ring drawn around that. It looked like
+ * a rendering bug because it was one.
+ *
+ * Browsers have followed the element's own radius with the outline since 2021
+ * on every engine this project supports, so the correct value is none at all.
+ * Two pixels rather than three: at three it reads as a border the control
+ * suddenly grew.
+ */
 .ov-root :focus-visible {
-    outline: 3px solid var(--fz-green-500);
+    outline: 2px solid var(--fz-green-500);
     outline-offset: 3px;
-    border-radius: 6px;
 }
+
+/* The dialog container takes focus when the page opens, which is the standard
+   way to put a screen reader at the top of a newly opened view. It is not a
+   control and must never look like one. */
+.ov-root:focus,
+.ov-root:focus-visible { outline: none; }
 
 /* Controls are the exception: selecting a button's label is never wanted. */
 .ov-root button,
@@ -184,7 +286,10 @@ body.ov-page {
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 12px var(--ov-pad);
+    /* More above than below, so the controls sit ON the page rather than
+       clinging to the top edge of the window. The hero's pull-up reads
+       --ov-bar-h, which is measured, so this needs no other number changed. */
+    padding: 20px var(--ov-pad) 14px;
     /* Pulls the page up under the bar so the hero owns that strip. The height
        is measured in JS (--ov-bar-h) because it changes across breakpoints;
        the fallback is the desktop measurement. */
@@ -197,44 +302,31 @@ body.ov-page {
 }
 
 /*
- * The bar's SURFACE, as a layer of its own that fades in and out.
+ * No surface, no border, no blur. The header is a strip of nothing.
  *
- * See-through while the page is at rest at the top, so the hero's drifting
- * motif field runs up behind the bar and straight through it instead of being
- * sliced off by a frosted band. It only becomes a surface once there is
- * content under it that has to stay readable.
- *
- * The state used to be a transition on `background` and `backdrop-filter`
- * directly. Animating a backdrop-filter means re-blurring the whole strip
- * every frame on the main thread, and on a phone that lands right on top of
- * the scroll it was reacting to — the stutter you get scrolling up. Fading a
- * layer whose blur never changes is a plain opacity animation, which the
- * compositor does on its own.
+ * It used to grow a frosted band with a hairline under it the moment the page
+ * moved, and that hairline was the only thing on this page drawing a box round
+ * the content. Without it the four controls read as small objects floating
+ * over the document -- which is what they already looked like since they were
+ * given their own lit surfaces, and it is why removing the band costs nothing
+ * in legibility: every control brings its own.
  */
-.ov-bar::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    box-sizing: border-box;
-    background: rgba(251, 253, 245, 0.94);
-    backdrop-filter: blur(14px) saturate(1.3);
-    -webkit-backdrop-filter: blur(14px) saturate(1.3);
-    border-bottom: 1px solid var(--ov-line);
-    opacity: 0;
-    transition: opacity 0.35s var(--ov-ease-soft);
-    pointer-events: none;
-    will-change: opacity;
-}
-
-/* Everything real in the bar rides above that surface. */
 .ov-bar > * { position: relative; z-index: 1; }
-.ov-root.is-scrolled .ov-bar::before { opacity: 1; }
 
-/* Reading progress — a hairline that fills as you go. */
+/*
+ * Reading progress, at the very top of the WINDOW.
+ *
+ * It used to run along the bottom edge of that band, which is where every site
+ * puts it and also why it read as part of the divider rather than as its own
+ * thing. On the top edge of the viewport it is the only piece of chrome on the
+ * page, it never overlaps anything, and it has no track behind it -- a track
+ * would be a full-width line, which is the exact thing this pass removes.
+ */
 .ov-progress {
-    position: absolute;
+    position: fixed;
+    top: 0;
     left: 0;
-    bottom: -1px;
+    z-index: 60;
     height: 2px;
     width: 100%;
     transform: scaleX(var(--p, 0));
@@ -242,6 +334,7 @@ body.ov-page {
     background: linear-gradient(90deg, var(--fz-green-400), var(--fz-green-500));
     /* Driven per-frame from scroll; a transition here would lag behind. */
     will-change: transform;
+    pointer-events: none;
 }
 
 .ov-back {
@@ -251,22 +344,25 @@ body.ov-page {
     flex-shrink: 0;
     min-height: 44px;
     padding: 8px 16px 8px 12px;
-    border: 1.5px solid var(--ov-line);
+    border: 1px solid var(--ov-edge);
     border-radius: var(--fz-radius-pill);
-    background: #fff;
+    background: var(--ov-surface);
     color: var(--fz-ink);
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-sm);
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.2s var(--ov-ease), box-shadow 0.2s var(--ov-ease),
-                border-color 0.2s var(--ov-ease);
+    box-shadow: var(--ov-e1);
+    transition: transform var(--ov-dur-hover) var(--ov-ease),
+                box-shadow var(--ov-dur-hover) var(--ov-ease),
+                border-color var(--ov-dur-hover) var(--ov-ease);
 }
 .ov-back:hover {
-    transform: translateX(-2px);
+    transform: translate(-2px, -1px);
     border-color: var(--fz-green-400);
-    box-shadow: var(--fz-shadow-soft);
+    box-shadow: var(--ov-e2);
 }
+.ov-back:active { transform: translate(-2px, 1px); box-shadow: var(--ov-e1); }
 .ov-back svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 .ov-nav {
@@ -275,9 +371,20 @@ body.ov-page {
     align-items: center;
     gap: 2px;
     margin-inline: auto;
-    padding: 4px;
+    /* Eight px on the sides, not four.
+       The pill scales about its own centre, so on the FIRST and LAST items it
+       grows outwards into the tray's padding. At four it crossed the tray's
+       own edge and the corner came out clipped; at eight there is room for the
+       full 12% on both ends. */
+    padding: 4px 8px;
+    border: 1px solid var(--ov-edge);
     border-radius: var(--fz-radius-pill);
-    background: rgba(215, 242, 228, 0.5);
+    /* Its own surface, now that the bar has none. At a 50% tint over a page
+       scrolling underneath, the labels sat on whatever happened to be passing,
+       including the dark project screenshots. The inner shade stays: it is
+       what makes the sliding pill read as running in a groove. */
+    background: var(--ov-surface);
+    box-shadow: inset 0 1px 2px rgba(39, 90, 70, 0.07), var(--ov-e1);
 }
 .ov-nav-link {
     position: relative;
@@ -294,8 +401,17 @@ body.ov-page {
     cursor: pointer;
     transition: color 0.25s var(--ov-ease-soft);
 }
+/*
+ * The white label belongs to whatever the PILL is under, not to the current
+ * section. With the pill away visiting the cursor, a white label left behind
+ * on the pale tray would be unreadable, so `is-lit` travels with it.
+ */
+.ov-nav-link { transition: color 0.25s var(--ov-ease-soft), transform 0.34s var(--fz-fab-ease); }
 .ov-nav-link:hover { color: var(--fz-green-500); }
-.ov-nav-link[aria-current='true'] { color: #fff; }
+.ov-nav-link.is-lit { color: #fff; }
+/* Grows under the cursor by the same factor as the pill, about the same
+   centre, so the two stay concentric while they scale. */
+.ov-nav-link.is-hot { transform: scale(1.14); }
 
 /* One pill slides between items instead of each item animating its own
    background — that is what makes the movement read as a single object. */
@@ -308,21 +424,55 @@ body.ov-page {
     border-radius: var(--fz-radius-pill);
     background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
     box-shadow: 0 4px 12px rgba(65, 160, 110, 0.3);
-    transform: translateX(var(--x, 0));
+    /* translate FIRST, then scale: the scale is then about the pill's own
+       centre wherever it has travelled to, rather than about the tray's. */
+    transform: translateX(var(--x, 0)) scale(var(--s, 1));
+    transform-origin: center;
     opacity: 0;
-    transition: transform 0.42s var(--ov-ease), width 0.42s var(--ov-ease),
+    transition: transform 0.42s var(--fz-fab-ease), width 0.42s var(--ov-ease),
                 opacity 0.25s var(--ov-ease-soft);
     pointer-events: none;
 }
 .ov-nav-pill.is-on { opacity: 1; }
 
 .ov-lang {
+    position: relative;
     display: inline-flex;
     flex-shrink: 0;
-    padding: 4px;
-    border: 1.5px solid var(--ov-line);
+    /* Six, for the same reason the nav tray has eight: the pill grows
+       outwards at both ends and needs somewhere to grow into. */
+    padding: 4px 6px;
+    border: 1px solid var(--ov-edge);
     border-radius: var(--fz-radius-pill);
-    background: #fff;
+    background: var(--ov-surface);
+    box-shadow: var(--ov-e1);
+}
+/*
+ * ONE pill that travels, exactly like the nav's.
+ *
+ * Each button used to paint its own green background, so switching language
+ * was two states swapping with nothing in between -- the kind of thing that
+ * works and that nobody notices. A single pill moving from ES to EN is an
+ * object changing its mind, it costs one transform, and it happens at the
+ * same moment the whole page re-renders in the other language.
+ *
+ * Sized off --lang-n and placed off --lang-i, both written by
+ * _renderLangToggle, so a third language would need no CSS at all.
+ */
+.ov-lang::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    width: calc((100% - 12px) / var(--lang-n, 2));
+    height: calc(100% - 8px);
+    border-radius: var(--fz-radius-pill);
+    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
+    box-shadow: 0 3px 10px rgba(65, 160, 110, 0.3);
+    transform: translateX(calc(var(--lang-i, 0) * 100%)) scale(var(--lang-s, 1));
+    transform-origin: center;
+    transition: transform 0.44s var(--fz-fab-ease);
+    pointer-events: none;
 }
 .ov-lang-btn {
     min-width: 42px;
@@ -337,13 +487,15 @@ body.ov-page {
     font-weight: 700;
     letter-spacing: 0.06em;
     cursor: pointer;
-    transition: background 0.25s var(--ov-ease-soft), color 0.25s var(--ov-ease-soft);
+    transition: color 0.25s var(--ov-ease-soft), transform 0.34s var(--fz-fab-ease);
 }
-.ov-lang-btn[aria-pressed='true'] {
-    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
-    color: #fff;
-}
-.ov-lang-btn:not([aria-pressed='true']):hover { color: var(--fz-green-500); }
+/* The pill above is the background now; these only carry their label, and
+   the white one is wherever the pill currently IS. */
+.ov-lang-btn { position: relative; z-index: 1; }
+.ov-lang-btn.is-lit { color: #fff; }
+.ov-lang-btn.is-hot { transform: scale(1.16); }
+/* No hover colour of its own: `is-lit` follows the pill, and a green label
+   on a green pill is what this rule used to produce. */
 
 /* Hamburger — hidden until the pill nav stops fitting. */
 .ov-menu-btn {
@@ -353,14 +505,22 @@ body.ov-page {
     flex-shrink: 0;
     width: 44px;
     height: 44px;
-    border: 1.5px solid var(--ov-line);
+    border: 1px solid var(--ov-edge);
     border-radius: 14px;
-    background: #fff;
+    background: var(--ov-surface);
     color: var(--fz-ink);
     cursor: pointer;
-    transition: border-color 0.2s var(--ov-ease-soft), box-shadow 0.2s var(--ov-ease);
+    box-shadow: var(--ov-e1);
+    transition: transform var(--ov-dur-hover) var(--ov-ease),
+                border-color var(--ov-dur-hover) var(--ov-ease-soft),
+                box-shadow var(--ov-dur-hover) var(--ov-ease);
 }
-.ov-menu-btn:hover { border-color: var(--fz-green-400); box-shadow: var(--fz-shadow-soft); }
+.ov-menu-btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--fz-green-400);
+    box-shadow: var(--ov-e2);
+}
+.ov-menu-btn:active { transform: translateY(1px); box-shadow: var(--ov-e1); }
 .ov-menu-btn svg { width: 21px; height: 21px; }
 
 /* ═══ Mobile sheet (Popover API — light dismiss and Escape come free) ═════ */
@@ -369,11 +529,13 @@ body.ov-page {
     inset: 0 0 auto 0;
     width: 100%;
     max-width: none;
-    max-height: 84dvh;
+    max-height: 92dvh;
     margin: 0;
-    padding: 16px clamp(16px, 4vw, 24px) 24px;
+    /* Generous, because there are five things in here and nothing else. The
+       old sheet was padded like a dialog with a form in it. */
+    padding: 18px clamp(20px, 6vw, 32px) clamp(30px, 8vw, 44px);
     border: 0;
-    border-radius: 0 0 26px 26px;
+    border-radius: 0 0 30px 30px;
     background: var(--ov-bg);
     color: var(--fz-ink);
     font-family: var(--fz-font-body);
@@ -416,57 +578,150 @@ body.ov-page {
     }
 }
 
+/* The same masthead every section on this page has: a small label in the
+   margin and the content at size underneath it. The sheet is not a different
+   kind of object from the document it belongs to. */
 .ov-sheet-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 4px 16px;
+    padding: 2px 0 clamp(18px, 5vw, 26px);
 }
 .ov-sheet-title {
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-2xs);
-    font-weight: 600;
-    letter-spacing: 0.12em;
+    font-weight: 700;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--ov-faint);
+    /* Green, like every other eyebrow on the page, rather than the faint grey
+       it had. This is a section label, not a caption. */
+    color: var(--fz-green-500);
 }
 .ov-sheet-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border: 1.5px solid var(--ov-line);
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--ov-edge);
     border-radius: 50%;
-    background: #fff;
+    background: var(--ov-surface);
     color: var(--fz-ink);
     cursor: pointer;
+    box-shadow: var(--ov-e1);
 }
 .ov-sheet-close svg { width: 18px; height: 18px; }
 
-.ov-sheet-list { display: grid; gap: 8px; }
+/*
+ * The index.
+ *
+ * Five white cards with borders and an arrow each is the shape every mobile
+ * menu has had for a decade, and it is a shape that appears nowhere else on
+ * this page. Five destinations on an otherwise empty sheet do not need five
+ * containers to be told apart -- the boxes were drawing a distinction nothing
+ * needed drawing, and they capped the names at 17px while a whole screen sat
+ * unused underneath.
+ *
+ * What replaced them is the Projects index, because that is already this
+ * page's way of showing a short list of places you can go: a number in the
+ * margin, the name at display size, a dashed rule between records. The menu
+ * reads as part of the document now instead of as a control panel laid over
+ * it, and the names are finally the size of the thing you are trying to hit.
+ */
+.ov-sheet-list {
+    display: grid;
+    border-bottom: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+}
 .ov-sheet-link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 3.4ch minmax(0, 1fr);
+    align-items: baseline;
+    gap: clamp(14px, 4vw, 20px);
     width: 100%;
-    min-height: 56px;
-    padding: 16px 16px;
-    border: 1.5px solid var(--ov-line);
-    border-radius: var(--fz-radius-sm);
-    background: #fff;
-    color: var(--fz-ink);
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-base);
-    font-weight: 600;
+    padding: clamp(16px, 4.4vw, 22px) 0;
+    border: 0;
+    border-top: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft);
 }
-.ov-sheet-link:hover,
-.ov-sheet-link:active { transform: translateX(3px); border-color: var(--fz-green-400); }
-.ov-sheet-link svg { width: 18px; height: 18px; color: var(--fz-green-400); flex-shrink: 0; }
+/* The same marker the project rows use, for the same reason: it says "this
+   one" without promising to take you anywhere, which is the job. */
+.ov-sheet-link::before {
+    content: '';
+    position: absolute;
+    left: calc(-1 * clamp(10px, 3vw, 14px));
+    top: clamp(18px, 4.6vw, 24px);
+    bottom: clamp(18px, 4.6vw, 24px);
+    width: 2px;
+    border-radius: 2px;
+    background: var(--fz-green-400);
+    transform: scaleY(0);
+    transition: transform 0.42s var(--fz-fab-ease);
+}
+.ov-sheet-link.is-on::before { transform: scaleY(1); }
+
+.ov-sheet-num {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.1em;
+    color: var(--ov-faint);
+}
+.ov-sheet-name {
+    font-family: var(--fz-font-title);
+    /* 8.4vw rather than a fixed size: this is the one place on the page where
+       the type should fill whatever phone it lands on. */
+    font-size: clamp(28px, 8.4vw, 40px);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    color: var(--fz-ink);
+    transition: color var(--ov-dur-hover) var(--ov-ease);
+}
+.ov-sheet-link.is-on .ov-sheet-num,
+.ov-sheet-link.is-on .ov-sheet-name { color: var(--fz-green-500); }
+.ov-sheet-link:active .ov-sheet-name { color: var(--fz-green-500); }
+
+/*
+ * The rows arrive one after another.
+ *
+ * The sheet itself is in the top layer and comes from display:none, so the
+ * only way its children can animate in is a @starting-style -- a transition
+ * needs a previous computed value and an element that was not being rendered
+ * has none. The closed state is declared too, so the stagger is armed again
+ * every time the sheet shuts.
+ */
+.ov-sheet-num,
+.ov-sheet-name {
+    display: block;
+    transition: opacity 0.5s var(--ov-ease), transform 0.5s var(--ov-ease),
+                color var(--ov-dur-hover) var(--ov-ease);
+}
+.ov-sheet:not(:popover-open) .ov-sheet-link > * {
+    opacity: 0;
+    transform: translateY(0.34em);
+}
+.ov-sheet:popover-open .ov-sheet-link > * {
+    opacity: 1;
+    transform: none;
+    transition-delay: calc(var(--i, 0) * 55ms + 80ms);
+}
+@starting-style {
+    .ov-sheet:popover-open .ov-sheet-link > * {
+        opacity: 0;
+        transform: translateY(0.34em);
+    }
+}
 
 /* ═══ Hero ════════════════════════════════════════════════════════════════ */
 
@@ -568,7 +823,11 @@ body.ov-page {
    lines with the leading pulled tight, so it reads as one solid mass balancing
    the character on the other side. Against 17px body that is a ~5.6:1 jump,
    where it used to be 4.3:1 — the old hierarchy was legible but timid. */
+.ov-name.is-in { clip-path: inset(-6% 0 -14% 0); transform: none; }
 .ov-name {
+    clip-path: inset(-6% 0 105% 0);
+    transition: clip-path 1.05s var(--ov-ease), transform 1.05s var(--ov-ease),
+                opacity 0.8s var(--ov-ease);
     margin: 0;
     /* Forces the break into "Sergii / Butrii" — two even lines stacked tight
        make a block with weight, where one long line just reads as a caption. */
@@ -589,14 +848,6 @@ body.ov-page {
     font-family: var(--fz-font-title);
     font-size: clamp(var(--ov-t-base), 2.4vw, var(--ov-t-lg));
     font-weight: 500;
-    color: var(--ov-muted);
-}
-
-.ov-lede {
-    max-width: 46ch;
-    margin: 20px 0 0;
-    font-size: clamp(var(--ov-t-base), 1.9vw, var(--ov-t-md));
-    line-height: 1.66;
     color: var(--ov-muted);
 }
 
@@ -696,8 +947,11 @@ body.ov-page {
    shadow with no blur — a diffuse glow reads as a web button, an unblurred
    ledge reads as something with a side you can press down. */
 .ov-btn--primary {
-    background: linear-gradient(168deg, var(--fz-green-400), var(--fz-green-500));
-    border: 3px solid #fff;
+    /* Flat green-500 and no white ring, matching the start screen's button.
+       See the note on .cloud-btn.ready in style.css -- both were read off a
+       screenshot rather than guessed at. The ledge stays. */
+    background: var(--fz-green-500);
+    border: 3px solid transparent;
     color: #fff;
     box-shadow:
         0 5px 0 #2f7a52,                      /* the pressable ledge */
@@ -731,58 +985,102 @@ body.ov-page {
 .ov-section {
     max-width: calc(var(--ov-max) + 2 * var(--ov-pad));
     margin: 0 auto;
-    padding: clamp(40px, 6.5vh, 68px) var(--ov-pad);
+    /*
+     * The air IS the design, and getting it wrong is possible in both
+     * directions. At 52px the sections read as components stacked on each
+     * other; at 160 they read as separate pages, and the eye loses the thread
+     * between the end of one subject and the start of the next.
+     *
+     * This is the middle, and it is not the same everywhere: Projects takes
+     * more, below, because it is the one section that is supposed to arrive
+     * like an event.
+     */
+    padding: clamp(64px, 10vh, 122px) var(--ov-pad);
     scroll-margin-top: 84px;
 }
 
-.ov-section-head { margin-bottom: 32px; }
+.ov-section-head { margin-bottom: clamp(34px, 4.5vw, 64px); }
 
-.ov-h2 {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 0;
+/*
+ * Label small, sentence large. It used to be the other way round.
+ *
+ * "Proyectos" at 38px with a green rule growing out of it put the biggest type
+ * on the page on its least interesting word, five times over, and the rule was
+ * decoration standing in for a hierarchy the type was not providing. Turned
+ * around, the category becomes a tab in the margin and the SENTENCE becomes
+ * the headline — which is the only line in each section anyone would want at
+ * size. The rule then has nothing left to do, and with it goes the reason
+ * every section on this page opened with a horizontal line.
+ */
+.ov-eyebrow {
+    margin: 0 0 clamp(14px, 1.6vw, 20px);
     font-family: var(--fz-font-title);
-    font-size: clamp(27px, 4.2vw, 38px);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: #1d4232;
-}
-/* Little leaf-green rule that grows in with the heading. */
-.ov-h2::after {
-    content: '';
-    flex: 1;
-    height: 2px;
-    max-width: 180px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, var(--fz-green-200), transparent);
-    transform: scaleX(0);
-    transform-origin: 0 50%;
-    transition: transform 0.7s var(--ov-ease) 0.15s;
-}
-.ov-section.is-in .ov-h2::after { transform: scaleX(1); }
-
-.ov-blurb {
-    margin: 12px 0 0;
-    max-width: 62ch;
-    color: var(--ov-muted);
-    font-size: var(--ov-t-base);
-}
-
-.ov-h3 {
-    margin: 0 0 20px;
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-lg);
-    font-weight: 600;
+    font-size: var(--ov-t-2xs);
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
     color: var(--fz-green-500);
 }
+/* Sub-headings inside a section (Experience, Education, Accredited training)
+   speak the same language one step quieter, so a section never contains two
+   competing kinds of label. */
+.ov-eyebrow--sub {
+    margin-bottom: clamp(16px, 2vw, 24px);
+    color: var(--ov-faint);
+    letter-spacing: 0.16em;
+}
+/* Inside Path only: a rule under the column heading, because two timelines
+   side by side need something that says where each one begins. */
+.ov-path .ov-eyebrow--sub {
+    padding-bottom: clamp(12px, 1.6vw, 18px);
+    border-bottom: 1px solid var(--ov-rule);
+}
+/* The credentials heading gets NO rule: the list below it already opens with
+   one, and a second line 300px wider than the first reads as a misalignment
+   rather than as structure. */
 
-/* ═══ Reveal ══════════════════════════════════════════════════════════════ */
+.ov-display {
+    margin: 0;
+    max-width: 17ch;
+    font-family: var(--fz-font-title);
+    font-size: clamp(30px, 4.6vw, 58px);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    color: #1d4232;
+    text-wrap: balance;
+}
+/* For a blurb that is a short pitch rather than a title. Same voice, enough
+   smaller that two sentences do not become five lines of display type. */
+.ov-display--sm {
+    max-width: 30ch;
+    font-size: clamp(22px, 2.4vw, 31px);
+    line-height: 1.24;
+    letter-spacing: -0.02em;
+}
+
+/* ═══ Reveal ══════════════════════════════════════════════════════════════
+   Two gestures, and only two.
+
+   FADE AND LIFT, for everything. Twenty pixels rather than twenty-six: the
+   travel is not what makes an entrance feel considered, the curve is, and past
+   about twenty the eye starts reading it as an element that was in the wrong
+   place and got corrected. The curve has a long tail, so most of the distance
+   is covered early and the last few pixels take their time.
+
+   RISE OUT OF A MASK, for display type only. It is the more expensive gesture
+   in attention, so it is spent on the four or five lines of the page that are
+   set large, and nowhere else. A section where everything rises out of a mask
+   is a section where nothing does.
+
+   The delay is a queue: --i is written from each element's position in its
+   section (see _observeReveals), so a section arrives part by part without a
+   single index maintained by hand. */
 .ov-reveal {
     opacity: 0;
-    transform: translateY(26px);
-    transition: opacity 0.62s var(--ov-ease), transform 0.62s var(--ov-ease);
-    transition-delay: calc(var(--i, 0) * 70ms);
+    transform: translateY(20px);
+    transition: opacity 0.72s var(--ov-ease), transform 0.72s var(--ov-ease);
+    transition-delay: calc(var(--i, 0) * 65ms);
 }
 .ov-section.is-in .ov-reveal,
 .ov-reveal.is-in {
@@ -790,250 +1088,840 @@ body.ov-page {
     transform: none;
 }
 
-/* ═══ About ═══════════════════════════════════════════════════════════════ */
+/*
+ * A picture is not a paragraph.
+ *
+ * The frame is the largest object on the page and it was arriving exactly like
+ * a line of body copy: fade, lift twenty pixels, done. An image has no
+ * baseline to rise from and nothing to line up with, so the lift reads as the
+ * whole thing being nudged rather than as it settling.
+ *
+ * Three percent of scale instead, over a slightly longer run. It is the same
+ * gesture the carousel's media used when a card arrived at the front, and it
+ * works for the same reason: the picture comes to rest rather than moving into
+ * place.
+ */
+.ov-reveal--art {
+    opacity: 0;
+    transform: scale(1.035);
+    transition: opacity 0.9s var(--ov-ease), transform 1.15s var(--ov-ease);
+    transition-delay: calc(var(--i, 0) * 65ms);
+}
+.ov-section.is-in .ov-reveal--art,
+.ov-reveal--art.is-in { opacity: 1; transform: none; }
+
+/*
+ * The headline comes up from behind its own baseline.
+ *
+ * clip-path and transform on the same element, on purpose: the clip is in the
+ * element's local box, so it travels with the text. What you see is the line
+ * lifting AND uncovering at once, which is softer than a wipe against a fixed
+ * edge and needs no wrapper element to hold the mask.
+ *
+ * The end state overshoots to -14% rather than stopping at 0: an inset of
+ * exactly zero clips descenders and any shadow flush against the box, and on a
+ * 56px Fredoka that shows.
+ */
+.ov-rise {
+    clip-path: inset(-6% 0 105% 0);
+    transform: translateY(0.16em);
+    transition: clip-path 0.95s var(--ov-ease), transform 0.95s var(--ov-ease);
+    transition-delay: calc(var(--i, 0) * 65ms);
+}
+.ov-section.is-in .ov-rise,
+.ov-rise.is-in {
+    clip-path: inset(-6% 0 -14% 0);
+    transform: none;
+}
+
+/* ═══ About ══════════════════════════════════════════════════════════
+   Not one line anywhere in this section, deliberately.
+
+   Two versions ago this was a white card with a border and a shadow, which
+   read as a widget dropped into the page. The version after that took the box
+   away and replaced it with rules: a rule over every fact, a rule under every
+   tool, a rule closing each list. That is the same mistake in cheaper
+   material. Ruling every datum turns a paragraph about a person into a
+   specification table, and the reader gets the message that this is data to be
+   looked up rather than something to read.
+
+   What separates things here is space, size and colour, in that order. A rule
+   appears in this section exactly never. If two things need telling apart,
+   they get further apart. */
 .ov-about {
     display: grid;
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-    gap: clamp(24px, 4vw, 48px);
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr);
+    column-gap: clamp(32px, 7vw, 110px);
+    row-gap: clamp(48px, 7vw, 88px);
     align-items: start;
 }
-/* ONE treatment for the whole story, deliberately.
-   The first paragraph used to be two pixels bigger and a shade darker, as a
-   lede. It does not read as a lede -- both paragraphs are body copy of exactly
-   the same rank, one after the other, so the difference lands as two different
-   typefaces in the same block rather than as hierarchy. The section title is
-   what gives this section its entrance; the prose under it should be even.
-   Ink rather than muted, because this is the one block on the page that is
-   there to be read rather than scanned. */
-.ov-prose p {
-    margin: 0 0 20px;
-    color: var(--fz-ink);
-    font-size: var(--ov-t-base);
-    line-height: 1.74;
-}
-.ov-prose p:last-child { margin-bottom: 0; }
+.ov-prose { grid-column: 1; }
+.ov-facts { grid-column: 2; }
 
-.ov-langs {
+
+/* The opening sentence carries the section. It is the one line a stranger
+   reads before deciding whether to read anything else, so it gets a size that
+   says so — and the paragraph after it drops to body copy and to muted ink,
+   which is the whole hierarchy this section needs. */
+/* This paragraph IS About's headline — the section has no separate display
+   line of its own.
+   Scoped under .ov-prose on purpose, and that is not tidiness. `.ov-prose p`
+   is a class plus a type selector and beats a lone class, so every one of
+   these declarations was being silently overruled by the body-copy rule right
+   below it: the opening statement was rendering at 17px with no space under
+   it, which is exactly what it looked like. */
+.ov-prose .ov-about-lede {
+    margin: 0 0 clamp(26px, 3vw, 40px);
+    /* Short, because a headline that runs the full column is a banner, and
+       not SO short that it comes out four lines deep. Three is the target. */
+    max-width: 24ch;
+    font-family: var(--fz-font-title);
+    font-size: clamp(26px, 3.2vw, 44px);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #1d4232;
+    /* balance, not pretty: a display line's failure mode is a last line with
+       one word on it, and balance is the property that spreads the break
+       points to prevent exactly that. It still only balances LENGTHS, which is
+       why the sentence break is made in the markup -- see .ov-lede-line. */
+    text-wrap: balance;
+}
+/* Each sentence starts its own line. Inside one, the browser still decides. */
+/* One mask per sentence. The spans exist already (the sentence break is made
+   in the markup so `balance` cannot put it in the wrong place), so this is a
+   line-by-line reveal without measuring a single line box. */
+.ov-lede-line {
+    display: block;
+    clip-path: inset(-6% 0 105% 0);
+    transform: translateY(0.18em);
+    transition: clip-path 0.95s var(--ov-ease), transform 0.95s var(--ov-ease);
+}
+.ov-section.is-in .ov-lede-line {
+    clip-path: inset(-6% 0 -14% 0);
+    transform: none;
+}
+.ov-section.is-in .ov-lede-line:nth-child(2) { transition-delay: 0.1s; }
+.ov-section.is-in .ov-lede-line:nth-child(3) { transition-delay: 0.2s; }
+.ov-prose .ov-about-lede strong { font-weight: 600; color: #1d4232; }
+
+.ov-prose p {
+    margin: 0;
+    max-width: 54ch;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-base);
+    line-height: 1.78;
+}
+.ov-prose p + p { margin-top: clamp(15px, 1.7vw, 21px); }
+.ov-prose p strong { color: var(--fz-ink); font-weight: 700; }
+
+
+/* ── Where, what, which languages ─────────────────────────────────────────
+   Three pairs with no boxes and no rules between them, in a column with ONE
+   rule down its left edge.
+
+   That single line is the correction to both earlier versions. Ruling every
+   fact made a table; ruling nothing left three pairs of words floating beside
+   a paragraph with nothing to say they belonged together or where they began.
+   A margin rule does one job, does it once, and is the oldest trick in
+   editorial layout for exactly this situation. */
+.ov-facts {
+    margin: 0;
+    display: grid;
+    gap: clamp(22px, 2.6vw, 34px);
+    padding: clamp(6px, 1vw, 14px) 0 4px clamp(24px, 3vw, 44px);
+    border-left: 1px solid var(--ov-rule);
+}
+.ov-fact dt {
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-fact dd {
+    margin: 7px 0 0;
+    font-size: var(--ov-t-base);
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--fz-ink);
+}
+
+/* ── "This site, under the hood" ──────────────────────────────────────────
+   One run of text at the foot of the prose column, not a band of its own.
+
+   It was a six-cell grid with an icon per cell, a rule above it and its own
+   pocket of air, sitting between About and Projects belonging to neither. The
+   labels it needed to justify being a grid ("GRAPHICS", "PHYSICS") were also
+   telling the reader nothing the tool names do not. As a sentence it is two
+   lines, it is attached to the paragraph it is evidence for, and it takes the
+   section from three blocks down to two. */
+/* Scoped under .ov-prose, and that is not tidiness: this is a <p> inside the
+   prose column, so `.ov-prose p` -- a class plus a type selector -- outranks a
+   lone class and was silently rendering the whole line at body size. It is an
+   annotation on the paragraph above it, not a second paragraph. */
+/*
+ * The footer of About, spanning both columns.
+ *
+ * It lived inside .ov-prose and needed that scoping to outrank `.ov-prose p`,
+ * which was setting it to 17px. Out here it is a grid child in its own right
+ * and the specificity fight is simply gone.
+ *
+ * Full width, under both columns: this is the one block in the section that is
+ * about the SITE rather than about the person, and putting it below everything
+ * else is what stops it interrupting the paragraph it is evidence for. The
+ * row-gap above it is the section's own, so it needs no margin of its own.
+ */
+.ov-made {
+    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 8px 12px;
-    margin: 24px 0 0;
-    padding-top: 20px;
-    border-top: 1px solid var(--ov-line);
-}
-.ov-langs-label {
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-2xs);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    /* Wide between tools, tight between the lines if it ever has to wrap:
+       the gap IS the separator now, so it has to be unmistakably bigger than
+       the space inside a pair. */
+    column-gap: clamp(18px, 2vw, 30px);
+    row-gap: 10px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    font-size: var(--ov-t-xs);
+    line-height: 1.6;
     color: var(--ov-faint);
 }
-.ov-langs-value { color: var(--ov-muted); font-size: var(--ov-t-base); font-weight: 600; }
-
-/* "This site, under the hood" — evidence panel beside the story. */
-/* Solid white, with the rows carrying the structure. The gradient this had was
-   doing the work a divider does better. */
-.ov-made {
-    padding: 24px 24px 8px;
-    border: 1.5px solid var(--ov-line);
-    border-radius: var(--fz-radius);
-    background: var(--ov-card);
-    box-shadow: var(--ov-lift);
-}
+/* The lead-in. On its own line above the tools it was a second heading in a
+   section that already has one; on the same line it is a label, which is all
+   it was ever trying to be. Green like every other eyebrow on this page. */
 .ov-made-title {
-    margin: 0 0 16px;
+    flex: 0 0 auto;
+    margin: 0;
+    /* A little more room after the label than between the tools, so the line
+       reads as "title, then a list" and not as seven equal things. */
+    margin-right: clamp(4px, 0.6vw, 10px);
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-2xs);
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-weight: 700;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--ov-faint);
-}
-.ov-made-list { list-style: none; margin: 0; padding: 0; }
-.ov-made-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 0;
-    border-top: 1px solid var(--ov-line);
-}
-.ov-made-item:first-child { border-top: 0; padding-top: 0; }
-.ov-made-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    border-radius: 10px;
-    background: var(--fz-green-50);
     color: var(--fz-green-500);
 }
-.ov-made-icon svg { width: 17px; height: 17px; }
-.ov-made-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ov-made-label {
-    font-size: var(--ov-t-2xs);
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ov-faint);
+/* nowrap so a pair never breaks between its label and its tool. */
+/* One tool: its icon and its name, and never split across a line. */
+.ov-made-pair {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
 }
-/* System mono — no extra font to download, and it does the "these are real
-   tools" job that a rounded sans cannot. */
-.ov-made-tech {
+
+/*
+ * The icon, back.
+ *
+ * It was dropped when this line moved into About, and the reasoning then was
+ * about a different thing: six icons standing ALONE in a row of their own had
+ * nothing to belong to. Inside the line they have a job. Six small marks give
+ * the eye somewhere to land between pairs, which is work the middle dot was
+ * doing and doing badly at 13px.
+ *
+ * They are the same icons the in-world computer shows for these same six
+ * entries, so this is not new artwork. Green, because on this page green means
+ * "this is the accent", and a full-ink icon at this size would out-shout the
+ * value beside it.
+ */
+.ov-made-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    margin-right: 7px;
+    color: var(--fz-green-400);
+}
+.ov-made-icon svg { width: 100%; height: 100%; }
+
+/* System mono — no extra font to download, and it does the "these are the
+   real tools" job that a rounded sans cannot. */
+/* Its own class rather than `.ov-made-pair span`, which also matched the
+   icon wrapper and quietly beat the icon's own colour rule on specificity. */
+.ov-made-value {
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: var(--ov-t-xs);
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-size: 1.02em;
+    letter-spacing: -0.02em;
     color: var(--fz-ink);
 }
+/* Its own element rather than a ::before on the pair, so the line is allowed
+   to break here and nowhere inside a pair. */
 
-/* ═══ Projects ════════════════════════════════════════════════════════════ */
-.ov-projects { display: grid; gap: 24px; }
 
-.ov-project {
+/* ═══ Projects — an index and one window ══════════════════════════════════
+   This was a carousel: three cards on a shallow stage, the two behind rotated
+   and hazed, with arrows, a counter, a rail, drag and a spring. Every piece of
+   it was well made and the form was still wrong. Cards fanned in perspective
+   with arrows underneath is coverflow, and coverflow is 2010. No amount of
+   easing rescues a dated genre.
+
+   And there were THREE projects. A carousel exists for when things do not fit;
+   three fit. All that machinery was solving a problem this page never had.
+
+   What replaced it is a list and a window. The names carry the section, the
+   frame answers them, and the only moving parts are a hover and a shader that
+   now has the whole picture to itself instead of a corner of a card. */
+.ov-work {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    overflow: hidden;
-    border: 1.5px solid var(--ov-line);
-    border-radius: var(--fz-radius);
-    background: var(--ov-card);
-    box-shadow: var(--fz-shadow-soft);
-    transition: transform 0.34s var(--ov-ease), box-shadow 0.34s var(--ov-ease);
-}
-.ov-project:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--fz-shadow);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+    align-items: start;
+    gap: clamp(32px, 5vw, 72px);
 }
 
-.ov-project-media {
+/* ── The index ────────────────────────────────────────────────────────────
+   Rules between the rows, and DASHED rather than solid.
+
+   Not everywhere: this page uses two kinds of horizontal line and they should
+   not look alike. A solid rule is STRUCTURE: it says where a column begins or
+   where one block ends and another starts, and those stay solid (the margin
+   rule beside the About facts, the underline of each Path column heading).
+
+   These are not that. They are the rhythm of a list of repeated records, and a
+   dashed rule reads as a tick between items rather than as a wall between
+   blocks. It is also the page's own vocabulary: the certificates toggle and
+   the skill links already speak it.
+
+   Drawn with a gradient rather than `border-style: dashed`, because the
+   browser's own dash pattern at 1px is coarse and differs per engine. Four on,
+   five off, in the same hairline tone the solid rules use. */
+.ov-work-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+}
+.ov-work-item { margin: 0; }
+
+/*
+ * A button, not a link, and styled like neither.
+ *
+ * It was an <a> and that was a trap: on a phone the only way to change the
+ * picture is to press a row, and pressing it navigated away. Now pressing does
+ * what hovering does, and the way out is the labelled button under the
+ * picture. See _projects.
+ *
+ * `text-align: left` and `font: inherit` because a <button> brings a centred,
+ * 13px, system-font agenda of its own.
+ */
+.ov-work-row {
     position: relative;
-    overflow: hidden;
-    min-height: 230px;
-    background: linear-gradient(160deg, var(--fz-green-100), var(--fz-green-50));
-}
-/* A <picture> is an inline box with no height of its own, so the img's
-   `height: 100%` below would resolve against nothing and the cover fill would
-   collapse. Make it the block the img used to be a direct child of. */
-.ov-project-media picture {
-    display: block;
+    display: grid;
     width: 100%;
-    height: 100%;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: clamp(14px, 2vw, 26px);
+    padding: clamp(20px, 2.6vw, 32px) 0;
+    border: 0;
+    border-top: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
-.ov-project-media img {
+
+/*
+ * The marker: a bar down the left edge that grows from nothing.
+ *
+ * This replaced an arrow, which was the wrong glyph for what the control now
+ * does -- an arrow promises to take you somewhere and this one only changes
+ * the picture. A bar makes no promise; it says "this one", which is the whole
+ * of what needs saying.
+ */
+.ov-work-row::before {
+    content: '';
+    position: absolute;
+    left: calc(-1 * clamp(12px, 1.6vw, 20px));
+    top: clamp(22px, 2.8vw, 34px);
+    bottom: clamp(22px, 2.8vw, 34px);
+    width: 2px;
+    border-radius: 2px;
+    background: var(--fz-green-400);
+    transform: scaleY(0);
+    transform-origin: 50% 50%;
+    transition: transform 0.42s var(--fz-fab-ease);
+}
+.ov-work-row.is-on::before { transform: scaleY(1); }
+
+/* Hovering something that is NOT showing has to do something, or the list
+   reads as three labels and one of them happens to be dark. */
+.ov-work-row:hover .ov-work-name,
+.ov-work-row:focus-visible .ov-work-name { color: #2c5a47; }
+.ov-work-row:hover .ov-work-num,
+.ov-work-row:focus-visible .ov-work-num { color: var(--fz-green-400); }
+.ov-work-row:hover .ov-work-body,
+.ov-work-row:focus-visible .ov-work-body { transform: translateX(4px); }
+.ov-work-num {
+    font-size: var(--ov-t-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.14em;
+    color: var(--ov-faint);
+    transition: color var(--ov-dur-move) var(--ov-ease-soft);
+}
+.ov-work-body {
+    display: block;
+    min-width: 0;
+    /* Six pixels, on the body rather than the row: the row owns the rule along
+       its top edge and dragging that sideways with the text would look like
+       the list had come apart. */
+    transform: translateX(0);
+    transition: transform var(--ov-dur-move) var(--ov-ease);
+}
+/* Fredoka has no U+2192: this glyph is substituted from a system font and
+   arrives a full em wide against capitals that are about 0.55em, in a lighter
+   weight. Two thirds of the size and heavier brings it back to the density of
+   what surrounds it. See projectName in Overview.js. */
+.ov-glyph-arrow {
+    font-size: 0.66em;
+    font-weight: 700;
+    vertical-align: 0.06em;
+}
+
+.ov-work-name {
+    display: block;
+    font-family: var(--fz-font-title);
+    font-size: clamp(24px, 2.5vw, 38px);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.028em;
+    /* Muted at rest and ink when picked, which is the whole marking. No glow,
+       no fill, no underline: a colour and a small move. */
+    color: var(--ov-muted);
+    transition: color var(--ov-dur-move) var(--ov-ease-soft);
+}
+.ov-work-line {
+    display: block;
+    margin-top: 9px;
+    max-width: 42ch;
+    font-size: var(--ov-t-sm);
+    line-height: 1.5;
+    color: var(--ov-faint);
+    transition: color var(--ov-dur-move) var(--ov-ease-soft);
+}
+.ov-work-row.is-on .ov-work-num { color: var(--fz-green-500); }
+.ov-work-row.is-on .ov-work-name { color: #1d4232; }
+.ov-work-row.is-on .ov-work-line { color: var(--ov-muted); }
+.ov-work-row.is-on .ov-work-body,
+.ov-work-row.is-on:hover .ov-work-body { transform: translateX(8px); }
+
+/* A project that is not there yet: same row, no control, no arrow. */
+.ov-work-row--soon { cursor: default; }
+.ov-work-row--soon .ov-work-name { font-size: clamp(20px, 1.9vw, 26px); }
+
+/* ── The window ───────────────────────────────────────────────────────────*/
+.ov-work-frame { position: sticky; top: calc(var(--ov-bar-h, 71px) + 24px); }
+
+.ov-work-view {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    border-radius: clamp(12px, 1.3vw, 17px);
+    overflow: hidden;
+    background: linear-gradient(160deg, var(--fz-green-100), var(--fz-green-50));
+    /* Large, diffuse and barely opaque, sitting low. The picture is the
+       heaviest object in the section now, and it should read as held above the
+       paper rather than printed on it. */
+    box-shadow:
+        0 2px 4px rgba(39, 90, 70, 0.06),
+        0 24px 44px -22px rgba(39, 90, 70, 0.26),
+        0 64px 96px -64px rgba(31, 78, 60, 0.32);
+}
+.ov-work-shot,
+.ov-work-canvas,
+.ov-work-video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 0.7s var(--ov-ease);
 }
-.ov-project:hover .ov-project-media img { transform: scale(1.045); }
 
-.ov-project-body { padding: clamp(24px, 3vw, 32px); }
+/* Two stills, alternating. Only ever visible when the shader is not running —
+   without WebGPU, under reduced motion, or if the boot threw — and that is
+   exactly when a single <img> swapping its src would blink white between
+   projects. */
+.ov-work-shot {
+    opacity: 0;
+    transition: opacity 0.5s var(--ov-ease);
+}
+.ov-work-shot.is-on { opacity: 1; }
 
-.ov-project-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 16px;
+/* The shader's canvas covers everything above the moment it has painted. */
+.ov-work-canvas {
+    opacity: 0;
+    transition: opacity 0.3s var(--ov-ease);
+    pointer-events: none;
 }
-.ov-project-title {
-    margin: 0;
-    font-family: var(--fz-font-title);
-    font-size: clamp(22px, 3vw, 28px);
-    font-weight: 600;
-    color: #1d4232;
+.ov-work-canvas.is-live { opacity: 1; }
+
+/* The <video> is a decoder, not a player: the frame samples it and nobody
+   sees it. The exception is the fallback path, where there is no frame to
+   sample it and it becomes the picture itself. */
+.ov-work-video {
+    opacity: 0;
+    transition: opacity 0.5s var(--ov-ease);
+    pointer-events: none;
 }
+.ov-work-video.is-playing { opacity: 1; }
+
+/* ── The caption ──────────────────────────────────────────────────────────*/
+.ov-work-meta { margin-top: clamp(20px, 2.6vw, 32px); }
+/*
+ * A label, not a chip.
+ *
+ * As a pill it was a pale green SURFACE sitting directly in the picture's drop
+ * shadow, and that shadow is a large soft one on purpose -- the frame is the
+ * heaviest object in the section and it is meant to read as held above the
+ * paper rather than printed on it. Two soft translucent things overlapping is
+ * how you get mud, and mud is what it looked like.
+ *
+ * The shadow is not the thing to change. It is doing the job it was built for
+ * and it is the reason the picture has any weight at all. The chip is. Bare,
+ * this is the same uppercase micro-label the page uses for every other label
+ * it has, and type reads perfectly well over a shadow: the figures sitting
+ * directly underneath it are the proof.
+ *
+ * The SVG is sized here and nowhere else -- with no rule of its own the inline
+ * cap falls back to its intrinsic size and draws a graduation cap the height
+ * of the whole caption.
+ */
 .ov-badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 12px;
-    border-radius: var(--fz-radius-pill);
-    background: var(--fz-green-100);
-    color: #2b6b4d;
+    gap: 6px;
+    color: var(--fz-green-500);
     font-family: var(--fz-font-title);
     font-size: var(--ov-t-2xs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+.ov-badge svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* A row that holds one badge, and the first thing in the caption. It used to
+   hold the stack list too, and with that gone the type rules went with it:
+   the badge sets its own. */
+.ov-work-tech {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0;
+}
+/* The numbers, which used to be behind a "see detail" nobody was going to
+   open. They are the most scannable thing a project has and they were the one
+   part of that disclosure worth keeping, so they come out and sit in the
+   caption where they can be read at a glance. */
+/*
+ * One row, one column per number, on every screen.
+ *
+ * As a wrapping flex row this was at the mercy of its longest label: "round
+ * trips to the server" is wider than a third of a phone, so the third figure
+ * of the third project dropped onto a line of its own and the row stopped
+ * reading as a row. A stat row with one stat hanging underneath is worse than
+ * no stat row.
+ *
+ * `grid-auto-flow: column` with auto columns gives exactly as many equal
+ * tracks as there are figures -- three here, two for BookMatch -- so the
+ * labels wrap INSIDE their own column instead of pushing each other around,
+ * and the numbers stay on one baseline however long the words under them get.
+ */
+.ov-figures {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: clamp(14px, 3vw, 40px);
+    margin: clamp(16px, 2vw, 22px) 0 0;
+    padding: 0;
+    border: 0;
+}
+.ov-figure dt {
+    font-family: var(--fz-font-title);
     font-weight: 600;
-    letter-spacing: 0.03em;
+    font-size: clamp(19px, 1.6vw, 24px);
+    line-height: 1.05;
+    color: var(--fz-ink);
+    font-variant-numeric: tabular-nums;
 }
-.ov-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
+.ov-figure dd {
+    margin: 3px 0 0;
+    font-size: var(--ov-t-xs);
+    color: var(--ov-faint);
+}
 
-.ov-project-tagline {
-    margin: 8px 0 0;
-    color: var(--ov-muted);
+.ov-work-links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px clamp(18px, 2.4vw, 28px);
+    margin-top: clamp(16px, 2vw, 22px);
+}
+
+/* The caption stages in behind the picture rather than appearing with it.
+   innerHTML is replaced on every change, so the animation re-runs for free. */
+@keyframes ov-meta-in {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: none; }
+}
+.ov-work-meta > * { animation: ov-meta-in 0.45s var(--ov-ease) both; }
+.ov-work-meta > :nth-child(2) { animation-delay: 0.06s; }
+.ov-work-meta > :nth-child(3) { animation-delay: 0.12s; }
+
+/* ── The links, at two weights ────────────────────────────────────────────
+   The site is the destination and the repository is a footnote. Two buttons
+   of equal weight would just be two buttons arguing. */
+.ov-project-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--fz-green-500);
+    font-family: var(--fz-font-title);
+    font-weight: 600;
     font-size: var(--ov-t-base);
+    color: var(--fz-ink);
+    text-decoration: none;
+    transition: gap var(--ov-dur-move) var(--ov-ease);
+}
+.ov-project-go svg { width: 16px; height: 16px; color: var(--fz-green-500); }
+.ov-project-go:hover { gap: 15px; }
+
+.ov-project-alt {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--ov-t-sm);
+    font-weight: 600;
+    color: var(--ov-faint);
+    text-decoration: none;
+    transition: color var(--ov-dur-hover) var(--ov-ease-soft);
+}
+.ov-project-alt svg { width: 13px; height: 13px; }
+.ov-project-alt:hover { color: var(--fz-green-500); }
+
+/* ═══ Timeline ════════════════════════════════════════════════════════════
+   A history, not a component. The changes are all subtraction: the spine was a
+   2px green gradient running the full height of the column, which is a lot of
+   saturated colour spent on a decoration nobody reads, and the nodes were 16px
+   white discs with a 3px green border and a 4px halo, which made every entry
+   open with a target. A hairline and a small solid dot say the same thing and
+   let the type be the loudest object in the section, which is the point of a
+   section whose job is "here is what I have done". */
+.ov-path {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    gap: clamp(40px, 6vw, 96px);
+    align-items: start;
 }
 
-.ov-highlights { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 12px; }
-.ov-highlight { display: flex; gap: 12px; align-items: flex-start; }
-.ov-highlight-tick {
-    flex-shrink: 0;
+/* The spine, and here a line is not decoration: it is the passage of time,
+   which is the only thing this section is about. The previous pass took it
+   down to a 1px grey hairline on the principle that the page had too many
+   rules, and that was the wrong place to apply the principle — a timeline
+   without a timeline is a list of dates. It comes back in the palette's own
+   green, fading as it descends into the past. */
+.ov-timeline { position: relative; list-style: none; margin: 0; padding: 0 0 0 30px; }
+.ov-timeline::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 9px;
+    bottom: 12px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg,
+        var(--fz-green-200) 0%,
+        rgba(155, 228, 202, 0.45) 55%,
+        rgba(155, 228, 202, 0.12) 100%);
+    transform: scaleY(0);
+    transform-origin: 50% 0;
+    transition: transform 1s var(--ov-ease) 0.1s;
+}
+.ov-section.is-in .ov-timeline::before { transform: scaleY(1); }
+
+.ov-tl-item { position: relative; padding-bottom: clamp(28px, 3.4vw, 46px); }
+.ov-tl-item:last-child { padding-bottom: 0; }
+
+/* The line draws itself, then the dots arrive on it one after another. Four
+   frames of stagger, done with nth-child delays rather than an index written
+   from JS: the list is four entries long at most and a timeline that needed
+   fifty would want a different design anyway. */
+/* A ring on the line, not a filled dot beside it. The ring is what makes the
+   node read as a station ON the spine; the halo is the paper showing through
+   so the line does not appear to run over the top of it. Smaller than the
+   original 16px, which opened every entry with a target. */
+.ov-tl-item::before {
+    content: '';
+    position: absolute;
+    left: -31px;
+    top: 7px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2.5px solid var(--fz-green-400);
+    box-shadow: 0 0 0 4px var(--ov-bg);
+    scale: 0;
+    transition: scale 0.5s var(--fz-fab-ease);
+}
+.ov-section.is-in .ov-tl-item::before { scale: 1; }
+.ov-section.is-in .ov-tl-item:nth-child(1)::before { transition-delay: 0.35s; }
+.ov-section.is-in .ov-tl-item:nth-child(2)::before { transition-delay: 0.47s; }
+.ov-section.is-in .ov-tl-item:nth-child(3)::before { transition-delay: 0.59s; }
+.ov-section.is-in .ov-tl-item:nth-child(n+4)::before { transition-delay: 0.71s; }
+
+/* The date is the least interesting thing in an entry and it used to be the
+   only coloured one. Faint and small; the title takes the ink. */
+.ov-tl-period {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+.ov-tl-title {
+    margin: 8px 0 0;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-lg);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    color: var(--fz-ink);
+    text-wrap: pretty;
+}
+.ov-tl-org { margin: 5px 0 0; color: var(--fz-green-500); font-size: var(--ov-t-sm); font-weight: 600; }
+.ov-tl-detail {
+    margin: 10px 0 0;
+    max-width: 46ch;
+    color: var(--ov-muted);
+    font-size: var(--ov-t-sm);
+    line-height: 1.66;
+}
+
+/* ═══ Certificates ════════════════════════════════════════════════════════
+   Rows, and at rest they are only type.
+
+   These were nine bordered white tiles in a two-column grid, which is the
+   shape of a course catalogue and reads like one: nine identical boxes, none
+   of them more important than any other, all of them shouting that they are
+   clickable. What is actually here is a list of credentials, and a list wants
+   rows. The surface only appears under the cursor, which is also the moment it
+   is the only useful thing on screen. */
+.ov-certs { margin-top: clamp(52px, 7vw, 96px); padding-top: 0; border-top: 0; }
+.ov-certs-title {
+    margin: 0 0 clamp(14px, 1.8vw, 22px);
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-2xs);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ov-faint);
+}
+/* A list of records. Year, what, who, and a way in.
+
+   This has been a grid of nine bordered tiles twice now, and the problem with
+   it was never the styling: it was that nine online courses presented as nine
+   equal objects reads as padding toward looking senior, and it drags the one
+   entry that genuinely matters — the course this entire island is built out of
+   — down to the level of the other eight. Three rows, then a count.
+
+   Rules between the rows, and here they earn it: these are repeated records of
+   the same shape, which is the one case where a separator is doing work that
+   space cannot do as well. Dashed, for the same reason as the project index:
+   the line is rhythm, not structure. */
+.ov-cert-list {
+    display: grid;
+    max-width: 820px;
+    border-bottom: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+}
+.ov-cert {
+    display: grid;
+    grid-template-columns: 4.5ch minmax(0, 1fr) auto 20px;
+    align-items: baseline;
+    gap: clamp(14px, 2.2vw, 30px);
+    padding: clamp(14px, 1.7vw, 19px) 0;
+    border: 0;
+    border-top: 1px solid transparent;
+    border-image: repeating-linear-gradient(90deg,
+        var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    text-decoration: none;
+}
+.ov-cert-year {
+    font-size: var(--ov-t-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: var(--ov-faint);
+}
+.ov-cert-title {
+    display: block;
+    font-family: var(--fz-font-title);
+    font-size: var(--ov-t-base);
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    color: var(--fz-ink);
+    transition: color var(--ov-dur-hover) var(--ov-ease-soft);
+}
+.ov-cert-issuer {
+    justify-self: end;
+    font-size: var(--ov-t-xs);
+    color: var(--ov-faint);
+    white-space: nowrap;
+}
+/* At rest a row is only type, which is the point, and also means nothing on it
+   says "link". The colour and the arrow carry that the moment a cursor lands. */
+.ov-cert:hover .ov-cert-title,
+.ov-cert:focus-visible .ov-cert-title { color: var(--fz-green-500); }
+
+.ov-cert-go {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    margin-top: 2px;
-    border-radius: 50%;
-    background: var(--fz-green-100);
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    align-self: center;
+    border-radius: 0;
+    background: none;
     color: var(--fz-green-500);
+    opacity: 0;
+    transition: opacity var(--ov-dur-hover) var(--ov-ease-soft),
+                transform var(--ov-dur-hover) var(--ov-ease);
 }
-.ov-highlight-tick svg { width: 12px; height: 12px; }
-.ov-highlight-text { font-size: var(--ov-t-base); line-height: 1.6; color: var(--ov-muted); }
-.ov-highlight-text strong { color: var(--fz-ink); font-weight: 700; }
+.ov-cert-go svg { width: 14px; height: 14px; display: block; }
+/* Visible on touch, where there is no hover to reveal it and the row would
+   otherwise give no sign at all that it goes anywhere. */
+@media (hover: none) { .ov-cert-go { opacity: 0.7; } }
+.ov-cert:hover .ov-cert-go,
+.ov-cert:focus-visible .ov-cert-go { opacity: 1; transform: translateX(3px); }
 
-.ov-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-.ov-chip {
-    padding: 4px 12px;
-    border-radius: var(--fz-radius-pill);
-    background: var(--fz-green-50);
-    border: 1px solid var(--ov-line);
-    color: var(--ov-muted);
-    font-size: var(--ov-t-xs);
-    font-weight: 600;
-}
-
-.ov-project-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
-.ov-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 12px 16px;
-    border: 1.5px solid var(--ov-line);
-    border-radius: var(--fz-radius-pill);
-    background: #fff;
-    color: var(--fz-ink);
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-sm);
-    font-weight: 600;
-    text-decoration: none;
-    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
-                box-shadow 0.2s var(--ov-ease), color 0.2s var(--ov-ease-soft);
-}
-.ov-link:hover {
-    transform: translateY(-2px);
-    color: var(--fz-green-500);
-    border-color: var(--fz-green-400);
-    box-shadow: var(--fz-shadow-soft);
-}
-.ov-link svg { width: 15px; height: 15px; }
-
-/* ── The dashed ring ────────────────────────────────────────────
-   Shared by the two provisional surfaces: "a few more" and the upcoming
-   project. Both used `border-style: dashed`, which cannot be animated — the
-   dashes come out of the border painting algorithm and no property moves
-   them. An SVG rect's stroke-dashoffset IS animatable, so the outline is
-   drawn rather than bordered, and the elements keep a transparent border of
-   the same width so nothing shifts.
+/* ── The dashed ring ──────────────────────────────────────────────────────
+   Drawn as an SVG rather than with `border-style: dashed`, because a CSS
+   dashed border cannot be animated: the dashes come out of the border painting
+   algorithm and no property moves them. A rect's stroke-dashoffset IS
+   animatable, which is what lets them march.
 
    The SVG has NO viewBox on purpose. Without one its user units are CSS
-   pixels, so the stroke weight and dash length come out identical on a 90px
-   pill and a 700px card; with a viewBox they would scale with the box and the
-   card's dashes would be five times the button's. */
+   pixels, so the stroke weight and dash length come out identical whatever
+   size the element is; with a viewBox they would scale with the box. */
 .ov-dash {
     position: absolute;
     /* The border box, not the padding box: an absolutely positioned child is
@@ -1055,9 +1943,22 @@ body.ov-page {
     stroke: rgba(65, 160, 110, 0.38);
     stroke-width: 2.5;
     /* 21px period — ov-dash-march moves exactly that, so the loop is seamless
-       and there is no jump at the restart. */
+       and there is no jump at the restart. Must match DASH_PERIOD in
+       Overview.js, which divides the perimeter to fit whole dashes. */
     stroke-dasharray: 12 9;
     stroke-linecap: round;
+    /*
+     * Marching ALWAYS, slowly.
+     *
+     * It used to be declared and paused, running only on hover, which meant
+     * the one piece of deliberate playfulness on the page was invisible
+     * unless you happened to point at it. Three seconds for one 21px period
+     * is a drift rather than a crawl: you notice it when you look and it
+     * never asks to be looked at. The hover rules speed it up.
+     *
+     * The global reduced-motion block kills it outright, as it should.
+     */
+    animation: ov-dash-march 3s linear infinite;
     /* Long, because a transition declared on the base state is the one that
        runs on the way OUT. The hover rules shorten it, so the colour arrives
        briskly and leaves slowly. */
@@ -1065,193 +1966,16 @@ body.ov-page {
 }
 @keyframes ov-dash-march { to { stroke-dashoffset: -21; } }
 
-/* Placeholder project — deliberately quiet, never lorem ipsum on show. */
-.ov-project--upcoming {
-    position: relative;
-    grid-template-columns: 1fr;
-    /* Was overflow: hidden, inherited from .ov-project to clip project media.
-       This card has none, and the ring has to reach out over the border. */
-    overflow: visible;
-    border-color: transparent;
-    background: linear-gradient(160deg, #fbfefc, var(--fz-green-50));
-    box-shadow: none;
-}
-/* Slower than the button's: the perimeter here is several times longer, and
-   at the same duration the dashes read as sliding rather than drifting. */
-.ov-project--upcoming .ov-dash rect {
-    rx: 21px;
-    animation: ov-dash-march 1.5s linear infinite;
-    animation-play-state: paused;
-}
-.ov-project--upcoming .ov-upcoming-icon {
-    animation: ov-chev-float 2.4s var(--ov-ease-soft) infinite;
-    animation-play-state: paused;
-}
-.ov-project--upcoming:hover { transform: none; box-shadow: none; }
-.ov-project--upcoming:hover .ov-dash rect {
-    stroke: rgba(65, 160, 110, 0.55);
-    transition-duration: 0.25s;
-    animation-play-state: running;
-}
-.ov-project--upcoming:hover .ov-upcoming-icon { animation-play-state: running; }
-.ov-upcoming-inner {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 32px clamp(24px, 3vw, 32px);
-}
-.ov-upcoming-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: #fff;
-    border: 1.5px solid var(--ov-line);
-    color: var(--fz-green-500);
-}
-.ov-upcoming-icon svg { width: 21px; height: 21px; }
-.ov-upcoming-title {
-    margin: 0;
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-md);
-    font-weight: 600;
-    color: var(--fz-ink);
-}
-.ov-upcoming-body { margin: 2px 0 0; color: var(--ov-muted); font-size: var(--ov-t-sm); }
-
-/* ═══ Timeline ════════════════════════════════════════════════════════════ */
-.ov-path {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-    gap: clamp(28px, 4vw, 48px);
-    align-items: start;
-}
-
-.ov-timeline { position: relative; list-style: none; margin: 0; padding: 0 0 0 32px; }
-.ov-timeline::before {
-    content: '';
-    position: absolute;
-    left: 7px;
-    top: 6px;
-    bottom: 6px;
-    width: 2px;
-    border-radius: 2px;
-    background: linear-gradient(180deg, var(--fz-green-200), rgba(155, 228, 202, 0.2));
-    transform: scaleY(0);
-    transform-origin: 50% 0;
-    transition: transform 0.9s var(--ov-ease) 0.2s;
-}
-.ov-section.is-in .ov-timeline::before { transform: scaleY(1); }
-
-.ov-tl-item { position: relative; padding-bottom: 24px; }
-.ov-tl-item:last-child { padding-bottom: 0; }
-.ov-tl-item::before {
-    content: '';
-    position: absolute;
-    left: -30px;
-    top: 6px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #fff;
-    border: 3px solid var(--fz-green-400);
-    box-shadow: 0 0 0 4px rgba(215, 242, 228, 0.7);
-}
-.ov-tl-period {
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-xs);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--fz-green-500);
-}
-.ov-tl-title {
-    margin: 4px 0 0;
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-md);
-    font-weight: 600;
-    color: var(--fz-ink);
-}
-.ov-tl-org { margin: 2px 0 0; color: var(--ov-faint); font-size: var(--ov-t-sm); font-weight: 600; }
-.ov-tl-detail { margin: 8px 0 0; color: var(--ov-muted); font-size: var(--ov-t-sm); line-height: 1.62; }
-
-/* ═══ Certificates — quiet, but unmistakably tappable ═════════════════════ */
-.ov-certs {
-    margin-top: clamp(32px, 5vw, 48px);
-    padding-top: 28px;
-    border-top: 1px solid var(--ov-line);
-}
-.ov-certs-title {
-    margin: 0 0 16px;
-    font-family: var(--fz-font-title);
-    font-size: var(--ov-t-2xs);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ov-faint);
-}
-/* Two across on desktop so the block reads as a strip rather than a column
-   trailing off the bottom of Education. */
-.ov-cert-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-    gap: 12px;
-}
-.ov-cert {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 16px;
-    border: 1.5px solid var(--ov-line);
-    border-radius: var(--fz-radius-sm);
-    background: var(--ov-card);
-    color: inherit;
-    text-decoration: none;
-    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
-                box-shadow 0.2s var(--ov-ease);
-}
-.ov-cert:hover,
-.ov-cert:active {
-    transform: translateY(-2px);
-    border-color: var(--fz-green-400);
-    box-shadow: var(--fz-shadow-soft);
-}
-.ov-cert-main { min-width: 0; flex: 1; }
-.ov-cert-title {
-    display: block;
-    font-size: var(--ov-t-sm);
-    font-weight: 600;
-    line-height: 1.4;
-    color: var(--fz-ink);
-}
-.ov-cert-meta { display: block; margin-top: 2px; color: var(--ov-faint); font-size: var(--ov-t-xs); }
-.ov-cert-go {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--fz-green-50);
-    color: var(--fz-green-500);
-    transition: background 0.2s var(--ov-ease-soft), transform 0.2s var(--ov-ease);
-}
-.ov-cert-go svg { width: 15px; height: 15px; display: block; }
-.ov-cert:hover .ov-cert-go { background: var(--fz-green-100); transform: translateX(2px); }
-
 .ov-cert-toggle {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     min-height: 44px;
-    margin-top: 12px;
-    padding: 8px 16px;
+    margin-top: clamp(16px, 2vw, 24px);
+    padding: 8px 18px;
     position: relative;
-    /* Transparent, not dashed — .ov-dash draws the outline now. Kept at the
+    
+/* Transparent, not dashed — .ov-dash draws the outline now. Kept at the
        same width so the button's metrics do not move. */
     border: 1.5px solid transparent;
     border-radius: var(--fz-radius-pill);
@@ -1272,23 +1996,20 @@ body.ov-page {
    what "pill" actually means here. */
 .ov-cert-toggle .ov-dash rect {
     rx: 22px;
-    /* Always declared, only paused. Removing the animation on hover-out resets
-       stroke-dashoffset to 0, so the whole outline jumps; pausing leaves the
-       dashes exactly where they stopped and the next hover picks them up from
-       there. Same idea for the chevron below. */
-    animation: ov-dash-march 0.9s linear infinite;
-    animation-play-state: paused;
 }
 .ov-cert-toggle:hover {
     color: var(--fz-green-500);
     background: var(--fz-green-50);
     transition-duration: 0.2s;
 }
+/* Brighter and three times the pace under the cursor. Changing only the
+   DURATION keeps the offset continuous, so it accelerates rather than
+   restarting from zero. */
 .ov-cert-toggle:hover .ov-dash rect,
 .ov-cert-toggle:focus-visible .ov-dash rect {
     stroke: var(--fz-green-400);
     transition-duration: 0.25s;
-    animation-play-state: running;
+    animation-duration: 0.9s;
 }
 
 /* :not(.ov-dash) because the ring is now a sibling svg inside the button. */
@@ -1329,68 +2050,149 @@ body.ov-page {
 }
 .ov-cert-rest.is-open {
     grid-template-rows: 1fr;
-    margin-top: 12px;
+    /* No gap at the seam: open, this is one list of eleven rows and it should
+       keep one rhythm. The rule between the third row and the fourth is the
+       list's own bottom border, doing double duty. */
+    margin-top: 0;
     visibility: visible;
 }
+/* ...which is why the first revealed row drops its top border. Without this
+   the two lines meet and the seam comes out twice as thick as every other
+   rule in the list. */
+.ov-cert-rest .ov-cert:first-child { border-top: 0; }
 .ov-cert-rest-inner {
     /* min-height: 0, or the grid item refuses to shrink below its content. */
     min-height: 0;
     overflow: hidden;
 }
 /* The clip above is only needed WHILE the track grows from 0fr; once the rows
-   are out it is the thing cutting them. The first row's 2px hover lift pushed
-   its green border past the top of the clip and the border came out sliced,
-   and the last row's drop shadow was cut off flat along the bottom. So the
-   clip is dropped once the opening has finished -- .is-settled is added on
-   transitionend, and removed the moment it starts closing again, because
-   without it the rows spill out of the collapsing box. */
+   are out it is the thing cutting them. The first row's hover lift pushed its
+   surface past the top of the clip and came out sliced, and the last row's
+   shadow was cut off flat along the bottom. So the clip is dropped once the
+   opening has finished -- .is-settled is added on transitionend, and removed
+   the moment it starts closing again, because without it the rows spill out of
+   the collapsing box. */
 .ov-cert-rest.is-settled .ov-cert-rest-inner { overflow: visible; }
 
-/* ═══ Skills — an editorial spec sheet, not a row of boxes ════════════════ */
-.ov-skills { display: grid; gap: 0; }
-.ov-skill-row {
+/* ═══ Skills ════════════════════════════════════════════════════════
+   An index, not a tag cloud.
+
+   No tiles, no borders, no surfaces, and that is deliberate rather than tired:
+   a grid of twelve bordered boxes is exactly the shape the certificates had
+   before they were taken apart for looking like a course catalogue, and
+   repeating it here would undo that on the next screen down. What holds this
+   together is the grid itself and the space in it.
+
+   Two sizes of type per cell and one colour decision: the places that are
+   projects stay muted, and "this site" is green. So the eye picks out, without
+   reading a word, which of these built the thing it is currently looking at. */
+.ov-skillset {
     display: grid;
-    grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
-    align-items: baseline;
-    gap: 12px clamp(16px, 3vw, 40px);
-    padding: 24px 0;
-    border-top: 1px solid var(--ov-line);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: clamp(30px, 4vw, 50px) clamp(24px, 3.5vw, 48px);
 }
-.ov-skill-row:last-child { border-bottom: 1px solid var(--ov-line); }
-.ov-skill-label {
+.ov-skillset-name {
     margin: 0;
     font-family: var(--fz-font-title);
-    font-size: var(--ov-t-xs);
+    font-size: clamp(19px, 1.7vw, 25px);
     font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    line-height: 1.15;
+    letter-spacing: -0.022em;
+    color: var(--fz-ink);
+}
+.ov-skillset-used {
+    margin: 8px 0 0;
+    font-size: var(--ov-t-xs);
+    line-height: 1.6;
     color: var(--ov-faint);
 }
-.ov-skill-row .ov-chips { margin-top: 0; gap: 8px; }
-/* Each tool sits on its own small tile: a hairline ring, a soft lift and a
-   tinted underline so the row reads as a set of objects rather than text. */
-.ov-skill-row .ov-chip {
-    position: relative;
-    padding: 8px 16px 12px;
-    border: 1.5px solid var(--ov-line);
-    border-radius: 13px;
-    background: #fff;
-    font-size: var(--ov-t-sm);
-    color: var(--fz-ink);
-    box-shadow: 0 2px 0 rgba(65, 160, 110, 0.12), var(--fz-shadow-soft);
-    transition: transform 0.2s var(--ov-ease), border-color 0.2s var(--ov-ease-soft),
-                box-shadow 0.2s var(--ov-ease), color 0.2s var(--ov-ease-soft);
+/* --ov-line is a hairline tone meant for 1px rules against a surface. On a
+   glyph it is invisible, and the separators came out as plain gaps. */
+.ov-skillset-sep { padding: 0 7px; color: var(--ov-faint); opacity: 0.6; }
+
+/*
+ * A project name, which is also the way to it.
+ *
+ * "Where did you use Kotlin?" answered by pressing the answer: the stage
+ * brings that card to the front and the page travels to it.
+ *
+ * The dotted underline is doing the discoverability work, and it is not a
+ * random choice of style: dashed already means "this does something" on this
+ * page -- the certificates toggle and the upcoming project both speak it. On
+ * hover it goes solid and green, which is the only moment this section uses
+ * the accent at all.
+ *
+ * The vertical padding with matching negative margin is a tap target: at 13px
+ * the text alone is 21px tall and the minimum is 24. The padding buys the
+ * height without moving a single pixel of the layout.
+ */
+.ov-skillset-go {
+    padding: 4px 0;
+    margin: -4px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--ov-muted);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: rgba(65, 130, 100, 0.45);
+    text-underline-offset: 3px;
+    transition: color var(--ov-dur-hover) var(--ov-ease-soft),
+                text-decoration-color var(--ov-dur-hover) var(--ov-ease-soft);
 }
-.ov-skill-row .ov-chip:hover {
-    transform: translateY(-3px);
+.ov-skillset-go:hover,
+.ov-skillset-go:focus-visible {
     color: var(--fz-green-500);
-    border-color: var(--fz-green-400);
-    box-shadow: 0 4px 0 rgba(65, 160, 110, 0.22), var(--fz-shadow);
+    text-decoration-style: solid;
+    text-decoration-color: var(--fz-green-400);
 }
 
-/* Soft skills use the same tile as everything else: they are one more row of
-   the same spec sheet, and a second tile style only made the section look like
-   two sections. */
+/* The three or four that built this island. Green, and not a link: there is
+   nowhere to send anyone, the page is the evidence. */
+.ov-skillset-site { color: var(--fz-green-500); font-weight: 600; }
+
+/* ── The tail under the tiles ─────────────────────────────────────────────
+   One link, and nothing else.
+
+   It used to carry a second list first -- ALSO: Java, Ionic, Prisma, n8n,
+   Docker, GLSL -- set in the same tone directly under twelve names that each
+   had a project attached to them. Those six had nothing attached, which made
+   them the exact thing this section was rebuilt to stop being: a list of words
+   somebody typed. The link says the same ("there is more") and claims
+   nothing, which is the honest version. */
+.ov-skillset-also {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px clamp(14px, 2vw, 24px);
+    margin: clamp(32px, 4vw, 48px) 0 0;
+    font-size: var(--ov-t-xs);
+    line-height: 1.8;
+    color: var(--ov-faint);
+}
+/*
+ * In the flow, not pushed to the far edge.
+ *
+ * It used to sit hard against the right margin with `margin-left: auto`, and
+ * it never looked aligned because there was nothing above it to align WITH:
+ * the tile grid ends wherever its last name ends, a good hundred pixels short
+ * of the column. Something right-aligned to an edge no other element touches
+ * reads as misplaced, not as aligned. On the left it is simply the last line
+ * of the section.
+ */
+.ov-skillset-also-cv {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--fz-font-body);
+    font-weight: 600;
+    color: var(--ov-muted);
+    text-decoration: none;
+    transition: color var(--ov-dur-hover) var(--ov-ease-soft);
+}
+.ov-skillset-also-cv svg { width: 14px; height: 14px; }
+.ov-skillset-also-cv:hover { color: var(--fz-green-500); }
 
 /* ═══ Contact + outro ═════════════════════════════════════════════════════ */
 .ov-card {
@@ -1582,7 +2384,54 @@ body.ov-page {
     }
     /* Window first: it is the thing worth seeing before any text. */
     .ov-portal { order: -1; max-width: 300px; }
-    .ov-about { grid-template-columns: 1fr; }
+    /* minmax(0, 1fr) and not 1fr. A bare `1fr` is minmax(AUTO, 1fr), so the
+       track refuses to go below its content's minimum -- and one unbreakable
+       860px line in the prose was enough to push the whole column off the
+       side of a 412px screen. The desktop rule has always said minmax(0, ...)
+       for exactly this reason; the phone one had quietly dropped it. */
+    .ov-about { grid-template-columns: minmax(0, 1fr); }
+
+    /*
+     * The three facts stop being a record card and become a line of type.
+     *
+     * A labelled <dl> behind a margin rule is editorial layout, and it is good
+     * editorial layout -- while there is a margin to be in. The moment the
+     * grid collapses there is no second column, the rule is describing an
+     * edge that no longer exists, and what is left reads as a form: three
+     * uppercase labels and three values stacked under a paragraph, which is
+     * the shape of a dossier and not of a page.
+     *
+     * The labels are the part that can go. "Málaga, Spain" does not need to be
+     * told it is a place, and "Native Spanish and Ukrainian" does not need to
+     * be told it is languages. What is left is one sentence of facts, in the
+     * size the page gives facts, reading like everything around it.
+     *
+     * The slash rather than a middle dot: two of the three values already
+     * contain middle dots, and separating dot-lists with dots produces one
+     * flat run where "Málaga, Spain" and "Web" look like peers.
+     */
+    .ov-facts {
+        display: block;
+        max-width: 60ch;
+        padding: 0;
+        border-left: 0;
+        font-size: var(--ov-t-sm);
+        line-height: 1.75;
+        color: var(--ov-muted);
+    }
+    .ov-fact { display: inline; }
+    .ov-fact dt { display: none; }
+    .ov-fact dd { display: inline; margin: 0; }
+    .ov-fact + .ov-fact::before {
+        content: '/';
+        padding: 0 9px;
+        color: var(--ov-faint);
+    }
+    .ov-prose, .ov-facts, .ov-made { grid-column: 1; }
+    /* The row gap is measured for two columns standing side by side. Stacked,
+       the same number reads as three unrelated blocks rather than as one
+       section, so the parts that belong together close up. */
+    .ov-about { row-gap: clamp(22px, 4vw, 30px); }
 }
 
 @media (max-width: 900px) {
@@ -1595,26 +2444,155 @@ body.ov-page {
         gap: clamp(10px, 3vw, 20px);
     }
     .ov-dog { max-width: none; margin: 0; }
-    .ov-project { grid-template-columns: 1fr; }
-    .ov-project-media { min-height: 190px; max-height: 260px; }
+
+    /* ── The index, on a phone ────────────────────────────────────────
+       The names first, then the window, stacked. No sticky: with three rows
+       the list is about 330px and the whole section fits on one screen, so
+       pinning the picture would be machinery guarding against a scroll that
+       does not happen. */
+    .ov-work {
+        grid-template-columns: minmax(0, 1fr);
+        gap: clamp(26px, 5vw, 38px);
+    }
+    .ov-work-frame { position: static; }
+    .ov-work-name { font-size: clamp(23px, 6vw, 30px); }
 }
 
 /* Below this the pill nav stops fitting: swap it for the sheet rather than
    letting the bar wrap onto a second line. */
 @media (max-width: 860px) {
+    /*
+     * The colophon goes.
+     *
+     * It is a footnote about the SITE sitting at the end of a section about
+     * the person, and on a phone a footnote costs the same vertical space as
+     * something anybody came for. Six tool names are not what a reader is
+     * scrolling this section to find, and the one place that genuinely wants
+     * them -- the computer inside the world -- explains all six properly.
+     *
+     * Keyed to the breakpoint where this page already declares itself mobile
+     * (the nav becomes a sheet on this same line), rather than to a number
+     * chosen for this block alone.
+     */
+    .ov-made { display: none; }
+
     .ov-nav { display: none; }
     .ov-menu-btn { display: inline-flex; }
     .ov-bar { gap: 12px; }
     .ov-back { margin-right: auto; }
     .ov-section { scroll-margin-top: 80px; }
+
+    /*
+     * A scrim, and then the bar leaves entirely.
+     *
+     * On a desktop the header floats over a wide empty margin and never meets
+     * anything. On a phone there is no margin -- the bar sits directly on the
+     * text column -- and a 40px section headline passing under the language
+     * pill was unreadable in both directions at once.
+     *
+     * The answer is NOT the panel this header was deliberately stripped of.
+     * It is a short fade of the page's own paper, enough to keep the controls
+     * legible while they are there, plus a bar that gets out of the way while
+     * you read and comes back the instant you flick upward -- which is already
+     * the phone gesture for "give me the controls". The class is only defined
+     * in here, so the desktop bar never moves however much it is toggled.
+     */
+    .ov-bar::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 -22px;
+        z-index: -1;
+        background: linear-gradient(var(--ov-bg) 0 62%, rgba(251, 253, 245, 0));
+        pointer-events: none;
+        /* Transparent at the top of the page, which is where the header was
+           designed to be transparent and where there is nothing behind it to
+           fight. The fade only arrives once real content is passing under the
+           controls. See _updateScrollState. */
+        opacity: 0;
+        transition: opacity 0.3s var(--ov-ease-soft);
+    }
+    .ov-bar.is-past::before { opacity: 1; }
+    .ov-bar {
+        transition: transform 0.36s var(--ov-ease-soft),
+                    opacity 0.26s var(--ov-ease-soft);
+    }
+    .ov-bar.is-tucked {
+        /* Past its own height plus the scrim, or the fade hangs there on its
+           own like a smudge. */
+        transform: translateY(calc(-100% - 24px));
+        opacity: 0;
+    }
 }
 
 @media (max-width: 620px) {
     .ov-root { font-size: var(--ov-t-base); }
+
+    /*
+     * Less air between sections, and only here.
+     *
+     * 10vh of padding top and bottom is right on a desktop, where it is a
+     * comfortable band beside a wide column. On a 900px phone it is 180px of
+     * nothing between one section and the next -- a fifth of the screen, twice
+     * over -- and the page stops reading as a document and starts reading as a
+     * series of slides you have to scroll past. The ratio to the type is what
+     * matters, and the type did not get bigger.
+     */
+    .ov-section { padding: clamp(54px, 8vh, 74px) var(--ov-pad); }
+
+    /*
+     * Twelve names on a phone: a LIST, and not twelve fragments in a column.
+     *
+     * At this width the grid collapses to one track, and a one-track grid is
+     * not a grid any more -- it is a stack of paragraphs with 30px of air
+     * between them and nothing saying where one ends and the next begins. It
+     * read as loose because it WAS loose: on a desktop the columns do that
+     * work, and on a phone there are no columns left to do it.
+     *
+     * So on a phone it becomes what it actually is, a list of records, and
+     * takes the treatment every other list of records on this page has: a
+     * dashed rule between rows, tight enough that a name and its evidence
+     * belong to each other visibly. Same reasoning as the project index and
+     * the credentials -- the rule is rhythm, not structure.
+     *
+     * The first row loses its rule, because the section's own heading is
+     * already the line above it.
+     */
+    /*
+     * TWO columns, and the whole reason is length.
+     *
+     * One track made this a list of twelve records running most of a thousand
+     * pixels down a phone, and the honest description of that is "a lot of
+     * scrolling for a section whose point is made by its third row". The names
+     * are short -- the longest is eleven characters -- and the evidence under
+     * each is two or three project names. There is no reason for either to own
+     * the full width.
+     *
+     * Two columns halve it, and because grid rows share a height the dashed
+     * rules line up across the pair, so it reads as a small table rather than
+     * as two lists that happen to be side by side.
+     */
+    .ov-skillset {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 clamp(16px, 4.5vw, 24px);
+    }
+    .ov-skillset-cell {
+        padding: clamp(12px, 3.2vw, 16px) 0;
+        border-top: 1px solid transparent;
+        border-image: repeating-linear-gradient(90deg,
+            var(--ov-tick) 0 4px, transparent 4px 9px) 1;
+    }
+    /* The first ROW, which is the first two cells. */
+    .ov-skillset-cell:nth-child(-n + 2) { border-top: 0; padding-top: 0; }
+    .ov-skillset-name { font-size: 17px; }
+    /* 8px belonged to a cell with 30px of air around it. Inside a ruled row
+       the pair has to read as one record. */
+    .ov-skillset-used { margin-top: 2px; font-size: 12px; line-height: 1.5; }
+    .ov-skillset-sep { padding: 0 4px; }
+    .ov-skillset-also { margin-top: clamp(24px, 5vw, 32px); }
+
     .ov-back span { display: none; }
     .ov-back { padding: 8px 12px; margin-right: auto; }
     .ov-cta-row .ov-btn { flex: 1 1 100%; }
-    .ov-skill-row { grid-template-columns: 1fr; gap: 12px; }
 
     /* The motifs are sized for a desktop column. At 430px a 460px tile shows
        barely one and a half of them, which reads as a few stray shapes rather
@@ -1653,10 +2631,6 @@ body.ov-page {
         margin-top: 8px;
         text-align: center;
     }
-    /* No pitch on the phone: the character, the name and the two buttons are
-       the whole message, and the paragraph only pushed them down. It still
-       carries the page on every wider screen. */
-    .ov-lede { display: none; }
     .ov-cta-row {
         grid-row: 4;
         margin-top: 26px;
@@ -1693,14 +2667,9 @@ body.ov-page {
     }
 }
 
-@media (max-width: 420px) {
-    .ov-upcoming-inner { flex-direction: column; align-items: flex-start; gap: 12px; }
-}
-
 /* ═══ Reduced motion ══════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
     .ov-dash rect,
-    .ov-upcoming-icon,
     .ov-cert-toggle > svg:not(.ov-dash) { animation: none !important; }
     .ov-cert-rest { transition: none; }
     .ov-root { scroll-behavior: auto; }
@@ -1712,13 +2681,17 @@ body.ov-page {
         transition-duration: 0.01ms !important;
         transition-delay: 0ms !important;
     }
-    /* Content must still end up visible, not stuck mid-reveal. */
+    /* Content must still end up visible, not stuck mid-reveal. The mask is
+       the dangerous one: resetting opacity and transform would leave a clipped
+       element clipped, and it would never show at all. */
     .ov-reveal { opacity: 1; transform: none; }
+    .ov-rise,
+    .ov-lede-line,
+    .ov-name { clip-path: none !important; transform: none !important; }
     /* Without this the pointer parallax would survive as an instant snap,
        which is worse than the easing it replaced. */
     .ov-hero-pattern::before,
     .ov-hero-pattern::after { --ov-depth: 0; transform: none; }
-    .ov-h2::after,
     .ov-timeline::before { transform: none; }
     .ov-sheet { transform: none; }
     .ov-portal-canvas { opacity: 1; }
@@ -1745,14 +2718,6 @@ body.ov-page {
     .ov-hero-pattern::before,
     .ov-hero-pattern::after { animation: none; }
 
-    /* The bar keeps its surface and loses the blur behind it.
-       The surface is already 94% opaque, so the backdrop blur is doing almost
-       nothing you can see -- while costing a re-blur of the full-width strip
-       on every scroll frame, which is precisely the frame budget the scroll
-       itself needs. Two more percent of opacity covers the difference. */
-    .ov-bar::before {
-        background: rgba(251, 253, 245, 0.96);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-    }
+    /* The header has no surface left to blur -- see .ov-bar. What remains in
+       this block is the motif field, above. */
 }

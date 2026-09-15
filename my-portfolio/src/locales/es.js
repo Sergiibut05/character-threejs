@@ -28,11 +28,15 @@ export default {
         },
 
         hero: {
-            role: 'Desarrollador web y móvil · Málaga',
-            lede: 'Titulado en Desarrollo de Aplicaciones Multiplataforma, con ' +
-                'estancia de prácticas en empresa desarrollando web y móvil. ' +
-                'Trabajo con Angular, TypeScript y Kotlin, y busco mi primer ' +
-                'puesto a jornada completa.',
+            // Una línea, y ya. El párrafo que había debajo era una entrada de
+            // CV ("titulado en...", "con estancia de prácticas en...") y el
+            // diploma ya se cuenta en Sobre mí, donde toca.
+            //
+            // El titulo real, no una lista de disciplinas: es lo que dice el
+            // grado y es lo que buscaria alguien filtrando candidatos. Malaga
+            // sale en el rail de datos de Sobre mi, asi que no hace falta
+            // arrastrarla tambien aqui.
+            role: 'Desarrollador de apps multiplataforma',
             enter: 'Entrar al mundo',
             enterLoading: 'Preparando el mundo',
             cv: 'Descargar CV',
@@ -41,19 +45,39 @@ export default {
 
         about: {
             title: 'Sobre mí',
+            // La linea grande de la seccion.
+            //
+            // Dos versiones anteriores fallaron por el mismo sitio. "Hago web,
+            // movil y 3D, y me gusta rematarlo" era la forma exacta de un
+            // titular de LinkedIn: una lista de disciplinas y una virtud.
+            // "Prefiero terminar una cosa a dejar cinco a medias" ya era una
+            // postura, pero hablaba de lo que NO hace.
+            //
+            // Esta dice por que existe todo lo demas. Ocho palabras, dos
+            // frases, y justifica el mundo 3D sin nombrarlo ni venderlo: quien
+            // la lee y despues pulsa "Entrar al mundo" ya sabe para que esta
+            // ahi. Es tambien la unica que cose About con el resto del sitio.
+            //
+            // Sin palabras con guion: se parten por ahi y a 44px parece una
+            // errata. CSS no tiene forma de prohibir ese corte, asi que la
+            // defensa esta en el texto.
+            statement: 'Aprendo construyendo. Esta página es una de esas cosas.',
+            // UN parrafo, y sin el nombre de la empresa: las practicas salen
+            // dos veces en Trayectoria, con fechas y puesto. Repetirlo aqui
+            // gasta la atencion del lector en algo que esta a punto de leer
+            // bien contado.
             story: [
-                'Terminé el grado superior de **Desarrollo de Aplicaciones ' +
-                'Multiplataforma** en el Parque Tecnológico de Málaga. La parte ' +
-                'dual la hice en **Aliqindoi**, trabajando en proyectos reales ' +
-                'de la empresa.',
-
-                'Me manejo tanto en **frontend como en backend**, y me gusta ' +
-                '**rematar las cosas**: que se desplieguen, que funcionen y que ' +
-                'se puedan usar. Fuera del trabajo suelo estar aprendiendo algo ' +
-                'nuevo, casi siempre gráficos o desarrollo de videojuegos.'
+                'Grado superior en **Desarrollo de Aplicaciones ' +
+                'Multiplataforma**, en el Parque Tecnológico de Málaga. ' +
+                '**Frontend y backend**, y fuera del trabajo casi siempre ' +
+                'acabo con gráficos.'
             ],
+            basedLabel: 'Dónde',
+            basedValue: 'Málaga, España',
+            focusLabel: 'A qué me dedico',
+            focusValue: 'Web · Móvil · 3D',
             langsLabel: 'Idiomas',
-            langsValue: 'Español y ucraniano nativos · Inglés C1 (Cambridge)',
+            langsValue: 'Español y ucraniano nativos · Inglés C1',
             madeTitle: 'Este sitio, por dentro'
         },
 
@@ -61,7 +85,14 @@ export default {
             title: 'Proyectos',
             blurb: 'Lo que he construido y está funcionando de verdad.',
             stack: 'Tecnologías',
+            stageLabel: 'Proyectos, uno a uno',
+            slideLabel: 'Proyecto {n} de {total}',
+            hint: 'Arrastra, o usa las flechas',
+            prev: 'Proyecto anterior',
+            next: 'Proyecto siguiente',
             tfgBadge: 'Proyecto de fin de curso',
+            more: 'Ver detalle',
+            less: 'Ocultar detalle',
             upcomingTitle: 'Próximamente',
             upcomingBody: 'Estoy con un proyecto nuevo. Vuelve pronto.',
             items: {
@@ -73,18 +104,32 @@ export default {
 
         path: {
             title: 'Trayectoria',
-            blurb: 'Dónde he trabajado y dónde me he formado.',
+            blurb: 'Trabajo y estudios.',
             experience: 'Experiencia',
             education: 'Formación',
             certsTitle: 'Formación acreditada',
-            certsMore: 'y algunos más',
-            certsLess: 'ocultar',
+            certsMore: '+{n} más',
+            certsLess: 'Ver menos',
             viewCredential: 'Ver credencial'
         },
 
         skills: {
             title: 'Habilidades',
-            blurb: 'Con lo que trabajo a diario.',
+            // A proposito NO con la forma de las otras dos ("Lo que he
+            // construido...", "Donde he trabajado..."): tres secciones
+            // abriendo con la misma construccion es un tic. Esta enuncia la
+            // regla sobre la que esta montada, que ademas es lo unico
+            // interesante que tiene: cada nombre de abajo entra en un
+            // proyecto.
+            blurb: 'Nada aquí sin un proyecto detrás.',
+            // La linea de debajo de cada nombre. Los proyectos salen de
+            // projectsData; esto es lo unico que hay que traducir.
+            thisSite: 'este sitio',
+            // La coletilla bajo las fichas. Los nombres viven en
+            // overviewContent porque son nombres propios y no se traducen.
+            alsoCv: 'Lista completa en el CV',
+            goTo: 'Ver {name} en proyectos',
+
             softTitle: 'Soft skills',
             soft: [
                 'Trabajo en equipo',
@@ -96,9 +141,10 @@ export default {
         },
 
         contact: {
-            title: 'Hablemos',
-            blurb: 'Busco mi primer puesto como desarrollador. Si encaja algo de ' +
-                'lo que has visto, escríbeme y te respondo.',
+            // El rótulo pequeño dice de qué sección se trata, igual que en
+            // todas las demás; la línea grande es lo que se dice.
+            title: 'Contacto',
+            blurb: 'Hablemos.',
             emailLabel: 'Correo',
             elsewhere: 'En otros sitios',
             outroTitle: '¿Prefieres verlo jugando?',

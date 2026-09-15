@@ -39,7 +39,11 @@ const MONTH_RE = new RegExp(`\\b(${Object.keys(MONTHS).join('|')})\\b`, 'g')
   */
 export function period(text) {
     if (i18n.locale !== 'en') return text
-    return String(text).replace(MONTH_RE, (m) => MONTHS[m])
+    // "Actualidad" is not a month, so MONTH_RE never saw it and the ongoing
+    // course read "2026 — Actualidad" in the English build.
+    return String(text)
+        .replace(MONTH_RE, (m) => MONTHS[m])
+        .replace(/Actualidad/g, 'Present')
 }
 
 /**
@@ -57,6 +61,11 @@ export function translateProject(p) {
     return {
         ...p,
         tagline: i18n.opt(`${key}.tagline`) || p.tagline,
+        short: i18n.opt(`${key}.short`) || p.short,
+        figures: (p.figures || []).map((f, i) => ({
+            value: f.value,
+            label: i18n.opt(`${key}.figures`)?.[i] || f.label
+        })),
         highlights: i18n.opt(`${key}.highlights`) || p.highlights,
         links: (p.links || []).map((l, i) => ({ ...l, label: linkLabels[i] || l.label }))
     }
@@ -76,6 +85,68 @@ function certificate(c) {
 
 /** Spoken languages belong with the person, not in a list next to Kotlin. */
 const isSpokenLanguages = (group) => /^idiomas$/i.test(group)
+
+/**
+ * What this page says I build with, and WHERE.
+ *
+ * The overview used to print all five groups of SKILLS: thirty entries, HTML
+ * and CSS and Git and "attention to detail" among them. That is a CV taxonomy,
+ * and on a page trying to read as considered work it does the opposite of what
+ * it looks like it is doing. Nobody was ever hired on "Teamwork", and listing
+ * it beside TSL makes the TSL cheaper.
+ *
+ * The rule that replaced it is simple and it does the selecting on its own:
+ * A NAME ONLY GOES ON THIS PAGE IF IT CAN SAY WHERE IT WAS USED. There is no
+ * curated list of "important" technologies here, because there does not need
+ * to be one: HTML, Git and Teamwork cannot name a project, so they are not
+ * here, and every entry that IS here carries its own evidence underneath it.
+ *
+ * `match` is what to look for in a project's `stack`, so the evidence comes
+ * out of projectsData and cannot drift from it. `site` means this island is
+ * built with it, which for three of these is the only place it appears — and
+ * saying so is the quietest way to tell a reader that the thing they are
+ * currently looking at IS the portfolio piece.
+ *
+ * Ordered the way a stack is read: interface, then the things behind it, then
+ * the graphics.
+ */
+const CORE_SKILLS = [
+    { name: 'TypeScript', match: ['TypeScript'] },
+    { name: 'Angular', match: ['Angular'] },
+    { name: 'Next.js', match: ['Next.js'] },
+    { name: 'Kotlin', match: ['Kotlin'] },
+    { name: 'Express', match: ['Express'] },
+    // The tile says Python; the match still looks for FastAPI too, because
+    // that is the name in the project's stack and the evidence has to
+    // resolve either way.
+    { name: 'Python', match: ['Python', 'FastAPI'] },
+    { name: 'PostgreSQL', match: ['PostgreSQL'] },
+    { name: 'Firebase', match: ['Firebase'], site: true },
+    { name: 'Stripe', match: ['Stripe'] },
+    { name: 'Three.js', match: ['Three.js'], site: true },
+    { name: 'TSL · WebGPU', site: true },
+    { name: 'Blender', site: true }
+]
+
+/**
+ * One tile: the name, and the list of places it was used.
+ *
+ * Each project entry carries the INDEX it sits at in the stage, so the label
+ * can be a control that brings that card to the front. "This site" carries no
+ * index: there is nowhere on this page to send anyone, the page is the thing.
+ */
+function skillEvidence(skill, ordered, siteLabel) {
+    const usedIn = []
+    ordered.forEach((p, i) => {
+        if (p.upcoming || !skill.match) return
+        if ((p.stack || []).some((tech) => skill.match.includes(tech))) {
+            usedIn.push({ label: p.title, index: i })
+        }
+    })
+    if (skill.site) usedIn.push({ label: siteLabel, index: null })
+    return { name: skill.name, usedIn }
+}
+
 
 /** A project whose content is still placeholder copy, not something to show off. */
 const isUpcoming = (project) => /^proximamente/.test(project.id)
@@ -117,6 +188,11 @@ export function getContent() {
     const featured = CERTIFICATES.filter((c) => c.featured)
     const rest = CERTIFICATES.filter((c) => !c.featured)
 
+    // Hoisted: the stage's order is also the order the skill tiles point into,
+    // and an index that disagreed between the two would send a reader to the
+    // wrong project.
+    const ordered = overviewOrder(collapseUpcoming(PROJECTS))
+
     return {
         name: 'Sergii Butrii',
         links: LINKS,
@@ -141,7 +217,6 @@ export function getContent() {
 
         hero: {
             role: t('hero.role'),
-            lede: t('hero.lede'),
             enter: t('hero.enter'),
             enterLoading: t('hero.enterLoading'),
             cv: t('hero.cv'),
@@ -150,7 +225,12 @@ export function getContent() {
 
         about: {
             title: t('about.title'),
+            statement: t('about.statement'),
             story: list('about.story'),
+            basedLabel: t('about.basedLabel'),
+            basedValue: t('about.basedValue'),
+            focusLabel: t('about.focusLabel'),
+            focusValue: t('about.focusValue'),
             langsLabel: t('about.langsLabel'),
             langsValue: t('about.langsValue'),
             madeTitle: t('about.madeTitle'),
@@ -166,8 +246,15 @@ export function getContent() {
             title: t('projects.title'),
             blurb: t('projects.blurb'),
             stackLabel: t('projects.stack'),
+            stageLabel: t('projects.stageLabel'),
+            slideLabel: t('projects.slideLabel'),
+            hint: t('projects.hint'),
+            prevLabel: t('projects.prev'),
+            nextLabel: t('projects.next'),
             finalProjectBadge: t('projects.tfgBadge'),
-            items: overviewOrder(collapseUpcoming(PROJECTS)).map((p) => {
+            moreLabel: t('projects.more'),
+            lessLabel: t('projects.less'),
+            items: ordered.map((p) => {
                 if (isUpcoming(p)) {
                     return {
                         id: p.id,
@@ -180,16 +267,28 @@ export function getContent() {
                 return {
                     id: p.id,
                     upcoming: false,
+                    // The data has always marked the strongest project; until
+                    // now it only reordered the list and the card looked like
+                    // every other one. The layout reads it too.
+                    spotlight: p.spotlight === true,
                     title: p.title,
                     finalProject: p.finalProject === true,
                     tagline: tp.tagline,
+                    // Two lines for the card. The long version did not get
+                    // shorter, it moved: the highlights are in the disclosure
+                    // under the stage, where a reader who wants them can open
+                    // them without the card having to carry them.
+                    short: tp.short,
+                    pills: p.pills || (p.stack || []).slice(0, 3),
                     // The card is one wide image, so a project can name a
                     // better-cropped shot than the one baked onto its 3D stand.
                     image: p.overviewImage || p.image,
-                    // Optional second crop for the desktop layout only, where
-                    // the media well is a tall column rather than a banner.
-                    imageWide: p.overviewImageWide || null,
+                    // The spread's own art: a 3:2 still at two sizes plus the
+                    // product actually running. Superseded overviewImageWide,
+                    // which was a crop for the old tall media well.
+                    spread: p.spread || null,
                     highlights: tp.highlights,
+                    figures: tp.figures,
                     stack: p.stack,
                     links: tp.links
                 }
@@ -226,11 +325,10 @@ export function getContent() {
         skills: {
             title: t('skills.title'),
             blurb: t('skills.blurb'),
-            groups: SKILLS
-                .filter((g) => !isSpokenLanguages(g.group))
-                .map((g) => ({ ...g, group: opt('skills.groupNames')?.[g.group] || g.group })),
-            softTitle: t('skills.softTitle'),
-            soft: list('skills.soft')
+            goTo: t('skills.goTo'),
+            alsoCv: t('skills.alsoCv'),
+            core: CORE_SKILLS.map((sk) =>
+                skillEvidence(sk, ordered, t('skills.thisSite')))
         },
 
         contact: {

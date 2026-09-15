@@ -131,11 +131,24 @@ export const EXPERIENCE = [
         role: 'Desarrollador de software',
         org: 'Aliqindoi · Málaga',
         period: 'Marzo 2025 — Junio 2025',
-        detail: 'Primera estancia en empresa: experiencia práctica contribuyendo al día a día del equipo de desarrollo.'
+        // Del CV, resumido. La version larga (WooCommerce, Divi, Gravity Forms)
+        // vive alli; aqui caben las herramientas y el entregable.
+        detail: 'Primera estancia del programa dual: Angular, Ionic y Firebase ' +
+            'en las apps de la empresa y WordPress en las webs de cliente. Me ' +
+            'encargué de actualizar su propia landing.'
     }
 ]
 
 export const EDUCATION = [
+    {
+        // En curso, y por eso va primero: la timeline se lee de arriba abajo
+        // como una linea de tiempo inversa, lo mas reciente arriba.
+        title: 'Curso de Especialización en Inteligencia Artificial y Big Data',
+        org: 'CPIFP Alan Turing · Accenture, Building I+D6 (Málaga)',
+        period: '2026 — Actualidad',
+        detail: 'Programa de la Junta de Andalucía en colaboración con Accenture, ' +
+            'con las clases en sus oficinas.'
+    },
     {
         title: 'CFGS Desarrollo de Aplicaciones Multiplataforma (DAM)',
         org: 'CPIFP Alan Turing · Málaga TechPark',

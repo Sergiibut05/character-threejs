@@ -23,11 +23,7 @@ export default {
         },
 
         hero: {
-            role: 'Web & mobile developer · Málaga, Spain',
-            lede: 'Qualified in Multiplatform App Development, with a company ' +
-                'internship building web and mobile. I work with Angular, ' +
-                'TypeScript and Kotlin, and I am looking for my first full-time ' +
-                'role.',
+            role: 'Cross-platform app developer',
             enter: 'Enter the world',
             enterLoading: 'Getting the world ready',
             cv: 'Download CV',
@@ -36,18 +32,39 @@ export default {
 
         about: {
             title: 'About me',
+            // The line set large in About.
+            //
+            // Two earlier versions failed at the same point. "I build for web,
+            // mobile and 3D, and I like finishing it" was the exact shape of a
+            // LinkedIn headline: a list of disciplines and a virtue. "I would
+            // rather finish one thing than leave five unfinished" was a
+            // position at least, but it described what he does NOT do.
+            //
+            // This one says why everything else on the site exists. Ten words,
+            // two sentences, and it justifies the 3D world without naming it
+            // or selling it: anyone who reads this and then presses "Enter the
+            // world" already knows what it is for.
+            //
+            // No hyphenated compounds in here. "half-built" broke across two
+            // lines at the hyphen, which is a legal break and looks like a typo
+            // at 44px; CSS has no property that forbids breaking at an explicit
+            // hyphen, so the guard has to live in the copy.
+            statement: 'I learn by building things. This page is one of them.',
+            // ONE paragraph, and no company name in it: the placements are
+            // listed twice in Path, with dates and a role. Repeating the name
+            // here spends the reader's attention on something they are about
+            // to be told properly.
             story: [
-                'I finished my higher diploma in **Multiplatform App Development** ' +
-                'at Málaga TechPark. I did my internship at **Aliqindoi**, ' +
-                'working on the company\'s real projects.',
-
-                'I am comfortable on both the **frontend and the backend**, and I ' +
-                'like **finishing things properly**: deployed, working and actually ' +
-                'usable. Outside work I am usually learning something new, ' +
-                'generally graphics or game development.'
+                '**Multiplatform App Development** diploma at Málaga ' +
+                'TechPark. **Frontend and backend**, and outside work I ' +
+                'usually end up doing the graphics.'
             ],
+            basedLabel: 'Based in',
+            basedValue: 'Málaga, Spain',
+            focusLabel: 'What I do',
+            focusValue: 'Web · Mobile · 3D',
             langsLabel: 'Languages',
-            langsValue: 'Native Spanish and Ukrainian · English C1 (Cambridge)',
+            langsValue: 'Native Spanish and Ukrainian · English C1',
             madeTitle: 'This site, under the hood',
             // Overrides BEHIND_THE_SCENES titles, in the same order as the data.
             made: [
@@ -64,14 +81,25 @@ export default {
             title: 'Projects',
             blurb: 'What I have built and actually shipped.',
             stack: 'Stack',
+            stageLabel: 'Projects, one at a time',
+            slideLabel: 'Project {n} of {total}',
+            hint: 'Drag, or use the arrows',
+            prev: 'Previous project',
+            next: 'Next project',
             tfgBadge: 'Final course project',
+            more: 'See detail',
+            less: 'Hide detail',
             upcomingTitle: 'Coming soon',
             upcomingBody: 'A new project is in the works. Check back shortly.',
             // Overrides over projectsData.js, which stays the Spanish source of
             // truth. Only keys present here replace the original.
             items: {
                 bookmatch: {
+                    figures: ['books in the catalogue', 'platforms, web and Android'],
                     tagline: 'Book marketplace: buy, sell and swap · web + Android',
+                    short: 'A catalogue of ~1000 books with cart, payments, forums and ' +
+                        'AI recommendations. Angular and Express on the web, native ' +
+                        'Kotlin on Android.',
                     highlights: [
                         'A **real, deployed full-stack platform**: a catalogue of ~1000 ' +
                         'books, cart, **Stripe payments** and a user-to-user swap module.',
@@ -83,7 +111,11 @@ export default {
                     links: ['Visit the site', 'Code on GitHub']
                 },
                 sql3d: {
+                    figures: ['parsing engines', 'JOINs in the guided demo', 'round trips to the server'],
                     tagline: 'Type a SQL query and watch it become a 3D entity-relationship diagram',
+                    short: 'It draws as you type: every table is a node and every JOIN a cable. ' +
+                        'Two parsers, one in the browser and a Python one for the awkward ' +
+                        'dialects.',
                     highlights: [
                         'The query is parsed and drawn **as you type it**: every table is a ' +
                         'node and every JOIN a cable routed at right angles between them.',
@@ -99,7 +131,11 @@ export default {
                     links: ['Visit the site', 'Code on GitHub']
                 },
                 volumine: {
+                    figures: ['chart types', 'JavaScript budget', 'cookies and third parties'],
                     tagline: '3D charts you embed anywhere with a link',
+                    short: 'Six chart types in three.js with hand-built geometry. The whole ' +
+                        'configuration travels compressed inside the link, so there is no ' +
+                        'database to keep.',
                     highlights: [
                         'Six chart types in **three.js with hand-built geometry**: bevelled ' +
                         'edges, real shadows and studio lighting, and no 3D charting ' +
@@ -117,12 +153,12 @@ export default {
 
         path: {
             title: 'Path',
-            blurb: 'Where I have worked and where I studied.',
+            blurb: 'Work and study.',
             experience: 'Experience',
             education: 'Education',
             certsTitle: 'Accredited training',
-            certsMore: 'and a few more',
-            certsLess: 'hide',
+            certsMore: '+{n} more',
+            certsLess: 'Show fewer',
             viewCredential: 'View credential',
             // Override EXPERIENCE / EDUCATION, same order as the data modules.
             // Orgs, dates and credential names are proper nouns — never translated.
@@ -134,11 +170,17 @@ export default {
                 },
                 {
                     role: 'Software Developer',
-                    detail: 'First company placement: hands-on experience contributing ' +
-                        'to the development team\'s day-to-day work.'
+                    detail: 'First placement of the dual programme: Angular, Ionic ' +
+                        'and Firebase on the company\'s apps and WordPress on its ' +
+                        'client sites. I took over updating its own landing page.'
                 }
             ],
             educationItems: [
+                {
+                    title: 'Specialisation Course in Artificial Intelligence and Big Data',
+                    detail: 'A Junta de Andalucía programme run with Accenture, ' +
+                        'with classes held at their offices.'
+                },
                 {
                     title: 'Higher VET Diploma — Multiplatform Application Development',
                     detail: 'Dual track: study at the college combined with work at a company.'
@@ -152,7 +194,16 @@ export default {
 
         skills: {
             title: 'Skills',
-            blurb: 'What I work with day to day.',
+            // Deliberately not the shape of the other two ("What I have
+            // built...", "Where I have worked..."): three sections opening on
+            // the same construction is a tic. This one states the rule the
+            // section is built on instead, which is also the only interesting
+            // thing about it -- every name below is a link into a project.
+            blurb: 'Nothing here without a project.',
+            thisSite: 'this site',
+            alsoCv: 'Full list in the CV',
+            goTo: 'See {name} in projects',
+
             // Keyed by the Spanish group name in SKILLS, not by position, so
             // reordering the data cannot silently mislabel a row.
             groupNames: {
@@ -172,9 +223,8 @@ export default {
         },
 
         contact: {
-            title: 'Get in touch',
-            blurb: 'I am looking for my first role as a developer. If anything ' +
-                'here fits, drop me a line and I will get back to you.',
+            title: 'Contact',
+            blurb: 'Let\'s talk.',
             emailLabel: 'Email',
             elsewhere: 'Elsewhere',
             outroTitle: 'Rather see it by playing?',

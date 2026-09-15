@@ -14,9 +14,12 @@
  * exists to be fast, and a 70 KB tweening engine would work against that.
  */
 import './overview.css'
+import Lenis from 'lenis'
+import 'lenis/dist/lenis.css'
 import i18n, { LOCALES } from '../../Utils/i18n.js'
 import { getContent, richText } from './overviewContent.js'
 import { SOCIALS } from './socialData.js'
+import ProjectFrame from './ProjectFrame.js'
 
 const CV_URL = '/cv.pdf'
 
@@ -30,7 +33,6 @@ const SVG = {
     menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
     close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
     chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`,
-    seed: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"/><path d="M12 14c0-4 3-7 8-7 0 5-3 8-8 8Z"/><path d="M12 16c0-3-2.5-5.5-6-5.5 0 3.6 2.4 6 6 6Z"/></svg>`,
     cap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg>`,
     /* The dashed outline for the two provisional surfaces — "a few more" and
        the upcoming-project card. It is an SVG and not `border-style: dashed`
@@ -60,6 +62,31 @@ const txt = (tag, cls, text) => {
 }
 
 const NAV_ITEMS = ['about', 'projects', 'path', 'skills', 'contact']
+
+/**
+ * A project name with its arrow sized on purpose.
+ *
+ * "SQL → 3D ER" read weaker than the other two titles beside it and there
+ * is a measurable reason: Fredoka has no U+2192, so the browser substitutes
+ * the glyph from a system font. Measured at 38px, that arrow is 38px wide --
+ * a full em -- while Fredoka's own capitals are around 21. So the title
+ * carried one oversized, lighter-weight character from a different typeface
+ * right through its middle, and the eye reads the whole line as thinner.
+ *
+ * Nothing can make Fredoka draw an arrow it does not have. What this does is
+ * stop the substitute from looking like an accident: two thirds of the size,
+ * heavier to match the density around it, nudged onto the caps' optical
+ * centre. Any title without an arrow goes through untouched.
+ */
+const projectName = (title) => {
+    const node = el('span', 'ov-work-name')
+    String(title).split('\u2192').forEach((part, i) => {
+        if (i) node.appendChild(txt('span', 'ov-glyph-arrow', '\u2192'))
+        if (part) node.appendChild(document.createTextNode(part))
+    })
+    return node
+}
+
 
 export default class Overview {
     /** Shared across instances: the CV either ships with the site or it does not. */
@@ -106,6 +133,9 @@ export default class Overview {
         this.el.setAttribute('role', 'dialog')
         this.el.setAttribute('aria-modal', 'true')
         this.el.setAttribute('aria-label', 'Portfolio')
+        // Focusable, but never in the tab order: opening the page parks focus
+        // here rather than on a control. See open().
+        this.el.tabIndex = -1
         this.el.hidden = true
 
         this.skip = el('a', 'ov-skip')
@@ -129,12 +159,21 @@ export default class Overview {
 
         this.menu = el('div', 'ov-sheet')
         this.menu.id = 'ov-menu'
+        // Opening the menu is a request for the controls, so the bar comes
+        // back with it: otherwise the close button has nothing to return to.
+        this.menu.addEventListener('toggle', (e) => {
+            this._menuOpen = e.newState === 'open'
+            if (this._menuOpen) this.bar.classList.remove('is-tucked')
+        })
+        // Lenis listens on the window and would otherwise eat a wheel or a
+        // drag meant for a sheet that has scrolled past its own height.
+        this.menu.setAttribute('data-lenis-prevent', '')
         this.menu.popover = 'auto'
 
         this.langWrap = el('div', 'ov-lang')
         this.langWrap.setAttribute('role', 'group')
 
-        this.bar.append(this.backBtn, this.nav, this.langWrap, this.menuBtn, this.progress)
+        this.bar.append(this.backBtn, this.nav, this.langWrap, this.menuBtn)
 
         this.main = el('main', 'ov-main')
         this.main.id = 'ov-main'
@@ -180,7 +219,10 @@ export default class Overview {
             )
         }
 
-        this.el.append(this.skip, this.bar, this.menu, this.main)
+        // The progress line is a child of the ROOT, not of the bar: it is
+        // fixed to the top edge of the window now, and inside the bar it would
+        // be positioned against a sticky element that moves.
+        this.el.append(this.skip, this.bar, this.progress, this.menu, this.main)
         document.body.appendChild(this.el)
 
         this._renderLangToggle()
@@ -191,15 +233,39 @@ export default class Overview {
         window.addEventListener('scroll', this._onScroll, { passive: true })
     }
 
+    /** The language pill travels too, for the same reason the nav's does. */
+    _litLang(i) {
+        const at = i == null ? this._langIndex : i
+        this.langWrap.style.setProperty('--lang-i', at)
+        this.langWrap.style.setProperty('--lang-s', i == null ? '1' : '1.12')
+        for (const [n, b] of this._langButtons.entries()) {
+            b.classList.toggle('is-lit', n === at)
+            b.classList.toggle('is-hot', i != null && n === i)
+        }
+    }
+
     _renderLangToggle() {
         this.langWrap.innerHTML = ''
-        for (const code of LOCALES) {
+        this._langButtons = []
+        // The pill behind the buttons is ONE object that moves, the same way
+        // the nav's does. Two buttons that each paint their own background
+        // swap states; one pill that travels between them is a thing changing
+        // its mind, and it costs a transform.
+        this.langWrap.style.setProperty('--lang-n', LOCALES.length)
+        this._langIndex = Math.max(0, LOCALES.indexOf(i18n.locale))
+        LOCALES.forEach((code, i) => {
             const b = txt('button', 'ov-lang-btn', code.toUpperCase())
             b.type = 'button'
             b.setAttribute('aria-pressed', String(code === i18n.locale))
             b.addEventListener('click', () => this.setLang(code))
+            b.addEventListener('pointerenter', () => this._litLang(i))
+            b.addEventListener('focus', () => this._litLang(i))
+            b.addEventListener('blur', () => this._litLang())
             this.langWrap.appendChild(b)
-        }
+            this._langButtons.push(b)
+        })
+        this.langWrap.onpointerleave = () => this._litLang()
+        this._litLang()
     }
 
     /** Rebuild every piece of language-dependent DOM. */
@@ -217,6 +283,19 @@ export default class Overview {
 
         this._renderNav(c)
         this._renderSheet(c)
+
+        // BEFORE the DOM is thrown away, and nowhere else.
+        //
+        // This lived at the top of _projects(), which looks like the same
+        // moment and is not: _fx is created DURING _projects, so on the render
+        // after a language switch the dispose ran against canvases that had
+        // just been attached, pulled them back out, and left every card with
+        // the has-fx class and nothing behind it. Here it can only ever see the
+        // previous render's.
+        this._workIo?.disconnect()
+        this._frame?.dispose()
+        this._frame = null
+        clearTimeout(this._detailTimer)
 
         this.main.innerHTML = ''
         this.main.append(
@@ -256,13 +335,41 @@ export default class Overview {
             b.type = 'button'
             b.dataset.target = `ov-${key}`
             b.addEventListener('click', () => this._goTo(`ov-${key}`))
+            // The pill GOES to whatever you are pointing at, and comes back
+            // when you stop. See _movePill.
+            b.addEventListener('pointerenter', () => this._movePill(b))
+            b.addEventListener('focus', () => this._movePill(b))
+            b.addEventListener('blur', () => this._movePill())
             this.nav.appendChild(b)
             this._navButtons.push(b)
         }
+        this.nav.addEventListener('pointerleave', () => this._movePill())
     }
 
+    /**
+     * The menu, which is an INDEX and not a list of cards.
+     *
+     * It was five white boxes with borders, an arrow each and a 56px minimum
+     * height -- the shape every mobile menu has had since about 2016, and a
+     * shape this page uses nowhere else. Five destinations do not need five
+     * containers to be told apart: on an empty sheet they are already the only
+     * things on screen, and the boxes were drawing a distinction that nothing
+     * needed drawing.
+     *
+     * So the boxes come off and the names go up to display size, numbered, on
+     * dashed rules. That is not an idea invented for the sheet: it is exactly
+     * the Projects index, which is this page's own way of presenting a short
+     * list of places you can go. The menu now reads as part of the document
+     * rather than as the operating system's contribution to it.
+     *
+     * The numbers earn their place twice over. They say how long the page is
+     * before you commit to it, and they are what makes a row scan as a line of
+     * an index rather than as a link that has lost its underline.
+     */
     _renderSheet(c) {
         this.menu.innerHTML = ''
+        this._sheetButtons = []
+
         const head = el('div', 'ov-sheet-head')
         head.appendChild(txt('span', 'ov-sheet-title', c.a11y.menuTitle))
         const closeBtn = el('button', 'ov-sheet-close', SVG.close)
@@ -273,26 +380,74 @@ export default class Overview {
         head.appendChild(closeBtn)
 
         const list = el('nav', 'ov-sheet-list')
-        for (const key of NAV_ITEMS) {
-            const b = el('button', 'ov-sheet-link',
-                `<span>${c.nav[key]}</span>${SVG.arrow}`)
+        list.setAttribute('aria-label', c.a11y.menuTitle)
+        NAV_ITEMS.forEach((key, i) => {
+            const b = el('button', 'ov-sheet-link')
             b.type = 'button'
+            b.dataset.target = `ov-${key}`
+            // The stagger is read from here rather than written per rule, so
+            // adding a section to NAV_ITEMS needs no CSS at all.
+            b.style.setProperty('--i', i)
+            b.appendChild(txt('span', 'ov-sheet-num', String(i + 1).padStart(2, '0')))
+            b.appendChild(txt('span', 'ov-sheet-name', c.nav[key]))
             b.addEventListener('click', () => {
                 this.menu.hidePopover()
                 this._goTo(`ov-${key}`)
             })
             list.appendChild(b)
-        }
+            this._sheetButtons.push(b)
+        })
+
         this.menu.append(head, list)
+        this._markSheet()
+    }
+
+    /** Mark the section the reader is actually in, as the nav pill does. */
+    _markSheet() {
+        if (!this._sheetButtons?.length) return
+        for (const b of this._sheetButtons) {
+            const on = b.dataset.target === this._currentId
+            b.classList.toggle('is-on', on)
+            b.setAttribute('aria-current', String(on))
+        }
     }
 
     // ═══ Sections ═════════════════════════════════════════════════════════
-    _section(id, title, blurb) {
-        const s = el('section', 'ov-section')
+    /**
+     * A section masthead: a small label, then the sentence set large.
+     *
+     * It used to be the other way round — the category ("Proyectos") at display
+     * size with a green rule growing out of it, and the sentence underneath in
+     * body copy. That put the page's biggest type on its least interesting
+     * word, five times over, and the rule was decoration standing in for a
+     * hierarchy the type was not providing.
+     *
+     * Turned around, the label is a tab in the margin and the SENTENCE is the
+     * headline, which is the one thing in each section worth reading at size.
+     * The rule then has nothing left to do and is gone, along with it the
+     * reason every section on this page started with a horizontal line.
+     *
+     * The <h2> is still the category, so the document outline and the nav spy
+     * are unchanged: what moved is which of the two is big, not which is the
+     * heading.
+     */
+    _section(id, title, blurb, modifier) {
+        const s = el('section', modifier ? `ov-section ${modifier}` : 'ov-section')
         s.id = id
-        const head = el('div', 'ov-section-head ov-reveal')
-        head.appendChild(txt('h2', 'ov-h2', title))
-        if (blurb) head.appendChild(txt('p', 'ov-blurb', blurb))
+        // The head is no longer one reveal: the label fades in and the
+        // headline comes up out of a mask behind it, which is the one piece of
+        // motion on this page worth spending a curve on.
+        const head = el('div', 'ov-section-head')
+        head.appendChild(txt('h2', 'ov-eyebrow ov-reveal', title))
+        if (blurb) {
+            // Two sentences cannot be a headline. Contact's blurb is a short
+            // pitch rather than a title, and at display size it came out five
+            // lines deep and swallowed the section under it.
+            const long = blurb.length > 78
+            head.appendChild(txt('p',
+                (long ? 'ov-display ov-display--sm' : 'ov-display') + ' ov-rise'))
+            head.lastChild.textContent = blurb
+        }
         s.appendChild(head)
         return s
     }
@@ -315,9 +470,6 @@ export default class Overview {
         const name = txt('h1', 'ov-name ov-reveal', c.name)
         const role = txt('p', 'ov-role ov-reveal', c.hero.role)
         role.style.setProperty('--i', 1)
-        const lede = txt('p', 'ov-lede ov-reveal', c.hero.lede)
-        lede.style.setProperty('--i', 2)
-
         const ctas = el('div', 'ov-cta-row ov-reveal')
         ctas.style.setProperty('--i', 3)
 
@@ -339,7 +491,7 @@ export default class Overview {
         this.cvBtn = cv
         this._probeCv()
 
-        text.append(name, role, lede, ctas)
+        text.append(name, role, ctas)
 
         // ── The window: the character from the world ──
         //
@@ -371,165 +523,590 @@ export default class Overview {
         return hero
     }
 
+    /**
+     * About — the one block on this page that exists to be READ.
+     *
+     * It used to be prose beside a bordered white card, and the card was the
+     * problem: a panel with a border, a radius and a shadow reads as a widget
+     * dropped into the page, so the section came out looking like a dashboard
+     * with a paragraph next to it. What is actually here is a short statement,
+     * two facts about where and what, and evidence for the claim the statement
+     * makes. That is a column of prose and a rail of specifications, and a rail
+     * is drawn with rules, not with a box.
+     *
+     * The line set large is a STATEMENT, and it is not the first paragraph.
+     *
+     * It was the first paragraph, and that was the problem: "I finished my
+     * higher diploma in Multiplatform App Development at Málaga TechPark" is a
+     * line from a CV, and at 34px it is a line from a CV in a very large font.
+     * The typography promised editorial and the sentence delivered
+     * administrative, which is exactly the mismatch that made the section feel
+     * off however well the columns were balanced.
+     *
+     * So the big line is now a sentence that sounds like a person — taken, as
+     * it happens, from the second paragraph, where it had always been sitting
+     * unread — and the diploma, the internship and Málaga go back to being
+     * what they are: facts, in body copy, underneath.
+     */
     _about(c) {
         const s = this._section('ov-about', c.about.title)
-        const grid = el('div', 'ov-about ov-reveal')
-        grid.style.setProperty('--i', 1)
-
+        const grid = el('div', 'ov-about')
         const prose = el('div', 'ov-prose')
+        if (c.about.statement) {
+            const lede = el('p', 'ov-about-lede')
+            // One line per SENTENCE, and that is not a flourish.
+            //
+            // `text-wrap: balance` balances the LENGTH of the lines and knows
+            // nothing about meaning, so it broke "Aprendo construyendo. Esta /
+            // pagina es una de esas cosas" -- a break two words past the full
+            // stop, which is the one place the line should never break. The
+            // sentence boundary is the only break here that carries meaning,
+            // so it is the one the markup decides; the rest is still left to
+            // the browser inside each line.
+            //
+            // No lookbehind in the pattern: Safari only shipped it in 16.4 and
+            // this file has no business being the reason someone's About is
+            // one long line.
+            const parts = c.about.statement.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g)
+            for (const part of parts || [c.about.statement]) {
+                lede.appendChild(txt('span', 'ov-lede-line', part.trim()))
+            }
+            prose.appendChild(lede)
+        }
         // richText, not plain text: the story marks its load-bearing nouns with
         // **bold**, the same convention the project highlights already use. Two
         // solid paragraphs of even grey is a wall you decide not to read; a
         // couple of anchors in each give the eye somewhere to land and turn it
         // into something scannable without shortening a word of it.
-        for (const p of c.about.story) prose.appendChild(el('p', null, richText(p)))
-
-        const langs = el('p', 'ov-langs')
-        langs.append(
-            txt('span', 'ov-langs-label', c.about.langsLabel),
-            txt('span', 'ov-langs-value', c.about.langsValue)
-        )
-        prose.appendChild(langs)
-
-        // Evidence beside the claim: the story says "built by hand", this lists
-        // what by. Same source the in-world computer reads.
-        const made = el('aside', 'ov-made')
-        made.appendChild(txt('h3', 'ov-made-title', c.about.madeTitle))
-        const ul = el('ul', 'ov-made-list')
-        for (const item of c.about.made) {
-            const li = el('li', 'ov-made-item')
-            li.appendChild(el('span', 'ov-made-icon', item.icon))
-
-            // "Gráficos: Three.js y TSL" → a muted label plus the tech set in a
-            // mono face. Six identical icon+sentence rows read as one grey block;
-            // splitting the two halves gives the eye something to scan, and the
-            // mono says "these are the actual tools" without adding a word.
-            const cut = item.title.indexOf(':')
-            const body = el('span', 'ov-made-body')
-            if (cut > 0) {
-                body.appendChild(txt('span', 'ov-made-label', item.title.slice(0, cut)))
-                body.appendChild(txt('span', 'ov-made-tech', item.title.slice(cut + 1).trim()))
-            } else {
-                body.appendChild(txt('span', 'ov-made-tech', item.title))
-            }
-            li.appendChild(body)
-            ul.appendChild(li)
+        for (const p of c.about.story) {
+            prose.appendChild(el('p', 'ov-reveal', richText(p)))
         }
-        made.appendChild(ul)
 
-        grid.append(prose, made)
+        // ── Two facts and a place ────────────────────────────────────────
+        const facts = el('dl', 'ov-facts ov-reveal')
+        for (const [label, value] of [
+            [c.about.basedLabel, c.about.basedValue],
+            [c.about.focusLabel, c.about.focusValue],
+            [c.about.langsLabel, c.about.langsValue]
+        ]) {
+            const row = el('div', 'ov-fact')
+            row.appendChild(txt('dt', null, label))
+            row.appendChild(txt('dd', null, value))
+            facts.appendChild(row)
+        }
+
+        // Evidence beside the claim: the story says "built by hand", this says
+        // what by. Same source the in-world computer reads.
+        //
+        // ONE run of text, and it lives inside the prose column rather than in
+        // a band of its own. As a six-cell grid with an icon in every cell it
+        // sat between About and Projects belonging to neither, and the labels
+        // it needed to make a grid work ("GRAPHICS", "PHYSICS") were carrying
+        // no information a reader could not get from the tool names. As a
+        // sentence it is two lines under the paragraph it is evidence for.
+        /*
+         * A colophon, which is what this always was.
+         *
+         * Every version of this block until now tried to be two things at
+         * once. It carried a category for each tool ("GRAPHICS", "SOUND",
+         * "ART") AND an icon for the same category, so it said everything
+         * twice and then had to wrap across three ragged lines to fit. What it
+         * ended up looking like was a small table that had failed to become a
+         * table.
+         *
+         * The category is the half that goes, because the icon is already
+         * saying it in a tenth of the width. What is left is the shape this
+         * block has wanted all along: a lead-in and six tools on one line,
+         * under everything else, the way a book names its typeface on the last
+         * page. It does not compete with the section, which is the whole job.
+         *
+         * A flex row rather than a run of inline text, so the spacing is a gap
+         * and not a middle dot pretending to be one. That also retires the
+         * zero-width-space trick the separators needed to stay wrappable.
+         */
+        const made = el('p', 'ov-made ov-reveal')
+        made.appendChild(txt('span', 'ov-made-title', c.about.madeTitle))
+        for (const item of c.about.made) {
+            const pair = el('span', 'ov-made-pair')
+            // The same icon the in-world computer shows for this same entry.
+            if (item.icon) pair.appendChild(el('span', 'ov-made-icon', item.icon))
+            const cut = item.title.indexOf(':')
+            pair.appendChild(txt('span', 'ov-made-value',
+                cut > 0 ? item.title.slice(cut + 1).trim() : item.title))
+            made.appendChild(pair)
+        }
+
+        /*
+         * Three children, and the order is the argument.
+         *
+         * `made` used to be appended INSIDE the prose, which put a line about
+         * how the 3D island is built in the middle of a paragraph about the
+         * person. It is evidence for the statement, but it is evidence about
+         * the SITE, and it was sitting where the reader was still being told
+         * who they were reading about.
+         *
+         * As a third child it spans both columns underneath them, which is
+         * what the .ov-made grid-column rule has said all along, and on a
+         * phone it falls last: statement, paragraph, the three facts, then the
+         * stack. Each block answers a different question and they arrive in
+         * the order the questions occur to anybody.
+         */
+        grid.append(prose, facts, made)
         s.appendChild(grid)
         return s
     }
 
+    /**
+     * Projects — an index and one window, and that is the whole section.
+     *
+     * It was a carousel before this: three cards on a shallow stage, the two
+     * behind it rotated and hazed, with arrows, a counter, a rail, drag and a
+     * spring. Every piece of that was well made and the form was still wrong.
+     * Cards fanned in perspective with arrows under them is coverflow, and
+     * coverflow is 2010; no amount of easing rescues a dated genre.
+     *
+     * There was also a tell I should have read much earlier: THERE ARE THREE
+     * PROJECTS. A carousel exists for when things do not fit. Three fit. All
+     * that machinery — the wrapping, the inertia, the dots — was solving a
+     * problem this page does not have.
+     *
+     * So: the names in a column at display size, and one frame beside them.
+     * Point at a name and the frame becomes that project; stay on it and the
+     * still gives way to the product running. One surface, not three players.
+     * The shader stops being a detail inside a card and becomes the thing the
+     * section is built around, which is the only place on this page where it
+     * changes what you actually see.
+     */
     _projects(c) {
         const s = this._section('ov-projects', c.projects.title, c.projects.blurb)
-        const list = el('div', 'ov-projects')
+        const items = c.projects.items
+        const pad = (n) => String(n).padStart(2, '0')
+        const hasPointer = matchMedia('(hover: hover) and (pointer: fine)').matches
+        const noMotion = matchMedia('(prefers-reduced-motion: reduce)').matches ||
+            !!navigator.connection?.saveData
 
-        c.projects.items.forEach((p, i) => {
-            const art = el('article', 'ov-project ov-reveal')
-            art.style.setProperty('--i', i + 1)
+        const wrap = el('div', 'ov-work')
 
-            if (p.upcoming) {
-                art.classList.add('ov-project--upcoming')
-                art.insertAdjacentHTML('beforeend', SVG.dashRing)
-                const inner = el('div', 'ov-upcoming-inner')
-                inner.appendChild(el('span', 'ov-upcoming-icon', SVG.seed))
-                const body = el('div')
-                body.appendChild(txt('h3', 'ov-upcoming-title', p.title))
-                body.appendChild(txt('p', 'ov-upcoming-body', p.tagline))
-                inner.appendChild(body)
-                art.appendChild(inner)
-                list.appendChild(art)
+        // ── The frame ────────────────────────────────────────────────────
+        const figure = el('div', 'ov-work-frame ov-reveal ov-reveal--art')
+        // The picture layers live in their own box. Stacked straight into the
+        // frame they are `inset: 0` against the whole column and would cover
+        // the caption underneath them.
+        const view = el('div', 'ov-work-view')
+        // Two stills rather than one, alternating. When the shader is running
+        // the canvas covers both and none of this is visible; when it is not —
+        // no WebGPU, reduced motion, a boot that threw — these ARE the section,
+        // and swapping a single src would blink white between projects.
+        const shots = [new Image(), new Image()]
+        shots.forEach((img, n) => {
+            img.className = 'ov-work-shot'
+            img.decoding = 'async'
+            img.loading = n === 0 ? 'eager' : 'lazy'
+            img.alt = ''
+            view.appendChild(img)
+        })
+        let shotOn = 0
+
+        const canvas = el('canvas', 'ov-work-canvas')
+        canvas.width = 1200
+        canvas.height = 800
+        canvas.setAttribute('aria-hidden', 'true')
+        view.appendChild(canvas)
+
+        // ONE video element for the whole section. It is a decoder, not a
+        // player: nothing ever sees it, the frame samples it.
+        const video = document.createElement('video')
+        video.className = 'ov-work-video'
+        video.muted = true
+        video.loop = true
+        video.playsInline = true
+        video.preload = 'none'
+        video.tabIndex = -1
+        video.setAttribute('aria-hidden', 'true')
+        view.appendChild(video)
+
+        this._frame = new ProjectFrame(canvas)
+        const frame = this._frame
+
+        // ── The caption under it ─────────────────────────────────────────
+        const meta = el('div', 'ov-work-meta')
+        figure.append(view, meta)
+
+        // ── The index ────────────────────────────────────────────────────
+        const list = el('ol', 'ov-work-list')
+        const rows = []
+
+        let active = -1
+        let videoTimer = null
+
+        /** Best format this browser will take, decided once. */
+        const pickSrc = (p) => {
+            const v = p.spread?.video
+            if (!v) return null
+            if (v.webm && video.canPlayType('video/webm; codecs="vp9"')) return v.webm
+            return v.mp4 || v.webm || null
+        }
+
+        /**
+         * Put the video away.
+         *
+         * The video is NOT paused here, and that is the whole point of the
+         * shape of this. Pausing it first froze the picture on its last frame
+         * and then spent the length of the transition wiping that frozen frame
+         * off the screen -- which is exactly what it looked like from the
+         * section below: a video stuck half way through a morph. It keeps
+         * running until the frame has finished travelling back to the still,
+         * and stops then, when nothing on screen is sampling it any more.
+         *
+         * `instant` when the picture has left the viewport: there is nobody to
+         * show the travel to, so it snaps and the video stops now rather than
+         * decoding for another three quarters of a second off screen.
+         */
+        const stopVideo = (instant = false) => {
+            clearTimeout(videoTimer)
+            frame.hideVideo({
+                instant,
+                onDone: () => {
+                    video.pause()
+                    video.classList.remove('is-playing')
+                }
+            })
+        }
+
+        /**
+         * The picture, and when there is a video the picture IS the video.
+         *
+         * ── Why this waits ──────────────────────────────────────────────
+         *
+         * It used to wipe to the still immediately and then wipe again to the
+         * video a moment later, and the second wipe always cut the first one
+         * off at about a third of its travel. Queueing the second one fixed
+         * the interruption but not the real problem: there were still two
+         * transitions for one decision, and the eye reads that as one
+         * transition that went wrong.
+         *
+         * The obvious repair -- keep the wipe to the still and then swap the
+         * video in underneath with no transition at all -- does not work here,
+         * and that is worth writing down. The stills are not the videos' first
+         * frames: measured against frame zero they differ by a mean of 37/255
+         * on Volumine and 12/255 on SQL to 3D ER. A silent swap would be a
+         * visible jump cut.
+         *
+         * So there is ONE transition and it goes where the reader is actually
+         * going. The row and the caption answer the moment you point at them,
+         * which is where the feedback lives; the picture changes once, and
+         * when it does it is already moving.
+         *
+         * ── And why it does not wait forever ────────────────────────────
+         *
+         * These files are small (0.2 to 0.4 MB) and come back in about 20ms
+         * locally, but a phone on a bad connection is a different machine. If
+         * the video has not arrived within the budget the still goes in
+         * instead, because a picture that does not change for a second reads
+         * as broken however good the reason is. On that path the video still
+         * takes over when it lands, and by then the two events are far enough
+         * apart to read as "the picture, and now it is playing" rather than as
+         * one broken morph.
+         */
+        const PICTURE_BUDGET = 600
+
+        /** A short dwell before touching the network, so running the pointer
+         *  down the list does not start three fetches. Short, because the
+         *  picture now waits behind it. */
+        const DWELL = 90
+
+        let pickToken = 0
+
+        const showPicture = (p, back) => {
+            const token = pickToken
+            const still = p.spread?.image || p.image
+            const src = pickSrc(p)
+
+            // Nothing to wait for: no file for this one, or motion is off.
+            if (!src || noMotion) {
+                if (still) frame.showStill(still, false, back)
                 return
             }
 
-            const media = el('div', 'ov-project-media')
-            if (p.image) {
-                const img = new Image()
-                img.alt = p.title
-                img.loading = 'lazy'
-                img.decoding = 'async'
+            let settled = false
+            let budget = null
 
-                if (p.imageWide) {
-                    // Two crops, one download. <picture> lets the browser choose
-                    // BEFORE it fetches; the same thing done with matchMedia
-                    // either downloads both or downloads the wrong one and then
-                    // swaps it out in front of the reader.
-                    //
-                    // The query is the projects grid's own breakpoint: at 900px
-                    // and below the card drops to a single column and the media
-                    // becomes a short wide banner, which is the shape `image` is
-                    // cropped for. Above it the well is a tall column, where the
-                    // wider shot has room to be itself.
-                    const picture = document.createElement('picture')
-                    const source = document.createElement('source')
-                    source.media = '(min-width: 901px)'
-                    source.srcset = p.imageWide
-                    picture.append(source, img)
-                    media.appendChild(picture)
-                } else {
-                    media.appendChild(img)
-                }
-
-                // Last, and only once the <source> is already its sibling: an
-                // img starts fetching the moment it has a src, and a src set
-                // before that would be the one that loads.
-                img.src = p.image
+            const toStill = () => {
+                if (settled || token !== pickToken) return
+                settled = true
+                clearTimeout(budget)
+                if (still) frame.showStill(still, false, back)
             }
 
-            const body = el('div', 'ov-project-body')
+            const toVideo = () => {
+                if (settled || token !== pickToken) return
+                settled = true
+                clearTimeout(budget)
+                // With the shader running, the frame samples this element and
+                // nobody ever sees it. Without one there is nothing to sample
+                // it, so it becomes the picture itself.
+                if (frame.live) frame.showVideo(video, { back, still })
+                else video.classList.add('is-playing')
+                video.play().catch(() => {
+                    // Refused. Undo the claim and fall back to the still.
+                    settled = false
+                    toStill()
+                })
+            }
 
-            const head = el('div', 'ov-project-head')
-            head.appendChild(txt('h3', 'ov-project-title', p.title))
+            const start = () => {
+                if (token !== pickToken) return
+                budget = setTimeout(toStill, PICTURE_BUDGET)
+                video.dataset.for = p.id
+                // Already decoded and still the same file: no wait at all.
+                if (video.dataset.src === src && video.readyState >= 2) {
+                    toVideo()
+                    return
+                }
+                // preload="none" is on the element so that opening the
+                // section fetches nothing at all. It also means assigning
+                // .src fetches nothing: the browser is doing exactly what it
+                // was told, and loadeddata never fires. Lifting it HERE is
+                // the difference between "never load a video nobody asked
+                // for" and "never load a video".
+                video.preload = 'auto'
+                video.dataset.src = src
+                video.src = src
+                video.addEventListener('loadeddata', toVideo, { once: true })
+                video.addEventListener('error', toStill, { once: true })
+            }
+
+            videoTimer = setTimeout(start, DWELL)
+        }
+
+        /*
+         * The caption: numbers, the badge if there is one, and the way out.
+         *
+         * Two things used to live at the top of this and neither survived the
+         * question "what does this say that something else does not".
+         *
+         * The PARAGRAPH said the engineering, which sounded load bearing until
+         * you read it next to the figures underneath it. "The whole
+         * configuration travels compressed inside the link, so there is no
+         * database to keep" is "0 round trips to the server" at four times the
+         * length; "two parsers, one in the browser and a Python one" is "2
+         * parsing engines". Each paragraph also opened by restating the first
+         * figure word for word. The numbers were already the denser version of
+         * the same claim, and they are the part anybody actually reads.
+         *
+         * The TECH PILLS said Angular, Express, Kotlin. Skills is twelve tiles
+         * that each name the projects that used them, cross-linked into this
+         * very list -- the same relation, read the other way. Printing it
+         * twice made the page look like it was padding.
+         *
+         * What is left is what only this project can say: its numbers, whether
+         * it was the final course project, and where to go if you want more.
+         */
+        const paintMeta = (p) => {
+            meta.innerHTML = ''
+            if (!p || p.upcoming) return
+            /*
+             * The badge FIRST, right under the picture.
+             *
+             * It sat between the numbers and the links, which is the one place
+             * on this caption where it interrupted something: "here is how big
+             * it is" / "this was my final project" / "here is the way in". The
+             * middle line answers a question nobody was in the middle of
+             * asking, and the two it split belong together.
+             *
+             * At the top it is a caption on the picture, which is what it
+             * actually is -- a fact about what this project WAS, not about how
+             * it is built or where it lives. The caption then reads in one
+             * direction: what this is, how big it is, where to go.
+             */
             if (p.finalProject) {
-                head.appendChild(el('span', 'ov-badge',
+                const line = el('p', 'ov-work-tech')
+                line.appendChild(el('span', 'ov-badge',
                     `${SVG.cap}<span>${c.projects.finalProjectBadge}</span>`))
+                meta.appendChild(line)
             }
-            body.appendChild(head)
-            body.appendChild(txt('p', 'ov-project-tagline', p.tagline))
-
-            if (p.highlights?.length) {
-                const ul = el('ul', 'ov-highlights')
-                for (const h of p.highlights) {
-                    const li = el('li', 'ov-highlight')
-                    li.appendChild(el('span', 'ov-highlight-tick', SVG.check))
-                    li.appendChild(el('span', 'ov-highlight-text', richText(h)))
-                    ul.appendChild(li)
+            if (p.figures?.length) {
+                const figs = el('dl', 'ov-figures')
+                for (const f of p.figures) {
+                    const cell = el('div', 'ov-figure')
+                    cell.appendChild(txt('dt', null, f.value))
+                    cell.appendChild(txt('dd', null, f.label))
+                    figs.appendChild(cell)
                 }
-                body.appendChild(ul)
+                meta.appendChild(figs)
             }
-
-            if (p.stack?.length) {
-                const chips = el('div', 'ov-chips')
-                chips.setAttribute('aria-label', c.projects.stackLabel)
-                for (const t of p.stack) chips.appendChild(txt('span', 'ov-chip', t))
-                body.appendChild(chips)
-            }
-
-            if (p.links?.length) {
-                const links = el('div', 'ov-project-links')
-                for (const l of p.links) {
-                    const a = el('a', 'ov-link', `<span>${l.label}</span>${SVG.external}`)
-                    a.href = l.url
-                    a.target = '_blank'
-                    a.rel = 'noopener noreferrer'
-                    links.appendChild(a)
+            const links = p.links || []
+            if (links.length) {
+                const row = el('div', 'ov-work-links')
+                const a = el('a', 'ov-project-go', `<span>${links[0].label}</span>${SVG.arrow}`)
+                a.href = links[0].url
+                a.target = '_blank'
+                a.rel = 'noopener noreferrer'
+                row.appendChild(a)
+                if (links[1]) {
+                    const b = el('a', 'ov-project-alt',
+                        `<span>${links[1].label}</span>${SVG.external}`)
+                    b.href = links[1].url
+                    b.target = '_blank'
+                    b.rel = 'noopener noreferrer'
+                    row.appendChild(b)
                 }
-                body.appendChild(links)
+                meta.appendChild(row)
+            }
+        }
+
+        const select = (i, first = false) => {
+            if (i === active || !items[i] || items[i].upcoming) return
+            // Which way along the list, before `active` is overwritten. Going
+            // back up runs the same frontier in the opposite direction, which
+            // is what stops the index feeling like a slideshow that only goes
+            // one way -- moving back should look like moving back.
+            const back = active >= 0 && i < active
+            active = i
+            const p = items[i]
+
+            rows.forEach((r, n) => {
+                if (!r) return
+                r.classList.toggle('is-on', n === i)
+                r.setAttribute('aria-current', String(n === i))
+            })
+
+            // Everything in flight for the project we are leaving is stale.
+            pickToken++
+            clearTimeout(videoTimer)
+            // Released, NOT retreated: the picture is about to be replaced, so
+            // travelling back to the old still first would be a wipe nobody
+            // asked for and the next one would undo it half a second later.
+            frame.releaseVideo(() => {
+                video.pause()
+                video.classList.remove('is-playing')
+            })
+            paintMeta(p)
+
+            const still = p.spread?.image || p.image
+            if (still) {
+                // The hidden one takes the new picture and then becomes the
+                // visible one, so the swap crossfades instead of blinking.
+                const next = shots[shotOn ^ 1]
+                next.src = still
+                next.alt = p.title
+                if (p.spread?.imageSm) {
+                    next.srcset = `${p.spread.imageSm} 810w, ${p.spread.image} 1620w`
+                    next.sizes = '(max-width: 900px) 92vw, 620px'
+                }
+                shots.forEach((img, n) => img.classList.toggle('is-on', n !== shotOn))
+                shotOn ^= 1
             }
 
-            art.append(media, body)
-            list.appendChild(art)
+            // The FIRST paint is the still and nothing else. The section opens
+            // on project 01 without anybody asking for it, and fetching and
+            // playing a video off the back of that is autoplay however it is
+            // dressed up: bytes spent and motion started for a reader who has
+            // not moved yet. Every later change goes through showPicture,
+            // which answers with the video.
+            if (first) frame.showStill(still, true, back)
+            else showPicture(p, back)
+        }
+
+        items.forEach((p, i) => {
+            const li = el('li', 'ov-work-item ov-reveal')
+
+            if (p.upcoming) {
+                const quiet = el('div', 'ov-work-row ov-work-row--soon')
+                quiet.appendChild(txt('span', 'ov-work-num', pad(i + 1)))
+                const body = el('span', 'ov-work-body')
+                body.appendChild(txt('span', 'ov-work-name', p.title))
+                body.appendChild(txt('span', 'ov-work-line', p.tagline))
+                quiet.appendChild(body)
+                li.appendChild(quiet)
+                list.appendChild(li)
+                rows.push(null)
+                return
+            }
+
+            // A BUTTON, and never a link.
+            //
+            // It was a link, on the reasoning that the row is the project, so
+            // pressing it should go there. That was wrong twice over. On a
+            // phone there is no hover at all, so the only way to change the
+            // picture is to press a row -- and pressing it navigated away,
+            // which is the opposite of what the person wanted. And on a
+            // desktop nobody knows the list answers to hover until they have
+            // tried it, so the natural first move is a click, and that click
+            // also left the page.
+            //
+            // Pressing a row now does exactly what hovering it does. The way
+            // out is the labelled button under the picture, which was already
+            // there and is the only thing on screen that claims to be one.
+            const row = el('button', 'ov-work-row')
+            row.type = 'button'
+            row.appendChild(txt('span', 'ov-work-num', pad(i + 1)))
+            const body = el('span', 'ov-work-body')
+            body.appendChild(projectName(p.title))
+            body.appendChild(txt('span', 'ov-work-line', p.tagline))
+            row.appendChild(body)
+            if (hasPointer) row.addEventListener('pointerenter', () => select(i))
+            // Focus, not just hover: arrowing or tabbing down the list has to
+            // move the picture too, or the frame tells a keyboard reader
+            // nothing.
+            row.addEventListener('focus', () => select(i))
+            row.addEventListener('click', () => select(i))
+
+            li.appendChild(row)
+            list.appendChild(li)
+            rows.push(row)
         })
 
-        s.appendChild(list)
+        // Up and down move through the work; Home and End jump the ends.
+        list.addEventListener('keydown', (e) => {
+            const live = rows.filter(Boolean)
+            const at = live.indexOf(document.activeElement)
+            if (at < 0) return
+            let next = null
+            if (e.key === 'ArrowDown') next = live[Math.min(at + 1, live.length - 1)]
+            else if (e.key === 'ArrowUp') next = live[Math.max(at - 1, 0)]
+            else if (e.key === 'Home') next = live[0]
+            else if (e.key === 'End') next = live[live.length - 1]
+            if (!next) return
+            e.preventDefault()
+            next.focus()
+        })
+
+        wrap.append(list, figure)
+        s.appendChild(wrap)
+
+        const firstReal = items.findIndex((p) => !p.upcoming)
+        if (firstReal >= 0) select(firstReal, true)
+
+        /*
+         * Nothing decodes when the picture is not on screen.
+         *
+         * Watching the PICTURE and not the section around it. The section is
+         * far taller than the frame -- on a phone the frame is at the bottom
+         * of it -- so a threshold on the section fired while the picture was
+         * still sitting in plain view, and the reader watched the video put
+         * itself away for no reason they could see.
+         *
+         * Two thresholds, two different answers. Below 45% the picture is on
+         * its way out and the travel back to the still is worth showing. At 0
+         * it is gone and the travel would be a private performance, so it
+         * snaps instead.
+         */
+        this._workIo?.disconnect()
+        if (typeof IntersectionObserver !== 'undefined') {
+            this._workIo = new IntersectionObserver(([e]) => {
+                if (e.intersectionRatio >= 0.45) return
+                stopVideo(e.intersectionRatio === 0)
+            }, { threshold: [0, 0.45] })
+            this._workIo.observe(view)
+        }
+
         return s
     }
 
     _timeline(title, entries, mapper) {
         const wrap = el('div', 'ov-reveal')
-        wrap.appendChild(txt('h3', 'ov-h3', title))
+        wrap.appendChild(txt('h3', 'ov-eyebrow ov-eyebrow--sub', title))
         const ul = el('ul', 'ov-timeline')
         for (const e of entries) {
             const m = mapper(e)
@@ -565,9 +1142,16 @@ export default class Overview {
     }
 
     /**
-     * Certificates are deliberately quiet: the two that carry weight are listed,
-     * the rest sit behind a disclosure. They are available to anyone who looks
-     * for them without the page reading as a trophy cabinet.
+     * Credentials, as a list of records and not as a wall of cards.
+     *
+     * Nine bordered tiles in a grid is an inventory, and an inventory of nine
+     * online courses argues against itself: it reads as padding toward looking
+     * senior, and it drags the one entry that genuinely matters down to the
+     * level of the other eight. Three rows, and a count for the rest.
+     *
+     * Nothing is lost. The full set is still one click away here, still in the
+     * in-world trophy shelf, and still on the CV, which is where an exhaustive
+     * list belongs.
      */
     _certificates(c) {
         const block = el('div', 'ov-certs ov-reveal')
@@ -580,12 +1164,13 @@ export default class Overview {
             a.target = '_blank'
             a.rel = 'noopener noreferrer'
             a.setAttribute('aria-label', `${cert.title} — ${c.path.viewCredential}`)
-            const main = el('span', 'ov-cert-main')
-            main.appendChild(txt('span', 'ov-cert-title', cert.title))
-            main.appendChild(txt('span', 'ov-cert-meta', `${cert.issuer} · ${cert.date}`))
-            a.appendChild(main)
-            // Always drawn, not revealed on hover: on a touch screen there is no
-            // hover, and without it the row does not read as something you tap.
+            // The year alone. The month is stored because the CV wants it and
+            // the trophy shelf shows it; in a list whose job is "when, and
+            // what", "September" is four syllables of nothing.
+            const year = String(cert.date).match(/\d{4}/)?.[0] || ''
+            a.appendChild(txt('span', 'ov-cert-year', year))
+            a.appendChild(txt('span', 'ov-cert-title', cert.title))
+            a.appendChild(txt('span', 'ov-cert-issuer', cert.issuer))
             a.appendChild(el('span', 'ov-cert-go', SVG.external))
             return a
         }
@@ -606,8 +1191,18 @@ export default class Overview {
         for (const cert of rest) moreInner.appendChild(row(cert))
         more.appendChild(moreInner)
 
+        // BOTH labels resolved once, here.
+        //
+        // The click handler used to write c.path.certsMore straight back into
+        // the button, which is the raw catalog string: the first open turned
+        // "+8 more" into the literal "+{n} more" and it never recovered. The
+        // count belongs to the label, so the label is what carries it.
+        const labels = {
+            more: c.path.certsMore.replace('{n}', String(rest.length)),
+            less: c.path.certsLess.replace('{n}', String(rest.length))
+        }
         const toggle = el('button', 'ov-cert-toggle',
-            `${SVG.dashRing}<span class="ov-cert-toggle-text">${c.path.certsMore}</span>${SVG.chevron}`)
+            `${SVG.dashRing}<span class="ov-cert-toggle-text">${labels.more}</span>${SVG.chevron}`)
         toggle.type = 'button'
         toggle.setAttribute('aria-expanded', 'false')
         toggle.setAttribute('aria-controls', 'ov-cert-rest')
@@ -635,43 +1230,133 @@ export default class Overview {
             // never arrives; this is the only path to settled in that case.
             settleTimer = setTimeout(settle, 460)
             toggle.querySelector('.ov-cert-toggle-text').textContent =
-                open ? c.path.certsMore : c.path.certsLess
-            // "y algunos más" and "ocultar" are not the same width, so the
+                open ? labels.more : labels.less
+            // "+8 more" and "Show fewer" are not the same width, so the
             // perimeter just changed and the ring has to be re-divided.
             this._fitDashRing(toggle.querySelector('.ov-dash rect'))
         })
 
-        block.append(toggle, more)
+        // The region FIRST, the button after it.
+        //
+        // With the button in between, opening it left a control sitting in the
+        // middle of what is otherwise one continuous list of credentials: it
+        // read as a separator rather than as something you pressed. After the
+        // region, the button is always at the end of the list, in both states,
+        // and it never jumps — the rows grow above it and it rides down on the
+        // same curve, which is the whole transition, for free, in normal flow.
+        //
+        // Fine for a screen reader too, and not by luck: collapsed, the region
+        // is `visibility: hidden` and out of the accessibility tree entirely,
+        // so the reading order is three rows then "+8 more". Opened, it is
+        // eleven rows then "Show fewer". Both read exactly as they look.
+        block.append(more, toggle)
         return block
     }
 
+    /**
+     * Twelve names, and every one of them says where it was used.
+     *
+     * This section has been four things. Five ruled rows of pills, which was a
+     * table with its borders showing. The same rows without the rules, which
+     * left the labels floating. A label column, which fixed the layout and
+     * left the real problem alone. Then seven bare names, which fixed the
+     * content and left the section with nothing to say beyond the words.
+     *
+     * A name on its own is the weakest thing a portfolio can print: "Angular"
+     * on this page and "Angular" on every other one are the same claim, and
+     * neither is worth anything. The line underneath is what makes it worth
+     * something, and it is not written by hand — it comes out of the project
+     * stacks, so it cannot drift from the work it describes.
+     *
+     * Those labels are also controls. "Where did you use Kotlin?" is answered
+     * by pressing the answer: the stage brings that project to the front and
+     * the page travels to it. It is the only place on this page where one
+     * section knows about another, and it costs a handful of lines because
+     * both halves already existed.
+     */
     _skills(c) {
+        /*
+         * It DOES get a headline, after all.
+         *
+         * It lost one because "What I work with day to day" was the third
+         * section in a row opening on the same cadence as "What I have
+         * built..." and "Where I have worked...", and it was the one with the
+         * least to add. But the fix for a bad sentence is a better sentence,
+         * not silence: with no display line this was the only section on the
+         * page that opened on a micro-label and went straight into content,
+         * and it read as unfinished rather than as restrained.
+         *
+         * The one it has now is not the same shape as the others -- no "What",
+         * no "Where" -- and it says the only thing about this section that is
+         * worth saying out loud: every name below links to something you can
+         * open. That is the whole reason it is twelve tiles of evidence rather
+         * than thirty tiles of vocabulary.
+         */
         const s = this._section('ov-skills', c.skills.title, c.skills.blurb)
-        // An editorial spec sheet, not a row of identical boxes: the label sits
-        // in its own column so the eye can run down it and stop at the group it
-        // came for.
-        const table = el('div', 'ov-skills')
-        c.skills.groups.forEach((g, i) => {
-            const row = el('div', 'ov-skill-row ov-reveal')
-            row.style.setProperty('--i', i + 1)
-            row.appendChild(txt('h3', 'ov-skill-label', g.group))
-            const chips = el('div', 'ov-chips')
-            for (const item of g.items) chips.appendChild(txt('span', 'ov-chip', item))
-            row.appendChild(chips)
-            table.appendChild(row)
+        const grid = el('div', 'ov-skillset')
+
+        c.skills.core.forEach((skill, i) => {
+            // The reveal lives on the CELL: on the grid it would fade twelve
+            // cells in as one block, and the stagger below would have nothing
+            // to stagger.
+            const cell = el('div', 'ov-skillset-cell ov-reveal')
+            // Staggered by column rather than one long cascade: twelve cells
+            // revealing one after another would take longer than anyone waits.
+            cell.style.setProperty('--i', (i % 4) + 1)
+            cell.appendChild(txt('h3', 'ov-skillset-name', skill.name))
+
+            const used = el('p', 'ov-skillset-used')
+            skill.usedIn.forEach((place, n) => {
+                if (n) used.appendChild(txt('span', 'ov-skillset-sep', '\u00b7'))
+                if (place.index === null) {
+                    // No index, no control: the page IS the evidence, and
+                    // there is nowhere to send anybody.
+                    used.appendChild(txt('span', 'ov-skillset-site', place.label))
+                    return
+                }
+                const go = txt('button', 'ov-skillset-go', place.label)
+                go.type = 'button'
+                go.setAttribute('aria-label',
+                    c.skills.goTo.replace('{name}', place.label))
+                go.addEventListener('click', () => {
+                    // Focusing the row is what selects it, so the frame is
+                    // already showing that project by the time the scroll
+                    // arrives -- and the reader lands with the keyboard on it.
+                    this._goTo('ov-projects')
+                    const rows = this.main.querySelectorAll('.ov-work-row')
+                    rows[place.index]?.focus?.({ preventScroll: true })
+                })
+                used.appendChild(go)
+            })
+            cell.appendChild(used)
+            grid.appendChild(cell)
         })
 
-        if (c.skills.soft.length) {
-            const row = el('div', 'ov-skill-row ov-reveal')
-            row.style.setProperty('--i', c.skills.groups.length + 1)
-            row.appendChild(txt('h3', 'ov-skill-label', c.skills.softTitle))
-            const chips = el('div', 'ov-chips')
-            for (const item of c.skills.soft) chips.appendChild(txt('span', 'ov-chip', item))
-            row.appendChild(chips)
-            table.appendChild(row)
-        }
+        s.appendChild(grid)
 
-        s.appendChild(table)
+        // ── The tail ─────────────────────────────────────────────────────
+        // Twelve tiles is a cut, not the whole truth, and this line is where
+        // that gets admitted. It used to admit it twice: a second list of six
+        // more names, in the same tone, directly under twelve that each had a
+        // project attached. Those six had nothing attached, so they read as
+        // the keyword padding the tiles were built to replace -- and a list of
+        // skills with no evidence is the exact thing this section exists to
+        // not be. The link on its own says the same and claims nothing.
+        const also = el('p', 'ov-skillset-also ov-reveal')
+        also.style.setProperty('--i', 2)
+
+        const cv = el('a', 'ov-skillset-also-cv',
+            `<span>${c.skills.alsoCv}</span>${SVG.download}`)
+        cv.href = CV_URL
+        cv.setAttribute('download', '')
+        // Same guard as the hero's button: until the probe says the file is
+        // really there, this points nowhere and refuses to pretend otherwise.
+        cv.addEventListener('click', (e) => {
+            if (!Overview._cvExists) e.preventDefault()
+        })
+        also.appendChild(cv)
+        s.appendChild(also)
+
         return s
     }
 
@@ -979,7 +1664,24 @@ export default class Overview {
             // intersect, so it sat at opacity 0 for good.
         }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 })
 
-        this.main.querySelectorAll('.ov-section, .ov-reveal').forEach((n) => {
+        // Every revealable gets its place in the cascade from its position in
+        // the section, rather than from an index written by hand at the call
+        // site. Hand-written ones drift the moment anything is inserted above
+        // them, and half the sections had none at all -- which is why About,
+        // Projects and Contact used to arrive as one block while Path and
+        // Skills came in staged.
+        //
+        // Capped, because the delay is a queue: twelve skill tiles at the full
+        // step would still be arriving most of a second after the section did.
+        for (const section of this.main.querySelectorAll('.ov-section')) {
+            let i = 0
+            for (const n of section.querySelectorAll('.ov-reveal, .ov-rise')) {
+                if (n.style.getPropertyValue('--i')) { i++; continue }
+                n.style.setProperty('--i', Math.min(i++, 6))
+            }
+        }
+
+        this.main.querySelectorAll('.ov-section, .ov-reveal, .ov-rise').forEach((n) => {
             if (!n.classList.contains('is-in')) this._io.observe(n)
         })
     }
@@ -1003,7 +1705,6 @@ export default class Overview {
         const top = window.scrollY
         const max = document.documentElement.scrollHeight - window.innerHeight
         this.progress.style.setProperty('--p', max > 0 ? (top / max).toFixed(4) : 0)
-        this.el.classList.toggle('is-scrolled', top > 8)
 
         // Current section = the last one whose top has crossed a line set about
         // a third down the viewport. Sitting it right under the bar switches too
@@ -1020,6 +1721,38 @@ export default class Overview {
                 b.setAttribute('aria-current', String(b.dataset.target === current.id))
             }
             this._movePill()
+            this._markSheet()
+        }
+
+        /*
+         * The bar gets out of the way on the way down.
+         *
+         * On a desktop the header floats over a wide margin and never meets
+         * anything. On a phone there is no margin: the bar sits directly on the
+         * text column, it has no surface of its own by design, and a section
+         * headline passing under the language pill was flatly unreadable.
+         *
+         * Rather than hand the bar back the panel it was deliberately stripped
+         * of, it leaves while you are reading and returns the moment you ask
+         * for it -- and on a phone the gesture for "give me the controls" is
+         * already a flick upward. Above the breakpoint the class is inert (see
+         * the CSS), so the desktop bar never moves.
+         *
+         * The 4px deadband is not a nicety. Without it, momentum scrolling on
+         * iOS delivers alternating one-pixel deltas at the end of a fling and
+         * the bar flickers in and out for as long as that lasts.
+         */
+        if (this._lastTop === undefined) this._lastTop = top
+        const past = top > this.bar.offsetHeight * 2
+        // At the very top the bar has the hero behind it and nothing to fight,
+        // so it stays as transparent as it was designed to be. The scrim only
+        // fades in once real content is passing underneath.
+        this.bar.classList.toggle('is-past', past)
+
+        const dy = top - this._lastTop
+        if (Math.abs(dy) > 4) {
+            this._lastTop = top
+            this.bar.classList.toggle('is-tucked', dy > 0 && past && !this._menuOpen)
         }
 
         // The portrait only animates while it is actually on screen.
@@ -1031,23 +1764,155 @@ export default class Overview {
     }
 
     /** Slide the single nav pill under the active item. */
-    _movePill() {
-        const active = this._navButtons.find((b) => b.getAttribute('aria-current') === 'true')
+    /**
+     * The pill travels to whatever is being pointed at.
+     *
+     * It used to sit on the current section and answer nothing: hovering a nav
+     * item changed the colour of its label and that was the entire response,
+     * on a bar whose one interesting object was parked a few items away. Now
+     * the same pill leaves its post, goes to the cursor, grows a little under
+     * it, and slides back when the cursor leaves. One object, one journey.
+     *
+     * The white label moves with it rather than living on [aria-current]: with
+     * the pill away, a white label on the pale tray would be unreadable. So the
+     * lit item is wherever the pill IS, which is what `is-lit` marks.
+     *
+     * @param {HTMLElement} [hover] the item under the cursor, if any
+     */
+    _movePill(hover) {
+        const current = this._navButtons.find((b) => b.getAttribute('aria-current') === 'true')
             || this._navButtons[0]
-        if (!active) return
-        this.navPill.style.setProperty('--x', `${active.offsetLeft}px`)
-        this.navPill.style.setProperty('--w', `${active.offsetWidth}px`)
+        const lit = hover || current
+        if (!lit) return
+        this.navPill.style.setProperty('--x', `${lit.offsetLeft}px`)
+        this.navPill.style.setProperty('--w', `${lit.offsetWidth}px`)
+        // Only grows while it is visiting; parked on the current section it
+        // sits at its own size, or the bar would look permanently inflated.
+        this.navPill.style.setProperty('--s', hover ? '1.09' : '1')
         this.navPill.classList.add('is-on')
+        for (const b of this._navButtons) {
+            b.classList.toggle('is-lit', b === lit)
+            b.classList.toggle('is-hot', b === hover)
+        }
     }
 
     _goTo(id) {
         const target = this.main.querySelector(`#${id}`)
         if (!target) return
+        const top = this._docTop(target) - this.bar.offsetHeight - 12
+
+        // Through Lenis when Lenis is driving, and NOT through the native
+        // smooth scroll. Two animators on the same scroll position fight each
+        // frame: the browser eases toward its own target while Lenis writes a
+        // different one, and the result is the stutter that makes people
+        // blame the library.
+        if (this._lenis) { this._lenis.scrollTo(top) ; return }
+
         const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-        window.scrollTo({
-            top: this._docTop(target) - this.bar.offsetHeight - 12,
-            behavior: reduce ? 'auto' : 'smooth'
-        })
+        window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' })
+    }
+
+    /**
+     * Lenis, and only while this page is the thing on screen.
+     *
+     * It animates the NATIVE scroll position every frame rather than
+     * transforming the document, which is why the scrollbar, `position:
+     * sticky`, IntersectionObserver and keyboard scrolling all still work —
+     * the reveals, the sticky bar and the nav spy on this page are built on
+     * exactly those and would have to be rewritten under a transform-based
+     * library.
+     *
+     * It is created on open() and destroyed on close(), which matters more
+     * here than on an ordinary site: behind this page there is a 3D world with
+     * its own wheel, pointer-lock and physics input. A smooth-scroll library
+     * still listening for wheel events in there would fight the camera and
+     * make the whole world feel like it is floating. Nothing survives the
+     * close.
+     *
+     * The import is inside this module on purpose: the overview code-splits
+     * out of the main bundle, so a visitor who goes straight to the world
+     * never downloads it.
+     */
+    _startLenis() {
+        if (this._lenis) return
+        try {
+            /*
+             * The one input Lenis cannot see: a drag of the native scrollbar.
+             *
+             * Lenis resyncs itself from native scroll events, but only while
+             * it is idle (see onNativeScroll: the guard is `isScrolling ===
+             * false || 'native'`). Grab the bar during or just after a wheel,
+             * while it is still easing toward its own target, and the two
+             * disagree about where the page is: Lenis keeps animating from the
+             * position it believes in, the drag keeps writing another, and
+             * what you see is the page stuttering for the first moment of the
+             * drag and then snapping.
+             *
+             * So for as long as the drag lasts, Lenis is pinned to the real
+             * scroll position on every scroll event. reset() is exactly that
+             * and nothing else: animatedScroll and targetScroll both become
+             * actualScroll and the easing stops.
+             *
+             * NOT lenis.stop(), which was the first thing tried here and was
+             * worse than the bug. stop() puts `lenis-stopped` on <html>, and
+             * lenis.css answers that with `overflow: clip` -- so the scrollbar
+             * you had just grabbed disappeared from under the cursor and took
+             * the drag with it.
+             *
+             * Detected by where the press landed: a pointerdown past the
+             * document's own client width is, by definition, on the scrollbar
+             * gutter and not on the page.
+             */
+            this._onBarPress = (e) => {
+                if (e.pointerType === 'touch' || e.button !== 0) return
+                const doc = document.documentElement
+                if (e.clientX <= doc.clientWidth && e.clientY <= doc.clientHeight) return
+                const pin = () => this._lenis?.reset()
+                pin()
+                window.addEventListener('scroll', pin, { passive: true })
+                const release = () => {
+                    window.removeEventListener('scroll', pin)
+                    window.removeEventListener('pointerup', release)
+                    window.removeEventListener('pointercancel', release)
+                    this._lenis?.reset()
+                }
+                window.addEventListener('pointerup', release)
+                window.addEventListener('pointercancel', release)
+            }
+            window.addEventListener('pointerdown', this._onBarPress, true)
+
+            this._lenis = new Lenis({
+                autoRaf: true,
+                // lerp alone. duration/easing are the other way of driving
+                // this and setting both is how you get a scroll that ignores
+                // one of the two; 0.09 is buttery without feeling detached.
+                lerp: 0.09,
+                // The skip link is an in-page anchor and should behave like
+                // the nav does.
+                anchors: true,
+                // Native scroll on touch. A phone's scroll is already smooth,
+                // momentum is the platform's job, and hijacking it is what
+                // breaks pull-to-refresh and the address-bar collapse this
+                // page went out of its way to keep.
+                syncTouch: false,
+                touchMultiplier: 1.2
+                // respectReducedMotion defaults to true: with the OS setting
+                // on, lerp becomes 1 and this is plain native scrolling.
+            })
+        } catch (err) {
+            // A failure here must never cost the page its scroll.
+            console.warn('Overview: smooth scroll unavailable, using native', err)
+            this._lenis = null
+        }
+    }
+
+    _stopLenis() {
+        if (this._onBarPress) {
+            window.removeEventListener('pointerdown', this._onBarPress, true)
+            this._onBarPress = null
+        }
+        this._lenis?.destroy()
+        this._lenis = null
     }
 
     /**
@@ -1064,6 +1929,9 @@ export default class Overview {
         this._movePill()
         this._syncBarHeight()
         this._updateScrollState()
+        // Lenis caches the document height; a resize that changes it leaves
+        // the scroll unable to reach the bottom until something tells it.
+        this._lenis?.resize()
         this.viewport?.resize()
         this.dogPortrait?.resize()
     }
@@ -1095,10 +1963,22 @@ export default class Overview {
         window.addEventListener('pointermove', this._onPointerMove)
         this._syncBarHeight()
         this._updateScrollState()
+        // After the layout flush above, so it measures a document that is
+        // actually laid out, and only now: see _startLenis for why it must
+        // not exist while the world is the thing on screen.
+        this._startLenis()
         this.viewport?.resize()
         this.viewport?.start()
         this._syncDog()
-        this.backBtn.focus({ preventScroll: true })
+        // The DIALOG takes focus, not the back button.
+        //
+        // Focusing a control programmatically is what put a green ring round
+        // the back button every single time this page opened, mouse or not:
+        // Chrome treats a scripted focus as keyboard-ish and matches
+        // :focus-visible. Parking focus on the container instead is both the
+        // standard dialog pattern and the thing that does not draw: an element
+        // with tabindex="-1" focused by script does not match :focus-visible.
+        this.el.focus({ preventScroll: true })
     }
 
     close({ silent = false } = {}) {
@@ -1106,6 +1986,9 @@ export default class Overview {
         this.isOpen = false
 
         this.menu?.hidePopover?.()
+        // Before the scroll reset below, and before the world gets the input
+        // back: see _startLenis.
+        this._stopLenis()
         this.viewport?.stop()
         this.dogPortrait?.stop()
         this.el.classList.remove('is-open')
@@ -1156,9 +2039,14 @@ export default class Overview {
     }
 
     destroy() {
+        this._stopLenis()
         this._io?.disconnect()
         this._dogIo?.disconnect()
         this._dashRo?.disconnect()
+        this._workIo?.disconnect()
+        this._frame?.dispose()
+        this._frame = null
+        clearTimeout(this._detailTimer)
         this.viewport?.dispose()
         this.dogPortrait?.dispose()
         if (this._onSourceLoaded) this.resources?.off('sourceLoaded', this._onSourceLoaded)
