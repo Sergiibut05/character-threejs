@@ -52,6 +52,64 @@
     transition: transform 0.16s ease, border-color 0.16s ease;
 }
 
+/* ── You are here ─────────────────────────────────────────────────────
+   Deliberately the INVERSE of a pin: a pin is a hollow white dot ringed in
+   green, this is a solid green dot ringed in white. Same two colours, so the
+   map gains no new one, and the difference reads instantly without a legend.
+
+   It does not respond to the cursor and it is not a button, because unlike the
+   six pins there is nowhere for it to take you -- you are already there. */
+.fz-map-you {
+    position: absolute;
+    /* left/top come from the world->map transform, in JS. */
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    /* Over the pins: where you stand matters more than where you could go, and
+       the two can overlap, since most pins mark somewhere worth standing. */
+    z-index: 2;
+}
+
+/* The halo lives on its own pseudo-element, not on the dot and not on the
+   marker itself. The marker carries the translate(-50%, -50%) that centres it
+   on its coordinate, and an animation that also writes `transform` would
+   overwrite that and fling the pulse off its own position. */
+/* The halo sits behind the face and marks the coordinate itself, which the
+   face only approximates -- a head is wider than the spot it stands on. */
+.fz-map-you::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(29, 66, 50, 0.4);
+    animation: fz-map-you-pulse 2.1s ease-out infinite;
+}
+
+/* The character's own face, which settles what a dot never could.
+   A coloured dot has to be explained -- it was ink-dark because the pin green
+   vanished into an illustration made of greens, and even then it read as a
+   seventh pin. A face needs no legend at all.
+   No circular crop: the hair silhouette is most of what makes it recognisable
+   at this size, and a round mask would shave it off. The drop-shadow does the
+   lifting instead, and unlike box-shadow it follows the actual outline. */
+.fz-map-you-face {
+    position: relative;
+    display: block;
+    width: 38px;
+    height: auto;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+@keyframes fz-map-you-pulse {
+    0%   { transform: scale(1);   opacity: 0.55; }
+    70%  { transform: scale(2.6); opacity: 0; }
+    100% { transform: scale(2.6); opacity: 0; }
+}
+
 .fz-map-label {
     /* Sits under the dot without pushing it off its coordinate: the pin is
        centred on the dot, and the label is pulled out of the layout flow. */
@@ -98,4 +156,5 @@
 @media (prefers-reduced-motion: reduce) {
     .fz-map-dot,
     .fz-map-label { transition: none; }
+    .fz-map-you::before { animation: none; }
 }

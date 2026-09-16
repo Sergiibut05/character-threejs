@@ -23,21 +23,57 @@ import { t } from '../../Utils/gameText.js'
  *     py = ay·X + by·Z + cy
  *
  * Fitted against three landmarks whose world positions are known exactly: the
- * house, the bridge, and the frisbee activity anchor. It has to be a full
- * affine and not a scale plus offset, because the drawing is stretched ~28%
- * along Z and its axes are ~12° off square — a uniform fit misses by metres at
- * the edges of the map.
+ * house, the bridge, and the frisbee activity anchor. It is a full affine and
+ * not a scale plus offset because the drawing is stretched ~28% along Z.
  *
- * Checked by fitting on those three and predicting others that were held out:
- * the three project carts land within ~1 world unit with the right spacing
- * between them, and the beach comes out on the sand 42 units further south
- * than anything used in the fit. Good enough that a pin sits on its subject.
+ * ── bx used to be 2.970, and it was wrong ─────────────────────────────────
+ *
+ * Nothing showed it while only pins used this transform: a pin is drawn from
+ * the same numbers it was authored with, so it lands on its subject whatever
+ * the transform does in between. Putting the player on the map is what broke
+ * the symmetry -- that reads a live position the fit never saw -- and the
+ * southern half of the island came out pushed to the right.
+ *
+ * bx is how far a step south moves you across the picture, and at 2.970 it
+ * moved things +1.2% of the map width per 4 units of Z. Walked out to the
+ * beach at Z=40 that is +11.6%, which is most of a beach.
+ *
+ * Two things say it was an artefact rather than the drawing:
+ *
+ *   - For a rotation plus scale the two cross terms mirror each other, and
+ *     ay is -0.070, thirty times smaller. A picture cannot be rotated on one
+ *     axis and not the other.
+ *   - All three landmarks it was fitted from sit between Z = -6.3 and Z = 5.7.
+ *     Estimating a slope in Z from a 12-unit spread, then applying it out to
+ *     Z = 42, is extrapolating 3.5x past the evidence.
+ *
+ * It is now zero, with ax and cx refitted on the four landmarks the artwork
+ * corroborates. Confirmed against reports of where the player marker actually
+ * appeared: the campfire and the bridge were right before and move by 0.3%
+ * and 0.1% now, the social corner was "a bit right" and comes back 6.1%, and
+ * the beach was "way right" and comes back 11.6%. The house and the frisbee
+ * pin shift by ~2% and ~1.6%, which is the price of the correction.
+ *
+ * ── and by was 4% too big, for exactly the same reason ───────────────────
+ *
+ * With the sideways drift gone, the beach still sat low. Same diagnosis, same
+ * cause: by is the scale along Z, fitted from landmarks spanning 12 units of
+ * it, and a 4% error there is invisible at Z=5 and half a beach at Z=40.
+ *
+ * Solved rather than fitted -- there was one hard reference, the marked-up
+ * screenshot -- by asking what by puts the beach landing spot on the mark,
+ * then refitting cy on the same four landmarks. They move 0.4% at worst.
+ *
+ * Both pins that are authored to LOOK right rather than to BE right (beach,
+ * social) were re-derived afterwards; see their entries. Everything else is
+ * authored at its subject's true position and just follows the maths.
  */
 const MAP_FIT = {
-    ax: 10.537, bx: 2.970, cx: 651.4,
-    ay: -0.070, by: 13.156, cy: 338.1
+    ax: 10.2585, bx: 0,      cx: 653.70,
+    ay: -0.070,  by: 12.6088, cy: 339.01
 }
 const MAP_IMAGE = '/images/map/world-map.webp'
+const YOU_IMAGE = '/images/map/character-face.webp'
 const MAP_PX = 1024
 
 /**
@@ -92,26 +128,48 @@ const DESTINATIONS = [
         id: 'social',
         labelKey: 'map.social',
         x: -7.5, y: 0.21, z: 21.0, yaw: 2.66,
-        // Nudged west of the social-area bbox centre. This is the one pin the
-        // map art cannot corroborate — the illustration draws forest here and
-        // never depicted the structure — so unlike the rest it is placed from
-        // what the zone actually looks like in game, not from the fit.
-        pin: { x: -9.5, z: 17.1 }
+        // The one pin the map art cannot corroborate — the illustration draws
+        // forest here and never depicted the structure — so unlike the rest it
+        // is placed to look right rather than to be right.
+        //
+        // Which means it had to be re-derived when bx changed. The others are
+        // authored at their subjects' true positions and simply follow the
+        // corrected transform to better places; this one is authored at
+        // whatever coordinate happens to DRAW in the right spot, so fixing the
+        // transform under it would have dragged it 4.5% west. Solved back from
+        // the pixel it occupied before, so it has not visibly moved at all --
+        // and solved a second time when by was corrected, for the same reason.
+        pin: { x: -5.03, z: 17.79 }
     },
     {
         id: 'playa',
         labelKey: 'map.beach',
         // On the sand, facing the sea (+Z).
         x: 1.65, y: 0.21, z: 40.0, yaw: 0,
-        // Pushed west of where the fit puts it, on purpose and by hand.
+        // Placed by hand, and further west again than the first correction.
+        //
         // The `pin` is DRAWING ONLY -- travel uses the x/z above -- so moving
         // it costs nothing but its agreement with the illustration, and the
-        // illustration is what the reader is looking at. The fit lands this
-        // one 42 units south of any landmark it was built from, which is
-        // further extrapolation than it was ever checked over; on the redrawn
-        // art that put the marker off the edge of the sand. ~32 px west at
-        // 1024, which is about a pin's width.
-        pin: { x: -1.35, z: 42.44 }
+        // illustration is what the reader is looking at. This one sits 42
+        // units south of any landmark the transform was fitted from, which is
+        // far more extrapolation than the fit was ever checked over, so it is
+        // the one pin whose drawn position is worth trusting over the maths.
+        //
+        // Read off a marked-up screenshot rather than guessed: the six pin
+        // rings were detected in the image and used to map screen pixels back
+        // to map uv (residuals under 0.6 px on all six), then the mark was run
+        // back through the inverse transform.
+        //
+        // Barely moved in the end, which is the tell that the pin was never
+        // the problem. Running the mark through the FIXED transform puts it a
+        // third of a unit west of where it always was, and at Z = 40.00 -- the
+        // landing spot itself, to two decimals. Every one of the ten units it
+        // appeared to need was error in the transform.
+        //
+        // It coinciding with the landing spot is right here, even though every
+        // other pin deliberately stands off its own: those name a building or a
+        // fire you would rather not arrive inside. This one names a beach.
+        pin: { x: -0.36, z: 40.00 }
     }
 ]
 
@@ -171,6 +229,7 @@ export default class WorldMap {
     open() {
         if (this._travelling || !this.canOpen()) return
         this._build()
+        this._placeYou()
         this.modal.open()
     }
 
@@ -212,7 +271,53 @@ export default class WorldMap {
             stage.appendChild(pin)
         }
 
+        // "You are here".
+        //
+        // Built once and moved on every open, rather than created per open,
+        // because _build() only ever runs the first time -- and because a
+        // marker that is always in the DOM can be animated by CSS without
+        // anything having to restart it.
+        //
+        // It costs almost nothing: worldToMap() is already fitted and already
+        // drives the six pins, so the only new idea here is reading the
+        // character's XZ instead of a hardcoded pair.
+        this.you = document.createElement('div')
+        this.you.className = 'fz-map-you'
+        this.you.setAttribute('role', 'img')
+        this.you.innerHTML =
+            `<img class="fz-map-you-face" src="${YOU_IMAGE}" alt="" draggable="false">`
+        stage.appendChild(this.you)
+
         this.modal.append(stage)
+    }
+
+    /**
+     * Put the marker where the character is standing.
+     *
+     * Called on open and not per frame on purpose: the map cannot be opened
+     * while anything owns the character (see canOpen), so while it is up the
+     * position it was opened with is still the position he is in.
+     *
+     * Off-map is a real case, not a defensive one -- the world runs past the
+     * edges of the illustration, and the fit extrapolates well but the art
+     * simply stops. Rather than clamp the marker to the border, where it would
+     * confidently claim a spot that is not where you are, it hides.
+     */
+    _placeYou() {
+        if (!this.you) return
+
+        const character = this.experience.world?.character
+        const position = character?.container?.position
+        if (!position) { this.you.hidden = true; return }
+
+        const { u, v } = worldToMap(position.x, position.z)
+        const onMap = u >= 0 && u <= 1 && v >= 0 && v <= 1
+        this.you.hidden = !onMap
+        if (!onMap) return
+
+        this.you.style.left = `${(u * 100).toFixed(2)}%`
+        this.you.style.top = `${(v * 100).toFixed(2)}%`
+        this.you.setAttribute('aria-label', t('map.you'))
     }
 
     // ─── Travel ─────────────────────────────────────────────────────────

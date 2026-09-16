@@ -276,6 +276,7 @@ export default {
         map: {
             title: 'Mapa',
             goTo: 'Ir a {place}',
+            you: 'Estás aquí',
             subtitle: 'Elige a dónde ir',
             house: 'Casa',
             frisbee: 'Frisbee',

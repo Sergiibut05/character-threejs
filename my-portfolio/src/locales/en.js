@@ -427,6 +427,7 @@ export default {
         map: {
             title: 'Map',
             goTo: 'Go to {place}',
+            you: 'You are here',
             subtitle: 'Pick where to go',
             house: 'The house',
             frisbee: 'Frisbee',
