@@ -45,9 +45,23 @@ function print() {
     const title = 'color:#41a06e;font-weight:700;line-height:1.15'
     const body = 'color:inherit;line-height:1.5'
 
-    console.log(`%c${ART}`, title)
+    /*
+ * Printed through an alias, and that is load-bearing.
+ *
+ * The production build lists `console.log` in esbuild's `pure` so the island
+ * stops narrating its own loading to strangers -- collider counts, blade
+ * counts, import timings. That rule is blind, though: it matched this card too
+ * and quietly deleted the one console output that is actually FOR somebody.
+ *
+ * `pure` matches the call expression by name, so a reference held in a local
+ * does not match and survives minification. Bound, not copied, because
+ * console.log detached from console is not callable everywhere.
+ */
+const emit = console.log.bind(console)
 
-    console.log('%c' + box('Hello', [
+emit(`%c${ART}`, title)
+
+    emit('%c' + box('Hello', [
         'Thanks for opening the console — you are exactly the kind of',
         'visitor I built this for.',
         '',
@@ -56,13 +70,13 @@ function print() {
         'screen opens the whole portfolio as a plain page.'
     ]), body)
 
-    console.log('%c' + box('Say hi', rows([
+    emit('%c' + box('Say hi', rows([
         ['Mail', LINKS.email],
         ['GitHub', LINKS.github],
         ['LinkedIn', LINKS.linkedin]
     ])), body)
 
-    console.log('%c' + box('Stack', rows([
+    emit('%c' + box('Stack', rows([
         ['Rendering', 'Three.js r183 — WebGPURenderer'],
         ['Shading', 'TSL (no GLSL strings anywhere)'],
         ['Physics', 'Rapier'],
@@ -73,26 +87,24 @@ function print() {
         ['Build', 'Vite — Draco meshes, KTX2 textures']
     ])), body)
 
-    console.log('%c' + box('Poke at it', [
+    emit('%c' + box('Poke at it', [
         'Add #debug to the URL and reload for the tweak panel:',
         'time of day, lighting, camera, every system in the world.',
         '',
         'window.experience is the whole thing, if you want a look around.'
     ]), body)
 
-    console.log('%c' + box('Source', [
+    emit('%c' + box('Source', [
         'https://github.com/Sergiibut05/character-threejs'
     ]), body)
 
-    console.log('%c' + box('Thank you', [
-        'Bruno Simon, for Three.js Journey — where I learned most of what',
-        'makes this run — and for his portfolio, the inspiration behind',
-        'this one.',
-        `  ${LINKS.threejsJourney}`,
-        `  ${LINKS.brunoSimon}`,
-        '',
+    emit('%c' + box('Thank you', [
         'Isa Lousberg, for the lovely low-poly models.',
         `  ${LINKS.isaLousberg}`,
+        '',
+        'Bruno Simon, for Three.js Journey, where I learned much of what',
+        'makes this run.',
+        `  ${LINKS.threejsJourney}`,
         '',
         'And mrdoob and everyone on Three.js — plus Sunag, whose TSL is',
         'what let this be written once and run on WebGPU.',
