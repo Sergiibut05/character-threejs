@@ -306,10 +306,11 @@ export default {
         },
 
         creditsTitle: 'Thanks',
+        // See the note in profileData.js: Isa Lousberg leads and stays.
         creditsBody:
-            'To Bruno Simon, for Three.js Journey, where I learnt much of what makes ' +
-            'this world work, and for his portfolio, the great inspiration behind ' +
-            'this one. And to Isa Lousberg, for her beautiful low-poly models.'
+            'To Isa Lousberg, for her beautiful low-poly models. And to Bruno ' +
+            'Simon, for Three.js Journey, where I learnt much of what makes ' +
+            'this world work.'
     },
 
     /* ── The 3D world ───────────────────────────────────────────────────

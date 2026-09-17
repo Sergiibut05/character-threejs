@@ -14,7 +14,6 @@ export const LINKS = {
     email: 'sergiibutrii5@gmail.com',
     sunoPlaylist: 'https://suno.com/playlist/e06c4d53-ae99-4c2b-a133-19147e03e5de',
     isaLousberg: 'https://www.isalousberg.com/',
-    brunoSimon: 'https://bruno-simon.com/',
     threejsJourney: 'https://threejs-journey.com/'
 }
 
@@ -221,12 +220,21 @@ export const BEHIND_THE_SCENES = [
 export const BTS_CREDITS = {
     icon: iconHeart,
     title: 'Agradecimientos',
-    body: 'A Bruno Simon, por Three.js Journey, donde aprendí gran parte de lo que hace ' +
-        'funcionar este mundo, y por su portfolio, la gran inspiración detrás de este. ' +
-        'Y a Isa Lousberg, por sus preciosos modelos low-poly.',
+    // Isa Lousberg comes first and stays whatever else changes: the models
+    // are hers, and crediting the person whose work is IN the thing is not
+    // the same kind of line as thanking a teacher.
+    //
+    // The rest is shorter than it was. What went is the sentence calling
+    // another portfolio "la gran inspiración detrás de este", and the link to
+    // it. Both were true and generous, and on an awards entry a sentence
+    // pointing at the site yours resembles is read by a jury as a lineage
+    // rather than as good manners. The course keeps its credit, because that
+    // one is about where the knowledge came from.
+    body: 'A Isa Lousberg, por sus preciosos modelos low-poly. Y a Bruno Simon, ' +
+        'por Three.js Journey, donde aprendí buena parte de lo que hace ' +
+        'funcionar este mundo.',
     links: [
-        { label: 'Three.js Journey', url: LINKS.threejsJourney },
-        { label: 'bruno-simon.com', url: LINKS.brunoSimon },
-        { label: 'isalousberg.com', url: LINKS.isaLousberg }
+        { label: 'isalousberg.com', url: LINKS.isaLousberg },
+        { label: 'Three.js Journey', url: LINKS.threejsJourney }
     ]
 }
