@@ -207,6 +207,17 @@ export default class Environment {
         this.params = {
             litTintScale: 0.0,
             nightBrightness: 6.0,
+            // Debug only: force the dusk lights on or off whatever the clock
+            // says. 'auto' follows nightFactor.
+            //
+            // They share a switch by default and a curve always, because the
+            // windows and the street lights coming on together is what reads
+            // as evening falling rather than as two unrelated bugs. Separate
+            // here anyway: that is the shared DESIGN, not a constraint, and
+            // for a photograph you may well want the lamps lit over an empty
+            // house or the reverse.
+            lampsOverride: 'auto',
+            windowsOverride: 'auto',
             sunAzimuthDeg: 180,
             moonAzimuthDeg: 180,
             sunArcTilt: 0.45
@@ -361,7 +372,47 @@ export default class Environment {
         const sc = quality.shadowCameraSize
         const cam = this.sunLight.shadow.camera
 
-        this.sunLight.castShadow = quality.sunShadows
+        // ── Turning shadows back ON needs the light rebuilt, not re-flagged ──
+        //
+        // Reported symptom: high → low → high throws
+        //   Cannot read properties of null (reading 'depthTexture')
+        // out of ShadowNode.updateShadow, which kills the 'tick' listener and
+        // takes the frame with it.
+        //
+        // The flag is not the whole story. When castShadow goes false the
+        // WebGPU backend lets the shadow map go, but the node graph keeps the
+        // ShadowNode that was compiled around it. Flip the flag back and that
+        // cached node runs again against a map that is now null, and reads
+        // depthTexture off it.
+        //
+        // Removing the light from the scene and adding it straight back
+        // invalidates the cached lights node, so the shadow node is rebuilt
+        // against whatever exists now instead of what existed two tiers ago.
+        // Cheap, and only on the rising edge -- going TO low is not a problem,
+        // because nothing samples a shadow that is switched off.
+        //
+        // Reproduced and verified, after two false negatives.
+        //
+        // Driving renderer.update() by hand never threw, however many cycles
+        // it ran. The failure needs the WHOLE tick -- time.trigger('tick') --
+        // because that is what lets _qualityStep sequence itself across frames
+        // with every other quality listener running in its real order.
+        //
+        // With that: production threw both errors over two cycles, this build
+        // throws neither over four. The second error turns out to be a
+        // consequence rather than a separate bug -- once the thrown listener
+        // leaves the pipeline half-rebuilt, the next rebuild trips the
+        // "no corresponding fragment stage output" validation. Fixing this one
+        // takes both away.
+        const wantsShadows = quality.sunShadows
+        const hadShadows = this.sunLight.castShadow
+        this.sunLight.castShadow = wantsShadows
+
+        if (wantsShadows && !hadShadows && this.sunLight.parent) {
+            const parent = this.sunLight.parent
+            parent.remove(this.sunLight)
+            parent.add(this.sunLight)
+        }
 
         cam.left = -sc; cam.right = sc; cam.top = sc; cam.bottom = -sc
         this._shadowHalfDepth = this._shadowHalfDepthFor(sc)
@@ -875,6 +926,24 @@ export default class Environment {
     }
 
     /**
+     * How lit a thing that switches on at dusk should be, 0 to 1.
+     *
+     * One curve for the street lamps and the house windows, which had the same
+     * smoothstep written out twice with a comment on each saying the other one
+     * must match. The narrow band is deliberate: clearly off by day, clearly
+     * on at night, and a short tidy fade rather than a long muddy half-lit
+     * stretch across the whole cycle.
+     */
+    _duskFactor(override) {
+        if (override === 'on') return 1
+        if (override === 'off') return 0
+        return THREE.MathUtils.smoothstep(this.skyNightFactor.value, 0.40, 0.60)
+    }
+
+    get lampFactor() { return this._duskFactor(this.params.lampsOverride) }
+    get windowFactor() { return this._duskFactor(this.params.windowsOverride) }
+
+    /**
      * Should there be clouds right now? 1 yes, 0 no.
      *
      * High quality only, and only while an activity is running. That is not
@@ -941,6 +1010,11 @@ export default class Environment {
         })
         f.add(this.cycle, 'enabled').name('Cycle running')
         f.add(this.cycle, 'durationSec', 5, 600, 1).name('Day length (s)')
+        // Beside the clock, because that is what they override. They were in
+        // "Phase tints" for a while, which is where nobody was ever going to
+        // find a light switch.
+        f.add(this.params, 'lampsOverride', ['auto', 'on', 'off']).name('Farolas')
+        f.add(this.params, 'windowsOverride', ['auto', 'on', 'off']).name('Ventanas')
 
         // Acne at one end, peter-panning at the other, and the sweet spot moves
         // with the sun -- so it is tuned by looking, at the lowest sun of the
