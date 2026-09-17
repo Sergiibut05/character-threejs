@@ -61,6 +61,25 @@ export default {
         },
         chunkSizeWarningLimit: 800
     },
+    /**
+     * Strip the chatter from production builds.
+     *
+     * The island logs a running commentary while it loads -- collider counts,
+     * blade counts, import timings -- which is exactly what you want while
+     * building it and is noise in a stranger's console. `pure` marks these as
+     * side-effect free so the minifier drops the whole call; dev builds are
+     * untouched, so the commentary is still there when it is useful.
+     *
+     * console.warn and console.error deliberately stay. They only fire when
+     * something has actually gone wrong, and that is the one moment a console
+     * message earns its place in a shipped site.
+     */
+    esbuild:
+    {
+        pure: ['console.log', 'console.info', 'console.debug',
+               'console.time', 'console.timeEnd'],
+        drop: ['debugger']
+    },
     plugins:
         [
             basicSsl(), // Enable HTTPS with compatible self-signed certificate
