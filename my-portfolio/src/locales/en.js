@@ -511,6 +511,7 @@ export default {
             quickBio: 'Quick bio',
             fullBio: 'Full bio',
             technicalSkills: 'Technical skills',
+            downloadCv: 'Download CV',
             about: 'About me',
             experience: 'Experience',
             behindScenes: 'Behind the scenes',

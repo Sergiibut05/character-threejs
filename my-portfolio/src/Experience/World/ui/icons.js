@@ -7,6 +7,14 @@
  */
 
 // Trophy — competitive mode.
+// Download — the CV, in the computer's Experience tab. Same path the Quick
+// overview's own download button draws, so the two read as one affordance.
+export const iconDownload = `
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+</svg>`
+
 export const iconTrophy = `
 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
   <path d="M15 12H9.5a5.5 5.5 0 0 0 6 9.5" stroke="#e8a200" stroke-width="2.6" stroke-linecap="round" fill="none"/>

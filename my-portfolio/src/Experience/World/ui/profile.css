@@ -172,6 +172,13 @@ a.fz-cert:focus-visible {
     transform: translateY(-1px);
 }
 
+/* The CV button in the Experience tab. Borrows .fz-profile-link wholesale so
+   it is the same object as the social buttons in the About tab, and only adds
+   the spacing it needs to sit on its own between two sections. */
+.fz-profile-cv {
+    margin: 18px 0 4px;
+}
+
 /* ── Experience / education entries ─────────────────────────────────── */
 .fz-xp {
     padding: 10px 4px;

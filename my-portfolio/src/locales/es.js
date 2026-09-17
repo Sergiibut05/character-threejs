@@ -359,6 +359,7 @@ export default {
             quickBio: 'Bio rápida',
             fullBio: 'Bio completa',
             technicalSkills: 'Habilidades técnicas',
+            downloadCv: 'Descargar CV',
             about: 'Sobre mí',
             experience: 'Experiencia',
             behindScenes: 'Behind the scenes',

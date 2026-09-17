@@ -3,8 +3,30 @@ import Modal from './Modal.js'
 import { LINKS } from './profileData.js'
 import { getProfile } from './profileContent.js'
 import { richText } from './overviewContent.js'
-import { iconGithub, iconLinkedin, iconMail } from './icons.js'
+import { iconGithub, iconLinkedin, iconMail, iconDownload } from './icons.js'
 import { t } from '../../Utils/gameText.js'
+
+/**
+ * The CV lives at the site root, and the Quick overview links the same file.
+ *
+ * Probed rather than trusted, for the reason the overview probes it: the dev
+ * server answers unknown paths with index.html, so a missing PDF would still
+ * come back 200 and the button would look fine in dev and 404 in production.
+ * Hence the content-type check as well as the status.
+ *
+ * One request for the life of the page, shared by every modal that asks.
+ */
+const CV_URL = '/cv.pdf'
+let cvProbe = null
+
+function probeCv() {
+    if (!cvProbe) {
+        cvProbe = fetch(CV_URL, { method: 'HEAD' })
+            .then((r) => r.ok && (r.headers.get('content-type') || '').includes('pdf'))
+            .catch(() => false)
+    }
+    return cvProbe
+}
 
 // Keys, resolved when the tabs are built — see the note in gameText.js.
 const TABS = [
@@ -84,6 +106,32 @@ export default class ComputerModal {
         for (const e of education) {
             this.content.appendChild(_xpEntry(e.title, e.org, e.period, e.detail))
         }
+
+        /*
+         * The CV, downloadable from in here.
+         *
+         * It was only ever on the Quick overview, which meant the one visitor
+         * most likely to want the file -- someone who came in, walked to the
+         * house and opened the computer to read the experience -- had to leave
+         * the world to get it. The tab that lists the roles, the education and
+         * the skills is exactly the tab whose contents the PDF summarises.
+         *
+         * Above the skills rather than at the very bottom: this is the end of
+         * the part the CV covers, and burying it under the chips would put it
+         * a scroll away from everything it relates to.
+         *
+         * Hidden outright when the file is not there, instead of the overview's
+         * aria-disabled. That page keeps the button so its hero stays visually
+         * complete; this is a list, and a list can simply be one item shorter.
+         */
+        const cv = _el('a', 'fz-profile-link fz-profile-cv')
+        cv.href = CV_URL
+        cv.setAttribute('download', '')
+        cv.innerHTML = iconDownload
+        cv.appendChild(document.createTextNode(t('computer.downloadCv')))
+        cv.hidden = true
+        this.content.appendChild(cv)
+        probeCv().then((ok) => { cv.hidden = !ok })
 
         this._heading(t('computer.technicalSkills'))
         for (const g of skills) {
