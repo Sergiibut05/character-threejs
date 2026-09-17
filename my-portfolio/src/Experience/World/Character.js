@@ -1034,6 +1034,31 @@ export default class Character {
 
         // When movement is locked (minigame), only update mixer
         if (this.movementLocked) {
+            /*
+             * Whatever he was doing, he is not doing it any more.
+             *
+             * Locking movement stops him MOVING, but the animation state was
+             * left wherever the last frame put it, and the mixer below keeps
+             * running. Walk into the house at a sprint and he jogs on the spot
+             * through the whole door transition; start a minigame mid-stride
+             * and the cutscene opens on a running man going nowhere.
+             *
+             * Deliberately only the locomotion states. The other things that
+             * lock movement are POSES that need the lock to exist at all --
+             * the throw, sitting on a bench, the volleyball bump -- and
+             * forcing idle over those would break the very animations the
+             * lock was taken out for. Anything not in this list is a pose
+             * somebody chose on purpose.
+             *
+             * Here rather than at the fifteen call sites that set the flag:
+             * one of those would eventually be added without remembering to
+             * do this, and it costs a string comparison on a frame that has
+             * already decided to do almost nothing.
+             */
+            if (this.state === 'walking' || this.state === 'running') {
+                this._transitionTo('idle')
+            }
+
             this.idleTime = 0
             this._updateBlinking(dt)
             if (this.mixer) this.mixer.update(dt)
