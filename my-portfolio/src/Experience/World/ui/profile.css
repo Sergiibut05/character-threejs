@@ -172,12 +172,24 @@ a.fz-cert:focus-visible {
     transform: translateY(-1px);
 }
 
-/* The CV button in the Experience tab. Borrows .fz-profile-link wholesale so
-   it is the same object as the social buttons in the About tab, and only adds
-   the spacing it needs to sit on its own between two sections. */
-.fz-profile-cv {
-    margin: 18px 0 4px;
+/* The CV button, riding the Experience heading. Borrows .fz-profile-link so it
+   is the same object as the social buttons in the About tab, then shrinks: a
+   full-size pill next to an 18px title reads as a second heading.
+
+   order:1 puts it AFTER the ::after rule -- a pseudo-element counts as the last
+   child, so without this the button would land between the title and its line.
+
+   The heading wraps, so on a narrow modal the button drops to its own row
+   instead of squeezing the title into two words and an ellipsis. */
+.fz-profile-heading { flex-wrap: wrap; row-gap: 8px; }
+
+.fz-profile-heading .fz-profile-cv {
+    order: 1;
+    padding: 6px 13px;
+    font-size: 14px;
 }
+
+.fz-profile-heading .fz-profile-cv svg { width: 16px; height: 16px; }
 
 /* ── Experience / education entries ─────────────────────────────────── */
 .fz-xp {

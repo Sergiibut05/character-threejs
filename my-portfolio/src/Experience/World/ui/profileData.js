@@ -110,8 +110,11 @@ export const ABOUT = {
         'Trabajo con **Angular, TypeScript y Kotlin**, y me muevo igual en el ' +
         'frontend que en el backend. La parte de **FP Dual** la hice en Aliqindoi, ' +
         'en proyectos reales de la empresa desde el primer día.',
+        // Sin la nota del examen. "(CAE, 190 puntos)" es dato de expediente:
+        // a quien le importe el detalle lo tiene en el certificado, en la
+        // pestaña de titulos, y aqui solo frenaba la frase.
         'Hablo **español y ucraniano** como lenguas maternas, y tengo el **C1 de ' +
-        'inglés** certificado por Cambridge (CAE, 190 puntos).',
+        'inglés** certificado por Cambridge.',
         'Me gusta **rematar las cosas**: que se desplieguen, que funcionen y que se ' +
         'puedan usar. Fuera del trabajo casi siempre ando aprendiendo algo nuevo, ' +
         'normalmente gráficos o desarrollo de videojuegos.'

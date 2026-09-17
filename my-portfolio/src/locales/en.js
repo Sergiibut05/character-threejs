@@ -252,7 +252,7 @@ export default {
             'on the frontend as on the backend. I did my **internship** at ' +
             'Aliqindoi, on the company\'s real projects from day one.',
             'I speak **Spanish and Ukrainian** natively, and hold a Cambridge-certified ' +
-            '**C1 in English** (CAE, 190 points).',
+            '**C1 in English**.',
             'I like **finishing things properly**: deployed, working and actually ' +
             'usable. Outside work I am usually learning something new, generally ' +
             'graphics or game development.'

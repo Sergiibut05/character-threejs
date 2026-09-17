@@ -97,7 +97,33 @@ export default class ComputerModal {
     // ─── Experiencia ─────────────────────────────────────────────────────
     _buildExperience() {
         const { experience, education, skills } = getProfile()
-        this._heading(t('computer.experience'))
+
+        /*
+         * The CV, on the heading rather than in the flow.
+         *
+         * It spent one commit sitting between Education and Skills, on the
+         * reasoning that this was where the part the CV covers ended. That was
+         * wrong twice over: the skills are in the PDF too, so it ended nothing,
+         * and the spot is the least findable in the tab -- invisible when the
+         * modal opens AND not where a hand goes when it reaches the bottom.
+         *
+         * Up here it is on screen the moment the tab is, which is the whole
+         * point of not making someone leave the world for it. On the rule
+         * beside the title it costs no vertical space and reads as what it is:
+         * the section is your experience, the action is taking it with you.
+         *
+         * Compact, because a full-size pill on an 18px heading is a button
+         * wearing the title's clothes.
+         */
+        const cv = _el('a', 'fz-profile-link fz-profile-cv')
+        cv.href = CV_URL
+        cv.setAttribute('download', '')
+        cv.innerHTML = iconDownload
+        cv.appendChild(document.createTextNode(t('computer.downloadCv')))
+        cv.hidden = true
+        probeCv().then((ok) => { cv.hidden = !ok })
+
+        this._heading(t('computer.experience'), cv)
         for (const e of experience) {
             this.content.appendChild(_xpEntry(e.role, e.org, e.period, e.detail))
         }
@@ -106,32 +132,6 @@ export default class ComputerModal {
         for (const e of education) {
             this.content.appendChild(_xpEntry(e.title, e.org, e.period, e.detail))
         }
-
-        /*
-         * The CV, downloadable from in here.
-         *
-         * It was only ever on the Quick overview, which meant the one visitor
-         * most likely to want the file -- someone who came in, walked to the
-         * house and opened the computer to read the experience -- had to leave
-         * the world to get it. The tab that lists the roles, the education and
-         * the skills is exactly the tab whose contents the PDF summarises.
-         *
-         * Above the skills rather than at the very bottom: this is the end of
-         * the part the CV covers, and burying it under the chips would put it
-         * a scroll away from everything it relates to.
-         *
-         * Hidden outright when the file is not there, instead of the overview's
-         * aria-disabled. That page keeps the button so its hero stays visually
-         * complete; this is a list, and a list can simply be one item shorter.
-         */
-        const cv = _el('a', 'fz-profile-link fz-profile-cv')
-        cv.href = CV_URL
-        cv.setAttribute('download', '')
-        cv.innerHTML = iconDownload
-        cv.appendChild(document.createTextNode(t('computer.downloadCv')))
-        cv.hidden = true
-        this.content.appendChild(cv)
-        probeCv().then((ok) => { cv.hidden = !ok })
 
         this._heading(t('computer.technicalSkills'))
         for (const g of skills) {
@@ -186,10 +186,17 @@ export default class ComputerModal {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────
-    _heading(text) {
+    /**
+     * @param {string} text
+     * @param {HTMLElement} [action] Sits at the far end of the rule, after the
+     *   flexible line. Section title left, what you can do about it right.
+     */
+    _heading(text, action) {
         const h = _el('div', 'fz-profile-heading')
-        h.textContent = text
+        h.appendChild(document.createTextNode(text))
+        if (action) h.appendChild(action)
         this.content.appendChild(h)
+        return h
     }
 
     /**
