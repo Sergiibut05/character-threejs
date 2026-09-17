@@ -38,7 +38,9 @@ export default class HeroViewport {
 
         this._pointer = new THREE.Vector2(0, 0)
         this._aim = new THREE.Vector2(0, 0)
-        this._clock = new THREE.Clock()
+        // See the note in DogPortrait: Clock is deprecated, and Timer splits
+        // "advance" from "read" so the delta can be looked at more than once.
+        this._timer = new THREE.Timer()
         this._frame = null
         this._tick = this._tick.bind(this)
 
@@ -435,8 +437,9 @@ export default class HeroViewport {
     _tick() {
         if (!this.active) return
         this._frame = requestAnimationFrame(this._tick)
-        const dt = Math.min(this._clock.getDelta(), 0.1)
-        const t = this._clock.elapsedTime
+        this._timer.update()
+        const dt = Math.min(this._timer.getDelta(), 0.1)
+        const t = this._timer.getElapsed()
 
         // Ease toward the pointer so the head glides instead of snapping.
         const k = 1 - Math.pow(0.001, dt)
@@ -468,7 +471,7 @@ export default class HeroViewport {
     render() {
         if (!this.ready) return
         this.mixer?.update(0)
-        this._updateCamera(this._clock.elapsedTime)
+        this._updateCamera(this._timer.getElapsed())
         this.renderer.render(this.scene, this.camera)
     }
 
@@ -478,7 +481,7 @@ export default class HeroViewport {
         // A still frame is the whole experience under reduced motion; spinning a
         // rAF loop to redraw the same pixels would just drain battery.
         if (this.reduceMotion) { this.render(); this.active = false; return }
-        this._clock.getDelta()
+        this._timer.reset()
         this._frame = requestAnimationFrame(this._tick)
     }
 

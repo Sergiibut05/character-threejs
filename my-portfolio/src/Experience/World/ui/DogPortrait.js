@@ -33,7 +33,17 @@ export default class DogPortrait {
         this.active = false
         this.ready = false
 
-        this._clock = new THREE.Clock()
+        /*
+         * Timer, not Clock: three deprecated Clock and says so in the console
+         * on every load.
+         *
+         * They are not drop-in. Clock.getDelta() both measures AND advances,
+         * so reading it twice in one frame gives the second reader a delta of
+         * nearly zero. Timer splits that: update() advances, getDelta() and
+         * getElapsed() just report, and can be called as often as needed.
+         * That is why the calls below changed shape rather than just names.
+         */
+        this._timer = new THREE.Timer()
         this._frame = null
         this._tick = this._tick.bind(this)
 
@@ -236,18 +246,22 @@ export default class DogPortrait {
     _tick() {
         if (!this.active) return
         this._frame = requestAnimationFrame(this._tick)
-        const dt = Math.min(this._clock.getDelta(), 0.1)
+        this._timer.update()
+        // The clamp used to be folded into the read. Same 100 ms ceiling: a
+        // tab that was in the background hands back one enormous delta, and
+        // the pose would jump rather than resume.
+        const dt = Math.min(this._timer.getDelta(), 0.1)
 
         this._poseFrame(dt)
 
-        this._updateCamera(this._clock.elapsedTime)
+        this._updateCamera(this._timer.getElapsed())
         this.renderer.render(this.scene, this.camera)
     }
 
     render() {
         if (!this.ready) return
         this._poseFrame(0)
-        this._updateCamera(this._clock.elapsedTime)
+        this._updateCamera(this._timer.getElapsed())
         this.renderer.render(this.scene, this.camera)
     }
 
@@ -259,7 +273,9 @@ export default class DogPortrait {
         if (this.active || !this.ready) return
         this.active = true
         if (this.reduceMotion) { this.render(); this.active = false; return }
-        this._clock.getDelta()
+        // Swallow the time spent stopped, so the first frame after start()
+        // is a normal one. reset() is Timer's way of saying that.
+        this._timer.reset()
         this._frame = requestAnimationFrame(this._tick)
     }
 
