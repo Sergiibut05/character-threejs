@@ -578,6 +578,42 @@ body.ov-page {
     }
 }
 
+/* The grab handle. See the note in Overview.js for why it is a real element
+   and why it sits at the bottom.
+
+   The padding is the point: the bar is 5px tall and the target around it is
+   about forty, because a thumb aims at a region and not at a line. `none` for
+   touch-action so the browser hands us the vertical drag instead of trying to
+   scroll the sheet with it. */
+.ov-sheet-grab {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: clamp(14px, 4vw, 20px) 0 2px;
+    margin-top: clamp(6px, 2vw, 12px);
+    touch-action: none;
+    cursor: grab;
+}
+.ov-sheet-grab:active { cursor: grabbing; }
+
+.ov-sheet-grab-bar {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--ov-line);
+    transition: background-color 0.2s var(--ov-ease), width 0.2s var(--ov-ease);
+}
+.ov-sheet-grab:active .ov-sheet-grab-bar {
+    background: var(--fz-green-500);
+    width: 52px;
+}
+
+/* Only ever on a phone: on a pointer device the close button and Escape are
+   right there, and a drag handle on a desktop panel is cargo cult. */
+@media (min-width: 861px) {
+    .ov-sheet-grab { display: none; }
+}
+
 /* The same masthead every section on this page has: a small label in the
    margin and the content at size underneath it. The sheet is not a different
    kind of object from the document it belongs to. */

@@ -170,6 +170,28 @@ export default class Overview {
         this.menu.setAttribute('data-lenis-prevent', '')
         this.menu.popover = 'auto'
 
+        /*
+         * The grab handle, at the BOTTOM, because this sheet comes down from
+         * the top and closes upwards. The bar is the phone convention for
+         * "this panel can be pushed away", and the direction it implies is
+         * whichever edge it sits on.
+         *
+         * It is not decoration. A handle that only looks draggable is worse
+         * than no handle, because the gesture it invites silently fails, so
+         * the drag below is the reason this element exists rather than a
+         * ::after on the sheet -- pseudo-elements cannot take pointer events.
+         *
+         * The native popover keeps its click-outside and its Escape, and the
+         * close button stays. This is a third way out for the thumb that is
+         * already at the bottom of the screen, not a replacement for any of
+         * them, which is also why it is aria-hidden: it adds no capability a
+         * keyboard or screen-reader user does not already have.
+         */
+        this.sheetGrab = el('div', 'ov-sheet-grab')
+        this.sheetGrab.setAttribute('aria-hidden', 'true')
+        this.sheetGrab.appendChild(el('span', 'ov-sheet-grab-bar'))
+        this._bindSheetDrag()
+
         this.langWrap = el('div', 'ov-lang')
         this.langWrap.setAttribute('role', 'group')
 
@@ -366,6 +388,52 @@ export default class Overview {
      * before you commit to it, and they are what makes a row scan as a line of
      * an index rather than as a link that has lost its underline.
      */
+    /**
+     * Drag the sheet up to dismiss it.
+     *
+     * Only upward travel counts: down is where the sheet already is, and
+     * letting it stretch that way would invent a state it does not have.
+     *
+     * The transition is switched off for the duration so the panel tracks the
+     * finger exactly, then restored on release so it either springs back or
+     * animates out with the same curve it opened with. Clearing the inline
+     * transform hands control back to the stylesheet rather than freezing it
+     * at whatever the last frame happened to be.
+     *
+     * Pointer capture matters more than it looks: without it a fast flick
+     * leaves the element before the pointerup lands, the gesture never ends,
+     * and the sheet stays stuck mid-drag with its transition still disabled.
+     */
+    _bindSheetDrag() {
+        const CLOSE_AT = 56      // px of upward travel that counts as "away"
+        let startY = 0
+        let travel = 0
+        let dragging = false
+
+        const finish = () => {
+            if (!dragging) return
+            dragging = false
+            this.menu.style.transition = ''
+            this.menu.style.transform = ''
+            if (travel < -CLOSE_AT) this.menu.hidePopover()
+        }
+
+        this.sheetGrab.addEventListener('pointerdown', (e) => {
+            dragging = true
+            startY = e.clientY
+            travel = 0
+            this.sheetGrab.setPointerCapture(e.pointerId)
+            this.menu.style.transition = 'none'
+        })
+        this.sheetGrab.addEventListener('pointermove', (e) => {
+            if (!dragging) return
+            travel = Math.min(0, e.clientY - startY)
+            this.menu.style.transform = `translateY(${travel}px)`
+        })
+        this.sheetGrab.addEventListener('pointerup', finish)
+        this.sheetGrab.addEventListener('pointercancel', finish)
+    }
+
     _renderSheet(c) {
         this.menu.innerHTML = ''
         this._sheetButtons = []
@@ -398,7 +466,7 @@ export default class Overview {
             this._sheetButtons.push(b)
         })
 
-        this.menu.append(head, list)
+        this.menu.append(head, list, this.sheetGrab)
         this._markSheet()
     }
 
