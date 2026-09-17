@@ -100,6 +100,27 @@ export default class Character {
         // Small lift above the capsule bottom so feet aren’t clipped by the terrain shader.
         this.spawnOffsetY = 0.32
 
+        /**
+         * Where the soles sit relative to the bottom of the capsule.
+         *
+         * It used to be +0.07 (scaled by the model, so +0.0595) on the theory
+         * that the feet would otherwise sink into the terrain. They would not:
+         * Rapier's character controller already holds the capsule clear of the
+         * floor, and measured on the spawn tile that gap is 0.046. So the lift
+         * was solving a problem the physics had already solved, and the two
+         * stacked: soles at 0.3092 over ground at 0.2036, floating 10.5 cm.
+         *
+         * Invisible from the follow camera, which never looks at his feet, and
+         * obvious the moment you fly the free camera down to them.
+         *
+         * Left at its original value on purpose. Lowering him to -0.045 does
+         * put the soles on the floor, but that is a change to how the game
+         * looks for everyone, decided from one free-camera screenshot, and the
+         * follow camera never shows it. The slider in the debug panel is there
+         * to take that shot; the default stays where it has always been.
+         */
+        this.footOffset = 0.07 * 0.85
+
         // Where you are standing when the world opens.
         //
         // Screen-right is +X here: the follow camera sits at character + (0,
@@ -234,9 +255,11 @@ export default class Character {
         this.model.scale.set(0.85, 0.85, 0.85)
 
         const box = new THREE.Box3().setFromObject(this.model)
-        // Small lift to prevent feet sinking visually, scaled with model scale.
-        const modelOffsetY = -this.capsuleCenterY - box.min.y + 0.07 * this.model.scale.y
-        this.model.position.set(0, modelOffsetY, 0)
+        // box.min.y is the soles in model space, so subtracting it puts them
+        // exactly on the capsule bottom; footOffset then places them where they
+        // should actually be. See the note on footOffset.
+        this._modelBaseY = -this.capsuleCenterY - box.min.y
+        this.model.position.set(0, this._modelBaseY + this.footOffset, 0)
 
         this._applyAtlas()
 
@@ -1215,5 +1238,9 @@ export default class Character {
         f.add(this, 'rotationSpeed', 2.0, 30.0, 0.5).name('Rotation Smoothing')
         f.add(this, 'restAfterRunThreshold', 0.5, 5.0, 0.1).name('Rest After Run (s)')
         f.add(this, 'blinkDuration', 0.05, 0.5, 0.01).name('Blink Duration')
+        // Positive floats him, negative digs him in. Watch it from the free
+        // camera at ground level, not from the follow camera.
+        f.add(this, 'footOffset', -0.15, 0.15, 0.001).name('Altura de los pies')
+            .onChange((v) => this.model.position.y = this._modelBaseY + v)
     }
 }

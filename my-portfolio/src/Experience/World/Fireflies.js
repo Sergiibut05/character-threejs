@@ -32,6 +32,16 @@ export default class Fireflies {
 
         this.grassPositions = options.grassPositions || []
         this.count = options.count ?? (this.experience.quality?.isLow ? 80 : 200)
+
+        // Headroom for the debug slider, and only for it.
+        //
+        // mesh.count decides how many instances are DRAWN, so raising it costs
+        // nothing but the draw; what cannot grow after the fact is the position
+        // buffer. Allocating four times the swarm up front means the slider can
+        // go up without rebuilding geometry mid-scene, at the price of a few KB
+        // of floats that are never read. Outside debug there is no slider, so
+        // there is no headroom either and the build is exactly as it was.
+        this.maxCount = this.debug.active ? this.count * 4 : this.count
         this.groundY = options.groundY ?? 0
 
         // View-distance culling radius (match grass)
@@ -54,7 +64,11 @@ export default class Fireflies {
     }
 
     _build() {
-        const count = this.count
+        // Scatter the full allocation; mesh.count below picks how many of them
+        // are actually drawn. That way the ones the slider reveals are already
+        // spread over the field instead of clustering wherever the last build
+        // happened to stop.
+        const count = this.maxCount
         const src = this.grassPositions
 
         // ── Scatter fireflies randomly across all grass positions ──
@@ -119,7 +133,7 @@ export default class Fireflies {
         // ── Mesh: WebGPU multi-instance via mesh.count ──
         const geometry = new THREE.CircleGeometry(1, 8)
         this.mesh = new THREE.Mesh(geometry, material)
-        this.mesh.count = count
+        this.mesh.count = this.count
         this.mesh.frustumCulled = false  // culling is done via scaleNode collapse
         this.mesh.renderOrder = 5
 
@@ -154,6 +168,8 @@ export default class Fireflies {
     setDebug() {
         const f = this.debug.ui.addFolder('Fireflies')
         f.close()
+        f.add(this, 'count', 0, this.maxCount, 1).name('Cantidad')
+            .onChange((v) => { this.mesh.count = v })
         f.add(this.uScale, 'value', 0.005, 0.2, 0.002).name('Size')
         f.add(this.uBrightness, 'value', 0.1, 3.0, 0.05).name('Brightness')
         f.add(this.uBlinkSpeed, 'value', 0.1, 5.0, 0.1).name('Blink Speed')

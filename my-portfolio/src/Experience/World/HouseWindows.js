@@ -98,11 +98,11 @@ export default class HouseWindows {
 
     update() {
         if (!this.resolved) { if (!this._resolve()) return }
-        const nf = this.experience.world?.environment?.skyNightFactor?.value ?? 0
-        // The same dusk band the lamps use, on purpose: the windows and the
-        // street lights coming on together is what reads as evening falling.
-        // Two different curves would read as two unrelated bugs.
-        this.uNight.value = THREE.MathUtils.smoothstep(nf, 0.40, 0.60)
+        // Same dusk curve as the street lamps, on purpose: the windows and
+        // the lights coming on together is what reads as evening falling. Two
+        // curves would read as two unrelated bugs. Only the debug override is
+        // separate, so a screenshot can have one without the other.
+        this.uNight.value = this.experience.world?.environment?.windowFactor ?? 0
     }
 
     destroy() {

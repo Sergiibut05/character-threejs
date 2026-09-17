@@ -166,10 +166,8 @@ export default class StreetLamps {
 
     update() {
         if (!this.resolved) { if (!this._resolve()) return }
-        const nf = this.experience.world?.environment?.skyNightFactor?.value ?? 0
-        // Clean dusk switch: a narrow smoothstep band so the lamp is clearly
-        // OFF during the day and clearly ON at night, with a short tidy fade —
-        // not a long muddy half-lit stretch across the cycle.
-        this.uNight.value = THREE.MathUtils.smoothstep(nf, 0.40, 0.60)
+        // See Environment.lampFactor: it owns the dusk band, and the debug
+        // override that forces the lights on at any hour.
+        this.uNight.value = this.experience.world?.environment?.lampFactor ?? 0
     }
 }
