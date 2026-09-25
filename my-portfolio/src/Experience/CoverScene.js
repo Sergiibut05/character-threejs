@@ -97,14 +97,32 @@ export default class CoverScene {
         if (!root) return
         if (!this.reduced) {
             this._measure()
-            window.addEventListener('pointermove', this._onMove, { passive: true })
             window.addEventListener('resize', this._onResize, { passive: true })
-            // Only where a finger is the pointer. A convertible laptop has an
-            // accelerometer too, and on one of those the mouse is the thing
-            // the parallax should be answering.
+            /*
+             * One input or the other, never both.
+             *
+             * A finger produces pointermove just as a mouse does, so with the
+             * pointer listener up on a touch screen the whole scene jumped to
+             * wherever you last tapped and stayed there -- which on an iPhone,
+             * where the tilt never arrives, was the only parallax there was:
+             * a picture that does nothing until you touch it and then shifts.
+             *
+             * Following a pointer is a mouse idea. It needs something that
+             * hovers, that is somewhere on screen without having been pressed,
+             * and a finger is neither. So the coarse-pointer branch does not
+             * get it, and if the tilt is refused as well -- iOS -- the right
+             * answer is the one that then happens by itself: nothing moves.
+             *
+             * `pointer: coarse` and not a touch test, because it asks about
+             * the PRIMARY pointer: a convertible laptop with an accelerometer
+             * still reports fine while the mouse is the thing in use, and the
+             * mouse is what the parallax should be answering there.
+             */
             if (window.matchMedia('(pointer: coarse)').matches) {
                 window.addEventListener('deviceorientation', this._onTilt, { passive: true })
                 window.addEventListener('orientationchange', this._onOrient, { passive: true })
+            } else {
+                window.addEventListener('pointermove', this._onMove, { passive: true })
             }
         }
         this.dog?.addEventListener('click', this._onPet)
@@ -176,9 +194,6 @@ export default class CoverScene {
         // Desktop browsers and blocked sensors fire this with nulls in it.
         if (beta == null || gamma == null) return
 
-        // The first real reading wins the job. A phone that answers to tilt
-        // should not also lurch when a finger brushes across it.
-        if (!this._tiltAt) window.removeEventListener('pointermove', this._onMove)
         if (!this._tiltZero) this._tiltZero = { beta, gamma }
 
         const db = beta - this._tiltZero.beta
