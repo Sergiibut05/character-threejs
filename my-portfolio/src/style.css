@@ -915,6 +915,47 @@ body:has(.cloud-btn.ready:hover) .dog-tail {
 }
 
 /*
+ * ── The same arrival, without the blur, on a phone ──────────────────────
+ *
+ * Same rise, same fade, minus the one property in these two animations that
+ * is not a transform.
+ *
+ * A transform and an opacity are handed to the compositor and cost nothing
+ * per frame. A filter is not: every letter carrying one is rasterised into a
+ * buffer of its own, every frame it moves, and there are twelve of them going
+ * at once -- on the screen whose entire job is to stay smooth while the main
+ * thread parses a glTF, and on the device least able to afford it.
+ *
+ * It is also the only thing here that WebKit is known to treat differently
+ * from Chromium: it rasterises a filtered inline-level box against its line
+ * box, and this title sits in a 0.98 line-height -- a line box smaller than
+ * its own letters. That fits the report exactly, because the name only looks
+ * wrong while it is arriving, which is the only time the filter exists. It
+ * could not be reproduced in Chrome at any width from 314px to 424px, with
+ * any font in the stack, so it is a diagnosis and not a measurement.
+ * Dropping the filter here is worth doing for the cost alone; that it is also
+ * the likely culprit is why it is this rule and not a slower one.
+ *
+ * ── And why this is down HERE, and is @keyframes and not a declaration ───
+ *
+ * An animated property is taken from the keyframes, so no ordinary rule can
+ * outrank one -- the override has to be keyframes too. Which are resolved by
+ * document order, last definition of a name wins: the first attempt at this
+ * went in the main phone block, which sits ABOVE the originals in this file,
+ * and did precisely nothing.
+ */
+@media (max-width: 760px) {
+    @keyframes cover-letter-in {
+        from { opacity: 0; transform: translateY(0.52em) rotate(-5deg) scale(0.94); }
+        to   { opacity: 1; transform: none; }
+    }
+    @keyframes cover-rise-in {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: none; }
+    }
+}
+
+/*
  * The copy is in the parallax too, and it is the nearest thing there is.
  *
  * Three different amounts rather than one on the block, because a title, a
