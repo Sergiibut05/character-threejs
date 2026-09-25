@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 59 520 359" width="520" height="359">
+  <defs>
+    <linearGradient id="wb" x1="66" y1="0" x2="421" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ab8df"/><stop offset=".514" stop-color="#9fbce1"/><stop offset=".514" stop-color="#abc9e9"/><stop offset="1" stop-color="#b0cbe8"/>
+    </linearGradient>
+    <linearGradient id="es" x1="0" y1="244" x2="0" y2="268" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3c5a8c" stop-opacity=".12"/><stop offset="1" stop-color="#3c5a8c" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="facade">
+      <path d="M66,240 L246,240 L339.3,128.1 L421.8,236 L421,236 L421,409 L66,409 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- facade: side wall + gable, one run of clapboard stripes -->
+  <g clip-path="url(#facade)">
+    <rect x="60" y="120" width="370" height="290" fill="#f5f1ec"/>
+    <g fill="#e2d6c8">
+      <rect x="60" y="145" width="370" height="5"/><rect x="60" y="199" width="370" height="5"/>
+      <rect x="60" y="253" width="370" height="5"/><rect x="60" y="306" width="370" height="6"/><rect x="60" y="360" width="370" height="6"/>
+    </g>
+    <rect x="60" y="150" width="370" height="21" fill="#b2cbe6"/>
+    <rect x="60" y="204" width="370" height="22" fill="#a8c8ea"/>
+    <rect x="60" y="258" width="370" height="21" fill="url(#wb)"/>
+    <rect x="60" y="312" width="370" height="21" fill="url(#wb)"/>
+    <rect x="60" y="366" width="370" height="21" fill="url(#wb)"/>
+    <g fill="#799dcf">
+      <rect x="60" y="171" width="370" height="5"/><rect x="60" y="226" width="370" height="4"/>
+      <rect x="60" y="279" width="370" height="5"/><rect x="60" y="333" width="370" height="5"/><rect x="60" y="387" width="370" height="4"/>
+    </g>
+    <rect x="60" y="391" width="370" height="18" fill="#f1efea"/>
+    <rect x="66" y="244" width="182" height="24" fill="url(#es)"/>
+  </g>
+
+  <!-- gable window -->
+  <circle cx="346.5" cy="198" r="18" fill="#4f7fbf"/>
+  <circle cx="342.5" cy="198" r="17.5" fill="#6a91c8"/>
+
+  <!-- roof plane -->
+  <path d="M145,104 L346,104 L235,237 L35,237 Z" fill="#8db1de"/>
+  <path d="M145,104 L166,104 L56,237 L35,237 Z" fill="#9bb6d9"/>
+  <g stroke-linecap="butt">
+    <path d="M161.8,114 L66.8,228 M197.8,114 L102.8,228 M233.8,114 L138.8,228 M269.8,114 L174.8,228 M305.8,114 L210.8,228" stroke="#b1d0f1" stroke-width="4.5"/>
+    <path d="M166.8,114 L71.8,228 M202.8,114 L107.8,228 M238.8,114 L143.8,228 M274.8,114 L179.8,228 M310.8,114 L215.8,228" stroke="#7093c5" stroke-width="4.5"/>
+  </g>
+  <!-- ridge -->
+  <rect x="137" y="103" width="201" height="11" fill="#98bce5"/>
+  <rect x="137" y="110" width="201" height="4" fill="#7aa2d2"/>
+  <!-- left rake between roof and gable -->
+  <path d="M335.7,112 L352.7,112 L246,240 L229,240 Z" fill="#7195c6"/>
+  <!-- eave -->
+  <g fill="#a3c3e8">
+    <rect x="63" y="226" width="14" height="7" rx="1"/><rect x="99" y="226" width="14" height="7" rx="1"/><rect x="135" y="226" width="14" height="7" rx="1"/>
+    <rect x="171" y="226" width="14" height="7" rx="1"/><rect x="207" y="226" width="14" height="7" rx="1"/>
+  </g>
+  <path d="M34,232 L248,232 L248,245 L40,245 Z" fill="#6f97cf"/>
+  <rect x="34" y="232" width="214" height="3" fill="#8cafdc"/>
+  <rect x="40" y="243" width="208" height="2" fill="#5f88c2"/>
+
+  <!-- chimney -->
+  <path d="M157,84 L189,84 L189,141 L157,141 Z" fill="#94b3db"/>
+  <path d="M189,84 L210,84 L210,115 L189,141 Z" fill="#6c93cc"/>
+  <rect x="157" y="84" width="53" height="8" fill="#3c64a8" opacity=".18"/>
+  <rect x="149" y="62" width="40" height="22" rx="1.5" fill="#96b7dd"/>
+  <rect x="189" y="62" width="29" height="22" rx="1.5" fill="#6b92cb"/>
+
+  <!-- right rake and ridge post -->
+  <path d="M339.3,128.1 L346,108 L376.6,150 L452,241 L446,247 L421,247 L421,236 Z" fill="#6e99cd"/>
+  <path d="M339.3,128.1 L346,108 L362,130 L438,236 L421,236 Z" fill="#4f7fb4"/>
+  <path d="M421,236 L438,236 L446,247 L421,247 Z" fill="#43709f"/>
+  <rect x="336" y="103" width="16" height="23" fill="#84add5"/>
+  <rect x="336" y="103" width="3" height="23" fill="#7196c4"/>
+
+  <!-- door -->
+  <path d="M302,366 V293.5 A40.5,40.5 0 0 1 383,293.5 V366 Z" fill="#d95b15"/>
+  <path d="M309,366 V296 A33.5,33.5 0 0 1 376,296 V366 Z" fill="#f06d24"/>
+  <circle cx="364" cy="321" r="6.5" fill="#b3742a"/>
+  <circle cx="365" cy="319.5" r="4.6" fill="#d9a043"/>
+  <circle cx="366.4" cy="317.8" r="1.7" fill="#fbe2a6"/>
+
+  <!-- steps -->
+  <rect x="265" y="366" width="190" height="23" fill="#dbac76"/>
+  <rect x="265" y="366" width="45" height="23" fill="#c28c4e"/>
+  <rect x="310" y="366" width="145" height="3" fill="#f0c592"/>
+  <rect x="265" y="389" width="209" height="21" fill="#dbac76"/>
+  <rect x="265" y="389" width="68" height="21" fill="#c28c4e"/>
+  <rect x="333" y="389" width="141" height="3" fill="#ecc28c"/>
+  <g stroke="#c4945a" stroke-width="1.6" stroke-linecap="round">
+    <path d="M326,378 H368 M392,381 H438 M346,385 H380 M352,398 H408 M424,402 H466 M344,406 H382"/>
+  </g>
+
+  <!-- mailbox -->
+  <rect x="502" y="350" width="20" height="64" fill="#fbc092"/>
+  <rect x="512" y="350" width="10" height="64" fill="#e2ae7f"/>
+  <rect x="502" y="350" width="20" height="8" fill="#d9955f"/>
+  <path d="M476,351 V312 Q476,304 484,304 H532 A16,16 0 0 1 548,320 V351 Z" fill="#fdc094"/>
+  <path d="M508,351 V304 H532 A16,16 0 0 1 548,320 V351 Z" fill="#f9a76f"/>
+  <path d="M512.5,347.5 V308.5 H531 A12.5,12.5 0 0 1 543.5,321 V347.5 Z" fill="none" stroke="#e3915a" stroke-width="2"/>
+  <rect x="480" y="317" width="23" height="6" rx="3" fill="#cf8b52"/>
+  <rect x="519" y="283" width="5" height="39" fill="#d23c45"/>
+  <rect x="521" y="277" width="17" height="11" rx="1" fill="#d93a45"/>
+  <circle cx="521.5" cy="322" r="5" fill="#c9303a"/>
+</svg>

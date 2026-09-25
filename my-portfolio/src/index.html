@@ -102,9 +102,42 @@
                   frame each now, which also gives the house somewhere to
                   stand.
                 -->
-                <path class="wave wave-3" d="M-200,58 C140,18 380,84 720,44 C1060,10 1300,74 1640,38 L1640,320 L-200,320 Z"/>
-                <path class="wave wave-2" d="M-200,128 C160,172 430,86 720,124 C1020,162 1260,98 1640,142 L1640,320 L-200,320 Z"/>
-                <path class="wave wave-1" d="M-200,196 C120,152 350,242 640,206 C940,168 1250,244 1640,200 L1640,320 L-200,320 Z"/>
+                <!--
+                  Each band is a group now: the hill, and its crest drawn again
+                  as a stroke. The stroke is the light catching the ridge, and it
+                  lives in the same group so it sways with the hill it belongs to
+                  instead of on a clock of its own. Two gradients because the sun
+                  is in a different place on a phone (see .wave-rim in style.css).
+                -->
+                <defs>
+                    <linearGradient id="rim-desktop" x1="-200" y1="0" x2="1640" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ffe7a8" stop-opacity="0"/>
+                        <stop offset=".45" stop-color="#ffe7a8" stop-opacity=".22"/>
+                        <stop offset=".76" stop-color="#fff0c0" stop-opacity=".95"/>
+                        <stop offset="1" stop-color="#ffe7a8" stop-opacity=".55"/>
+                    </linearGradient>
+                    <linearGradient id="rim-phone" x1="120" y1="0" x2="700" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ffe7a8" stop-opacity=".05"/>
+                        <stop offset=".5" stop-color="#ffe7a8" stop-opacity=".35"/>
+                        <stop offset=".78" stop-color="#fff0c0" stop-opacity=".95"/>
+                        <stop offset="1" stop-color="#ffe7a8" stop-opacity=".7"/>
+                    </linearGradient>
+                </defs>
+                <g class="wave wave-3">
+                    <path d="M-200,58 C140,18 380,84 720,44 C1060,10 1300,74 1640,38 L1640,320 L-200,320 Z"/>
+                    <path class="wave-rim wave-rim--glow" d="M-200,58 C140,18 380,84 720,44 C1060,10 1300,74 1640,38"/>
+                    <path class="wave-rim" stroke-width="2.5" d="M-200,58 C140,18 380,84 720,44 C1060,10 1300,74 1640,38"/>
+                </g>
+                <g class="wave wave-2">
+                    <path d="M-200,128 C160,172 430,86 720,124 C1020,162 1260,98 1640,142 L1640,320 L-200,320 Z"/>
+                    <path class="wave-rim wave-rim--glow" d="M-200,128 C160,172 430,86 720,124 C1020,162 1260,98 1640,142"/>
+                    <path class="wave-rim" stroke-width="3" d="M-200,128 C160,172 430,86 720,124 C1020,162 1260,98 1640,142"/>
+                </g>
+                <g class="wave wave-1">
+                    <path d="M-200,196 C120,152 350,242 640,206 C940,168 1250,244 1640,200 L1640,320 L-200,320 Z"/>
+                    <path class="wave-rim wave-rim--glow" d="M-200,196 C120,152 350,242 640,206 C940,168 1250,244 1640,200"/>
+                    <path class="wave-rim" stroke-width="3.5" d="M-200,196 C120,152 350,242 640,206 C940,168 1250,244 1640,200"/>
+                </g>
             </svg>
 
             <!--
@@ -125,17 +158,46 @@
               eager + fetchpriority, because this is the first thing on screen
               and it is 40 KB: lazy here would mean the frame assembling in
               front of the reader.
+
+              Two changes since, both about the pair not matching:
+
+              The house is SVG again, but not hand-plotted: it is the same
+              artwork traced shape for shape from media-src/art/house.png
+              (viewBox = that file's alpha bounds). The webp was 516px wide and
+              upscaled on every screen past ~1400px, next to a dog that is sharp,
+              and the difference in quality was the first thing you noticed.
+
+              The dog is four layers of its own artwork, cut by
+              tools/split-dog-layers.py, so it can breathe, wag, blink and turn
+              its head without being redrawn. dog.webp stays for the shadow,
+              which only needs the silhouette.
             -->
             <div class="loading-home">
                 <span class="lh-fig lh-fig--house">
-                    <span class="lh-shadow"><img class="lh-cast" src="/images/house.webp" alt="" aria-hidden="true"></span>
-                    <img class="lh-house" src="/images/house.webp" alt=""
-                         width="516" height="354" decoding="async" fetchpriority="high">
+                    <span class="lh-shadow"><img class="lh-cast" src="/images/house.svg" alt="" aria-hidden="true"></span>
+                    <img class="lh-house" src="/images/house.svg" alt=""
+                         width="520" height="359" decoding="async" fetchpriority="high">
+                    <span class="lh-smoke"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i></span>
                 </span>
                 <span class="lh-fig lh-fig--dog">
                     <span class="lh-shadow"><img class="lh-cast" src="/images/dog.webp" alt="" aria-hidden="true"></span>
-                    <img class="lh-dog" src="/images/dog.webp" alt=""
-                         width="74" height="80" decoding="async" fetchpriority="high">
+                    <span class="lh-dog" id="cover-dog">
+                        <span class="dog-hop"><span class="dog-breathe">
+                            <img class="dog-part dog-tail" src="/images/dog/tail.webp" alt="" width="420" height="451" decoding="async" fetchpriority="high">
+                            <img class="dog-part" src="/images/dog/body.webp" alt="" width="420" height="451" decoding="async" fetchpriority="high">
+                            <span class="dog-part dog-head"><span class="dog-part dog-tilt">
+                                <img class="dog-part" src="/images/dog/head.webp" alt="" width="420" height="451" decoding="async" fetchpriority="high">
+                                <img class="dog-part dog-eye" src="/images/dog/eye.webp" alt="" width="420" height="451" decoding="async" fetchpriority="high">
+                            </span></span>
+                        </span></span>
+                    </span>
+                    <!-- The minigame's frisbee, lying where he dropped it. -->
+                    <svg class="lh-frisbee" viewBox="0 0 60 26" aria-hidden="true">
+                        <ellipse cx="27" cy="21" rx="26" ry="5" fill="rgba(90,60,20,.18)"/>
+                        <ellipse cx="30" cy="14" rx="27" ry="10" fill="#e8505f" stroke="#c43d4b" stroke-width="2.2"/>
+                        <ellipse cx="30" cy="12.6" rx="17" ry="5.6" fill="#f26f7c"/>
+                        <ellipse cx="30" cy="12" rx="7" ry="2.2" fill="#ffc2c9"/>
+                    </svg>
                 </span>
             </div>
         </div>
@@ -148,7 +210,24 @@
                  the line underneath it is the same thing this page already
                  tells a crawler in its og:description, and that line was
                  always the better one: it says what the button does. -->
-            <p class="cloud-title">Sergii Butrii</p>
+            <!--
+              The name arrives a letter at a time.
+
+              Split in the markup rather than by script, because the copy is
+              the first thing on screen and the script that would have cut it
+              up runs after the parser: a title that assembles itself half a
+              second late is the one moment on this screen you cannot cover.
+
+              The letters are spans with an index, and the stylesheet does the
+              rest (see "The way the copy arrives" in style.css). Words are
+              their own box so a phone can still break the line between them,
+              and the whole thing is aria-hidden behind a label -- a screen
+              reader given thirteen one-character elements spells them out.
+            -->
+            <p class="cloud-title" aria-label="Sergii Butrii">
+                <span class="ct-word" aria-hidden="true"><span class="ct-l" style="--i:0">S</span><span class="ct-l" style="--i:1">e</span><span class="ct-l" style="--i:2">r</span><span class="ct-l" style="--i:3">g</span><span class="ct-l" style="--i:4">i</span><span class="ct-l" style="--i:5">i</span></span>
+                <span class="ct-word" aria-hidden="true"><span class="ct-l" style="--i:6">B</span><span class="ct-l" style="--i:7">u</span><span class="ct-l" style="--i:8">t</span><span class="ct-l" style="--i:9">r</span><span class="ct-l" style="--i:10">i</span><span class="ct-l" style="--i:11">i</span></span>
+            </p>
             <p class="cloud-sub">A portfolio you can walk around</p>
             <div class="cloud-actions">
                 <button class="cloud-btn" id="loading-enter-btn" disabled>

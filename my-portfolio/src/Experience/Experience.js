@@ -19,6 +19,7 @@ import { t } from './Utils/gameText.js'
 import MoveHint from './World/ui/MoveHint.js'
 import FrameSpy from './Utils/FrameSpy.js'
 import LoadSpy from './Utils/LoadSpy.js'
+import CoverScene from './CoverScene.js'
 
 let instance = null
 
@@ -90,6 +91,9 @@ export default class Experience {
         this.loadingOverviewBtn = document.getElementById('loading-overview-btn')
         this.initialCover = document.getElementById('initial-cover')
         this.bootScreen = document.getElementById('boot-screen')
+        // Parallax, the dog's head and the walk-in on Explore. Listeners only,
+        // no loop; see CoverScene.js.
+        this.coverScene = new CoverScene(this.cloudTransition)
         this._setupOverviewButton()
 
         // State tracking
@@ -366,6 +370,12 @@ export default class Experience {
             this.loadingEnterBtn.classList.remove('ready')
         }
 
+        // ── A short walk into the hills before the boot screen ────────────
+        // Nothing expensive has started yet, so this thread is free and the
+        // move is smooth; the boot screen then fades in over the zoomed hills.
+        // Skipped from the Quick Overview, where the hills are not on screen.
+        await this.coverScene?.leave({ skip: this.overview?.isOpen === true })
+
         // ── The boot screen goes up FIRST, and gets a frame to paint ──────
         // Everything below it is expensive and blocking, so the mark has to be
         // on screen and already beating before any of it starts -- otherwise
@@ -385,6 +395,8 @@ export default class Experience {
         this.audio?.startSoundtrack()
 
         // The start screen is gone from underneath.
+        this.coverScene?.destroy()
+        this.coverScene = null
         this.cloudTransition?.remove()
         this.cloudTransition = null
         this.overview?.destroy()
