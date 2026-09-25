@@ -7,7 +7,7 @@
  * toggles two classes; the easing is done by CSS transitions, so there is no
  * requestAnimationFrame here and nothing to keep in step with Time.
  *
- *   --mx, --my           pointer position (-1..1) on #cloud-transition
+ *   --mx, --my           pointer position, or phone tilt, as -1..1
  *   --wave-ux, --wave-uy  px -> viewBox-unit scale for the hills (see below)
  *   --hx                 where the dog should look, on #cover-dog
  *   .is-happy    two hops and a fast wag when the dog is clicked
@@ -32,6 +32,48 @@
  */
 const IRIS_MS = 1450
 
+/*
+ * -- The same parallax, driven by tilting the phone --------------------------
+ *
+ * Nothing below this point knows the difference. The whole effect hangs off
+ * two custom properties, so a second source only has to write the same two
+ * numbers in the same -1..1 range and every layer, every multiplier and every
+ * easing in style.css carries on exactly as it is.
+ *
+ * TILT_RANGE is how far you have to lean the phone to reach full deflection,
+ * and TILT_GAIN is how much of "full" you then actually get. Two numbers
+ * rather than one because they are not the same question: the range decides
+ * how sensitive it feels, the gain decides how far the picture ever travels.
+ * At 0.45 a phone leaned right over moves the house about 12px -- a scene that
+ * breathes rather than one that swings, and on a 390px screen 12px is already
+ * proportionally most of what 26px is on a desktop.
+ */
+const TILT_RANGE = 20
+const TILT_GAIN = 0.45
+
+/*
+ * -- And why there is no permission call anywhere in this file ---------------
+ *
+ * iOS gates the motion sensors behind DeviceOrientationEvent.requestPermission,
+ * which only works from inside a user gesture and puts a system dialog on
+ * screen. Asking for somebody's motion sensors on the first screen they ever
+ * see, before they have been given a single reason to care, is a worse trade
+ * than a picture that holds still. So it is never called.
+ *
+ * Not calling it IS the implementation. Subscribe to `deviceorientation`
+ * without permission and iOS does not prompt and does not refuse -- it simply
+ * never fires the event, so the listener sits there costing nothing and the
+ * scene stays exactly where it is. Android fires it, because Chromium has
+ * never required the call for same-origin secure pages, and the phone tilts.
+ * One code path, the right behaviour on both, and no dialog anywhere.
+ *
+ * The obvious-looking alternative -- feature-detect `requestPermission` and
+ * treat its presence as "this platform will prompt" -- was written first and
+ * is wrong. Chromium implements that method too (Chrome 153 on Windows has
+ * it), so the test is true on desktop Chrome and on Chrome for Android, and
+ * it would have switched the tilt off on the one platform it is here for.
+ */
+
 export default class CoverScene {
     constructor(root) {
         this.root = root
@@ -41,9 +83,15 @@ export default class CoverScene {
         this._dogBox = null
         this._happyTimer = 0
         this._leaveTimer = 0
+        this._tiltZero = null
+        this._tiltAt = null
+        this._tiltRaf = 0
 
         this._onMove = this._onMove.bind(this)
         this._onResize = this._measure.bind(this)
+        this._onTilt = this._onTilt.bind(this)
+        this._onTiltFrame = this._onTiltFrame.bind(this)
+        this._onOrient = () => { this._tiltZero = null }
         this._onPet = this._onPet.bind(this)
 
         if (!root) return
@@ -51,6 +99,13 @@ export default class CoverScene {
             this._measure()
             window.addEventListener('pointermove', this._onMove, { passive: true })
             window.addEventListener('resize', this._onResize, { passive: true })
+            // Only where a finger is the pointer. A convertible laptop has an
+            // accelerometer too, and on one of those the mouse is the thing
+            // the parallax should be answering.
+            if (window.matchMedia('(pointer: coarse)').matches) {
+                window.addEventListener('deviceorientation', this._onTilt, { passive: true })
+                window.addEventListener('orientationchange', this._onOrient, { passive: true })
+            }
         }
         this.dog?.addEventListener('click', this._onPet)
     }
@@ -96,6 +151,63 @@ export default class CoverScene {
         this.dog.style.setProperty('--hx', hx.toFixed(3))
     }
 
+    /**
+     * Phone tilt, as the same -1..1 the pointer produces.
+     *
+     * -- Relative to where you were holding it, not to the ground ------------
+     *
+     * beta and gamma are absolute angles, and read raw they would peg the
+     * scene the moment anybody held the phone the way people actually hold a
+     * phone: somewhere around 45 degrees back, which is full deflection, and
+     * it stays there. The first reading is taken as the neutral pose and
+     * everything after it is a delta from that, so the effect starts centred
+     * wherever your hands happen to be. Turning the device sideways throws
+     * that pose away and adopts the next one.
+     *
+     * -- And the axes turn with the screen -----------------------------------
+     *
+     * beta and gamma are fixed to the DEVICE, not to what you are looking at,
+     * so in landscape the axis that used to move the picture sideways is the
+     * one that now moves it up and down. screen.orientation.angle is what puts
+     * the two back in agreement.
+     */
+    _onTilt(e) {
+        const { beta, gamma } = e
+        // Desktop browsers and blocked sensors fire this with nulls in it.
+        if (beta == null || gamma == null) return
+
+        // The first real reading wins the job. A phone that answers to tilt
+        // should not also lurch when a finger brushes across it.
+        if (!this._tiltAt) window.removeEventListener('pointermove', this._onMove)
+        if (!this._tiltZero) this._tiltZero = { beta, gamma }
+
+        const db = beta - this._tiltZero.beta
+        const dg = gamma - this._tiltZero.gamma
+        let x, y
+        switch (window.screen?.orientation?.angle ?? 0) {
+            case 90:  x = -db; y =  dg; break
+            case 270: x =  db; y = -dg; break
+            case 180: x = -dg; y = -db; break
+            default:  x =  dg; y =  db
+        }
+
+        this._tiltAt = [clampTilt(x), clampTilt(y)]
+        // The sensor is not capped to the frame rate the way pointermove is,
+        // and on plenty of devices it runs well past it. Without this gate the
+        // same property is written several times for one painted frame: every
+        // write but the last one thrown away, and each one still paying for a
+        // style invalidation.
+        if (!this._tiltRaf) this._tiltRaf = requestAnimationFrame(this._onTiltFrame)
+    }
+
+    /** One write per painted frame; the CSS transitions do the smoothing. */
+    _onTiltFrame() {
+        this._tiltRaf = 0
+        if (!this.root || !this._tiltAt) return
+        this.root.style.setProperty('--mx', this._tiltAt[0].toFixed(3))
+        this.root.style.setProperty('--my', this._tiltAt[1].toFixed(3))
+    }
+
     _onPet() {
         if (this.dog.classList.contains('is-happy')) return
         this.dog.classList.add('is-happy')
@@ -124,6 +236,9 @@ export default class CoverScene {
     destroy() {
         window.removeEventListener('pointermove', this._onMove)
         window.removeEventListener('resize', this._onResize)
+        window.removeEventListener('deviceorientation', this._onTilt)
+        window.removeEventListener('orientationchange', this._onOrient)
+        cancelAnimationFrame(this._tiltRaf)
         this.dog?.removeEventListener('click', this._onPet)
         clearTimeout(this._happyTimer)
         clearTimeout(this._leaveTimer)
@@ -131,4 +246,9 @@ export default class CoverScene {
         this.dog = null
         this.waves = null
     }
+}
+
+/** Degrees off the neutral pose -> the -1..1 the stylesheet expects. */
+function clampTilt(deg) {
+    return Math.max(-1, Math.min(1, deg / TILT_RANGE)) * TILT_GAIN
 }

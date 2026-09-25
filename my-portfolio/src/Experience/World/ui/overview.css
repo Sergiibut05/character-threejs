@@ -201,6 +201,46 @@ body.ov-page {
        element into a scroller. */
     overflow: visible;
     height: auto;
+
+    /*
+     * And no rubber band at either end of it.
+     *
+     * Scrolling hard to the bottom on an iPhone overscrolls the document, and
+     * the document is what moves: .ov-root is in normal flow and rides up with
+     * it, while .cloud-transition underneath is position: fixed and does not.
+     * The gap that opens below the page is the start screen, sky and all --
+     * you are reading a CV and the bottom of the screen is a sunset.
+     *
+     * Nothing about the page's own layout can close that gap, because the gap
+     * is outside the page. The bounce itself has to go.
+     */
+    overscroll-behavior-y: none;
+}
+
+/*
+ * Belt and braces for the same bug, and a saving on the side.
+ *
+ * overscroll-behavior only landed in Safari with iOS 16, so on anything older
+ * the band is still there and still has to reveal something. This makes that
+ * something nothing: the start screen is completely covered by an opaque
+ * document at z-index 4000 the whole time the overview is up, so there is no
+ * moment it needs to be drawn.
+ *
+ * Which is the saving. Behind that opaque page, the cover is otherwise still
+ * running three drifting clouds, three swaying hills, the dog breathing,
+ * wagging and blinking, and three puffs of smoke -- every one of them a layer
+ * the compositor keeps handing to the GPU for pixels nobody can see. On a
+ * phone that is the same battery as the part you ARE looking at.
+ *
+ * The delay is what keeps the open honest: the overview fades in over 0.45s
+ * and needs the start screen behind it for all of it, so the flip waits until
+ * the fade is done. Closing needs no such care -- close() drops .ov-page
+ * before its own fade begins, and with the class goes the transition, so the
+ * cover is back instantly and in time.
+ */
+body.ov-page .cloud-transition {
+    visibility: hidden;
+    transition: visibility 0s linear 0.5s;
 }
 
 /* Paper tooth. The first attempt at this was invisible and it was arithmetic,
