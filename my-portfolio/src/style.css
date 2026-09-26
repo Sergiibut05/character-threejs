@@ -1064,6 +1064,39 @@ body:has(.cloud-btn.ready:hover) .dog-tail {
     color: #5d8574;
 }
 
+/*
+ * ── The two buttons lean toward the cursor ──────────────────────────────
+ *
+ * Magnetic.js writes --mag-x/--mag-y and this decides what happens with them.
+ * Written as two numbers rather than as a transform for exactly this reason:
+ * the pill takes the offset, and the label and the arrow inside it take half
+ * of it AGAIN on top. That second layer is most of the effect. A pill that
+ * slides as one rigid lump reads as a bug; the same pill with its contents
+ * drifting a little further than its edges reads as something with weight,
+ * leaning.
+ *
+ * `translate` and not `transform`, because both of these already use
+ * `transform` for their hover lift and their arrow, and the two compose
+ * without either knowing about the other.
+ */
+.cloud-btn,
+.cloud-btn-alt { translate: var(--mag-x, 0) var(--mag-y, 0); }
+
+/* .cloud-btn transitions `all` at half a second, and `all` means translate
+   too: this pill was being smoothed a second time, by CSS, while its own
+   label and the button beside it were not -- which is what made the three of
+   them disagree about how far they had moved. A later entry for the same
+   property wins over the one `all` implies, so this takes translate out of
+   the transition and leaves every other property that rule is there for
+   exactly as it was. The smoothing all of them share is in Magnetic.js. */
+.cloud-btn { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1), translate 0s; }
+
+.cloud-btn-text,
+.cloud-btn-arrow,
+.cloud-btn-alt > * {
+    translate: calc(var(--mag-x, 0) * 0.5) calc(var(--mag-y, 0) * 0.5);
+}
+
 /* ── Button with horizontal fill ── */
 
 /* Stacked, not side by side: the two actions are not peers. Exploring is the

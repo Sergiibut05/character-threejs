@@ -20,6 +20,10 @@ import i18n, { LOCALES } from '../../Utils/i18n.js'
 import { getContent, richText } from './overviewContent.js'
 import { SOCIALS } from './socialData.js'
 import ProjectFrame from './ProjectFrame.js'
+import Magnetic from '../../Utils/Magnetic.js'
+import Tilt from '../../Utils/Tilt.js'
+import { splitLines } from '../../Utils/SplitLines.js'
+import CountUp from '../../Utils/CountUp.js'
 
 const CV_URL = '/cv.pdf'
 
@@ -246,6 +250,9 @@ export default class Overview {
         // be positioned against a sticky element that moves.
         this.el.append(this.skip, this.bar, this.progress, this.menu, this.main)
         document.body.appendChild(this.el)
+
+        // Before _render: the figures are written during it.
+        this._count = new CountUp()
 
         this._renderLangToggle()
         this._render()
@@ -997,7 +1004,12 @@ export default class Overview {
                 const figs = el('dl', 'ov-figures')
                 for (const f of p.figures) {
                     const cell = el('div', 'ov-figure')
-                    cell.appendChild(txt('dt', null, f.value))
+                    const dt = txt('dt', null, '')
+                    // Set through CountUp rather than written straight in: it
+                    // puts the value there itself and, if there is a number in
+                    // it, counts up to it the moment the cell is looked at.
+                    this._count.watch(dt, f.value)
+                    cell.appendChild(dt)
                     cell.appendChild(txt('dd', null, f.label))
                     figs.appendChild(cell)
                 }
@@ -1712,6 +1724,100 @@ export default class Overview {
         })
     }
 
+    /**
+     * The section headlines, cut into their rendered lines (SplitLines.js).
+     *
+     * Only .ov-display: they are the only text on this page set at display
+     * size and the only text that runs to three lines, which is what makes a
+     * per-line arrival worth the work. Doing it to body copy would be twelve
+     * masks per paragraph to stagger something nobody reads as a gesture.
+     */
+    _splitDisplays() {
+        for (const el of this.el.querySelectorAll('.ov-display')) splitLines(el)
+    }
+
+    /**
+     * Skills, read the other way round.
+     *
+     * The heading of that section promises that nothing in it is there without
+     * a project behind it, and then prints the evidence -- the project names
+     * under each skill -- in the smallest grey type on the page. This makes
+     * the promise operable: point at a project and every skill it paid for
+     * lights up, and the rest of the grid steps back. Point at a skill and
+     * only that one does.
+     *
+     * ── One system, and why that is the whole fix ────────────────────────
+     *
+     * The first version of this had two. A pure-CSS `:hover` rule dimmed the
+     * cells you were not on, and these classes dimmed the ones that did not
+     * match, and a third rule tried to switch the first off while the second
+     * was running. Sweeping across the grid they took turns, a frame apart,
+     * and the thing flickered. Worse, moving off a project name onto the bare
+     * part of its cell matched neither, so the last highlight simply stayed
+     * on until you left the grid entirely.
+     *
+     * So the CSS no longer decides anything: every state the grid can be in is
+     * one of the three below, written here, and nothing is ever half applied.
+     *
+     * ── And pointermove, with the early return ───────────────────────────
+     *
+     * The key is what the pointer is ON, not that it moved. Crossing forty
+     * pixels of the same label recomputes nothing and touches no classList --
+     * which is the other half of why this is smooth now, because writing the
+     * same classes back every mouse event is its own kind of churn.
+     */
+    _wireSkillLinks() {
+        const grid = this.el.querySelector('.ov-skillset')
+        if (!grid) return
+        const cells = [...grid.querySelectorAll('.ov-skillset-cell')]
+        const TAGS = '.ov-skillset-go, .ov-skillset-site'
+        let on = ''
+
+        /**
+         * @param {string} key  '' clears; 'p:<label>' a project; 'c:<n>' a cell
+         */
+        const paint = (key) => {
+            // A STRING and not the element or a little object, because this is
+            // compared on every mouse event and two freshly built objects are
+            // never equal -- which quietly turned the early return below into
+            // dead code the first time round, and wrote the same classes back
+            // sixty times a second.
+            if (key === on) return
+            on = key
+            if (!key) {
+                for (const c of cells) c.classList.remove('is-lit', 'is-dim')
+                return
+            }
+            const label = key.startsWith('p:') ? key.slice(2) : null
+            const one = label === null ? cells[+key.slice(2)] : null
+            for (const c of cells) {
+                const hit = c === one || (label !== null
+                    && [...c.querySelectorAll(TAGS)]
+                        .some((n) => n.textContent.trim() === label))
+                c.classList.toggle('is-lit', hit)
+                c.classList.toggle('is-dim', !hit)
+            }
+        }
+
+        this._onSkillMove = (e) => {
+            const tag = e.target.closest?.(TAGS)
+            if (tag) { paint('p:' + tag.textContent.trim()); return }
+            const cell = e.target.closest?.('.ov-skillset-cell')
+            // Nothing under the pointer: KEEP what is lit rather than clearing
+            // it. The cells do not tile the grid -- there are column gaps
+            // between them and the rows are only as tall as their own text --
+            // so sweeping across turned the effect on and off several times on
+            // the way to anywhere, which read as it being broken rather than
+            // as it being precise. Only leaving the grid puts it out.
+            if (cell) paint('c:' + cells.indexOf(cell))
+        }
+        this._onSkillLeave = () => paint('')
+
+        grid.addEventListener('pointermove', this._onSkillMove, { passive: true })
+        grid.addEventListener('pointerleave', this._onSkillLeave, { passive: true })
+        this._skillGrid = grid
+    }
+
     // ═══ Reveal / scroll ══════════════════════════════════════════════════
     _observeReveals() {
         this._io?.disconnect()
@@ -1994,6 +2100,10 @@ export default class Overview {
     }
 
     _onResize() {
+        this._magnetic?.refresh()
+        // Where a line ends is a result of the width, so it is wrong the
+        // instant the width changes.
+        this._splitDisplays()
         this._movePill()
         this._syncBarHeight()
         this._updateScrollState()
@@ -2038,6 +2148,20 @@ export default class Overview {
         this.viewport?.resize()
         this.viewport?.start()
         this._syncDog()
+        // The page's own controls get the same lean the start screen's do.
+        // Built here rather than at construction because it measures, and
+        // until now this root was [hidden] and every box in it was zero.
+        this._magnetic = new Magnetic(this.el, '.ov-btn, .ov-back')
+        // Both of these measure, so both wait for the layout flush above.
+        this._splitDisplays()
+        // Listeners only, but on cells that _render built, so not before it.
+        this._wireSkillLinks()
+        // The picture, and only the picture. The closing card had this too and
+        // it had to come out: the dog on it is a live WebGL render, and no
+        // arrangement of a 3D transform over a canvas that repaints every
+        // frame was cheap enough to keep. See the note in Tilt.js.
+        const view = this.el.querySelector('.ov-work-view')
+        this._tilt = new Tilt(view, view?.closest('.ov-work'))
         // The DIALOG takes focus, not the back button.
         //
         // Focusing a control programmatically is what put a green ring round
@@ -2059,6 +2183,13 @@ export default class Overview {
         this._stopLenis()
         this.viewport?.stop()
         this.dogPortrait?.stop()
+        this._magnetic?.destroy()
+        this._magnetic = null
+        this._tilt?.destroy()
+        this._tilt = null
+        this._skillGrid?.removeEventListener('pointermove', this._onSkillMove)
+        this._skillGrid?.removeEventListener('pointerleave', this._onSkillLeave)
+        this._skillGrid = null
         this.el.classList.remove('is-open')
         document.removeEventListener('keydown', this._onKeyDown)
         window.removeEventListener('resize', this._onResize)

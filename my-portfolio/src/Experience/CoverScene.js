@@ -14,6 +14,7 @@
  *   .is-leaving  the walk into the hills on Explore (see style.css)
  *   .is-closing  the iris shutting over it, through that same walk
  */
+import Magnetic from './Utils/Magnetic.js'
 
 /*
  * The shape of the exit, in one number.
@@ -126,6 +127,10 @@ export default class CoverScene {
             }
         }
         this.dog?.addEventListener('click', this._onPet)
+
+        // Explorar and Quick overview lean toward the cursor; see Magnetic.js
+        // for why this and not a custom cursor.
+        this.magnetic = new Magnetic(root, '.cloud-btn, .cloud-btn-alt')
     }
 
     /**
@@ -257,6 +262,8 @@ export default class CoverScene {
         this.dog?.removeEventListener('click', this._onPet)
         clearTimeout(this._happyTimer)
         clearTimeout(this._leaveTimer)
+        this.magnetic?.destroy()
+        this.magnetic = null
         this.root = null
         this.dog = null
         this.waves = null

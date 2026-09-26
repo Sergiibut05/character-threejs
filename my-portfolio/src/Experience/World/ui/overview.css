@@ -2797,3 +2797,261 @@ body.ov-page .cloud-transition {
     /* The header has no surface left to blur -- see .ov-bar. What remains in
        this block is the motif field, above. */
 }
+
+/*
+ * The same lean the start screen's buttons have, on this page's own controls.
+ * See Magnetic.js, and the matching block in style.css for why the contents
+ * move further than the pill does.
+ *
+ * Only the calls to action and the way back. The nav links and the language
+ * toggle are deliberately left out: both of those already have one travelling
+ * pill shared between their items, and a second thing pulling the items
+ * themselves about would be two objects arguing over the same hover.
+ */
+.ov-btn,
+.ov-back { translate: var(--mag-x, 0) var(--mag-y, 0); }
+
+.ov-btn > *,
+.ov-back > * {
+    translate: calc(var(--mag-x, 0) * 0.5) calc(var(--mag-y, 0) * 0.5);
+}
+
+/*
+ * ── Headlines arrive a line at a time ───────────────────────────────────
+ *
+ * SplitLines.js cuts the text into its rendered lines; this is what happens to
+ * them. Each line is a mask with the words inside it starting just below, so
+ * they rise into view rather than fading in place -- the same gesture .ov-rise
+ * was already making for the whole block, spent per line.
+ *
+ * .ov-split turns the block-level version off. It has to be here, after
+ * .ov-rise and at the same specificity, because the element keeps that class:
+ * it is what the IntersectionObserver watches for, and it is what puts .is-in
+ * on it. Only the look is replaced, not the wiring.
+ */
+.ov-split { clip-path: none; transform: none; }
+
+.ov-line {
+    display: block;
+    overflow: hidden;
+    /*
+     * Room for the letters, taken straight back off the layout.
+     *
+     * .ov-display sets line-height: 1.04, which is a line box very slightly
+     * smaller than the type in it -- fine normally, because text is allowed to
+     * spill out of its line box, and fatal the moment that box starts
+     * clipping. Without this the mask would shave the descender off every g
+     * and the accent off every á, and this site is written in a language with
+     * an accent in half its words.
+     *
+     * The negative margins give the padding back, so the lines sit exactly
+     * where they sat before any of this.
+     */
+    padding-top: 0.14em;
+    margin-top: -0.14em;
+    padding-bottom: 0.14em;
+    margin-bottom: -0.14em;
+}
+
+.ov-line-i {
+    display: inline-block;
+    /* 105 and not 100: at exactly 100% the top of the glyphs sits on the mask
+       edge, and a subpixel of a tall letter peeks over it before it starts. */
+    transform: translateY(105%);
+    transition: transform 0.9s var(--ov-ease);
+    /* Enough apart to be read as one line after another, close enough that the
+       last one is not still arriving after the eye has finished the first. */
+    transition-delay: calc(var(--l, 0) * 95ms);
+}
+
+.ov-split.is-in .ov-line-i { transform: none; }
+
+/*
+ * ── And the project preview leans ───────────────────────────────────────
+ *
+ * Tilt.js writes the two angles; the perspective lives here, inside this
+ * element's own transform rather than on its parent, because the parent is
+ * the block this panel is `position: sticky` within.
+ *
+ * 1100px is a long lens. A short one (400-600px, the usual copy-paste value)
+ * makes four degrees look like forty: the near corner balloons and the panel
+ * stops being a photograph on a table and becomes a door swinging open.
+ *
+ * On .ov-work-view, the picture, and NOT on .ov-work-frame around it. Two
+ * reasons, and the first is a bug this rule caused before it moved: the frame
+ * carries .ov-reveal, whose whole animation is a `transform`, and one
+ * transform per element means the tilt silently ate the panel's arrival. The
+ * second is that it turned out to be the better framing anyway -- the frame
+ * also holds the row of figures underneath, and numbers you are meant to read
+ * should not be the part that is leaning.
+ *
+ * 900px now rather than 1100, to go with the bigger angle: a longer lens over
+ * a wider turn flattens back out into something that reads as a skew.
+ */
+.ov-work-view {
+    transform: perspective(900px)
+               rotateX(var(--tilt-x, 0deg))
+               rotateY(var(--tilt-y, 0deg));
+}
+
+/*
+ * And the light moves across it.
+ *
+ * Rotation on its own is a weak depth cue on a flat picture, because a
+ * photograph looks much the same from a slightly different angle -- what tells
+ * you a surface has turned is the highlight sliding over it. This is that
+ * highlight: one soft diagonal band, well outside the box on both sides, that
+ * travels as the panel turns.
+ *
+ * It slides on `translate` and fades on `opacity`, which are the two things
+ * the compositor does by itself, rather than on a gradient whose stops move --
+ * that version repaints the whole picture every frame for the same effect.
+ *
+ * inset: -40% so the band is never seen ending; overflow: hidden on the parent
+ * crops it to the picture.
+ */
+.ov-work-view::after {
+    content: '';
+    position: absolute;
+    inset: -40%;
+    pointer-events: none;
+    background: linear-gradient(104deg,
+        rgba(255, 255, 255, 0) 40%,
+        rgba(255, 255, 255, 0.20) 50%,
+        rgba(255, 255, 255, 0) 60%);
+    translate: calc(var(--tilt-nx, 0) * -26%) calc(var(--tilt-ny, 0) * -14%);
+    opacity: 0;
+    transition: opacity 0.45s var(--ov-ease);
+}
+.ov-work:hover .ov-work-view::after { opacity: 1; }
+
+/*
+ * ── Skills, with the evidence turned up ─────────────────────────────────
+ *
+ * Point at a skill and only it stays lit; point at a project name under any
+ * skill and every skill that project paid for lights at once, so the grid
+ * answers "what did this one thing teach me" and not only "what did I use
+ * here". The project names are the evidence for the heading above them and at
+ * rest they are the quietest type on the page; this is what brings them up.
+ *
+ * Every state here arrives as a class from _wireSkillLinks, and NOTHING is
+ * keyed off :hover. That is deliberate and it is the bug fix: a `:hover` rule
+ * and a class rule both deciding the same opacity is how the grid came to
+ * flicker as the pointer crossed it. One source, no disagreement.
+ *
+ * Opacity and colour only. No layout, no transform, nothing that could move a
+ * link out from under a cursor already on its way to clicking it.
+ */
+.ov-skillset-cell { transition: opacity 0.28s var(--ov-ease); }
+.ov-skillset-name,
+.ov-skillset-used,
+.ov-skillset-go,
+.ov-skillset-site { transition: color 0.28s var(--ov-ease); }
+
+/*
+ * `.ov-section.is-in` in front, and it is not padding.
+ *
+ * These cells carry .ov-reveal, and the rule that brings a revealed thing to
+ * full opacity is written `.ov-section.is-in .ov-reveal, .ov-reveal.is-in`.
+ * The FIRST selector in that list is three classes deep, so a two-class rule
+ * here loses to it outright and this dimming silently did nothing -- the
+ * classes went on, the cells stayed at opacity 1, and the only way to see it
+ * was to read the computed value rather than the class list.
+ *
+ * Four classes, so it wins on specificity rather than on being further down
+ * the file, which is a thing that survives someone moving this block.
+ */
+.ov-section.is-in .ov-skillset-cell.is-dim { opacity: 0.32; }
+.ov-skillset-cell.is-lit .ov-skillset-name { color: #1d4232; }
+.ov-skillset-cell.is-lit .ov-skillset-used,
+.ov-skillset-cell.is-lit .ov-skillset-go,
+.ov-skillset-cell.is-lit .ov-skillset-site { color: var(--fz-ink); }
+
+/*
+ * ── One cursor per region, and no I-beam anywhere ───────────────────────
+ *
+ * Two different complaints about the same pointer, and only the second one
+ * was the real one.
+ *
+ * The text caret: this is a document, .ov-root turns selection back on for it,
+ * and the default `cursor: auto` over any run of text is the I-beam. Over a
+ * grid of twelve headings that is the caret you get for writing in a field,
+ * offered on something you cannot type into. `default` on the cell says what
+ * is true -- there is text here, it is not an input.
+ *
+ * The hand: each project name IS a real button, it takes you to that project,
+ * so each one turned the cursor into a hand and the gaps between them turned
+ * it back, several times in the width of a sentence set at twelve pixels. So
+ * the hand belongs to the whole line rather than to the words in it, and
+ * crossing that line changes the cursor exactly once, on the way in.
+ *
+ * The separators take no pointer events at all, which also closes the dead
+ * gaps that were dropping the highlight mid-sweep.
+ */
+.ov-skillset-cell,
+.ov-skillset-name { cursor: default; }
+.ov-skillset-used { cursor: pointer; }
+.ov-skillset-sep { pointer-events: none; }
+
+/*
+ * ── The timeline draws itself against the scroll, not against a clock ───
+ *
+ * The rail already grew from nothing: `scaleY(0)` to `scaleY(1)` over a second
+ * when the section revealed. That is a nice arrival and it is also the wrong
+ * relationship -- it plays once, on its own schedule, and then the line is
+ * just a line while you read the thing it is measuring.
+ *
+ * Tied to the scroll it means something instead: it is how far down your own
+ * history you have got. Which is the only place on this page where movement
+ * carries information rather than decorating it.
+ *
+ * No JavaScript, and that is not an economy -- a scroll-driven animation runs
+ * off the main thread entirely, which is this project's whole argument about
+ * what may and may not move. A scroll listener writing a transform would be
+ * the one piece of motion here that stutters when something else is busy.
+ *
+ * Wrapped in @supports because Safari has not shipped it. Without the query
+ * the rail would sit at scaleY(0) there -- an invisible line, which is a worse
+ * outcome than the animation it is replacing. Inside it, browsers that do not
+ * understand the block keep exactly the behaviour they have today.
+ */
+@supports (animation-timeline: view()) {
+    .ov-timeline::before {
+        transition: none;
+        animation: ov-tl-draw linear both;
+        animation-timeline: view();
+        /*
+         * Done well before the section is, because a line that only fills as
+         * it leaves is a line nobody sees fill. It starts a third of the way
+         * into its travel and is full at two thirds -- so by the time the last
+         * entry is level with the middle of the screen the rail is already
+         * complete, and the rest of the scroll is just reading.
+         *
+         * Both ends are named against `cover` and that is not a style choice.
+         * `cover` is the only range that always exists: `contain` collapses to
+         * nothing the moment the rail is taller than the viewport, which is
+         * exactly what happens to these lists on a phone, and a range whose
+         * two ends have collapsed onto each other is a line that snaps from
+         * empty to full in one pixel of scrolling.
+         */
+        animation-range: cover 28% cover 54%;
+    }
+    @keyframes ov-tl-draw {
+        from { transform: scaleY(0); }
+        to   { transform: scaleY(1); }
+    }
+
+    /* An animation outranks the `transform: none` the reduced-motion block
+       already sets on this rail, so it has to be turned off by name here
+       rather than left for that rule to catch. */
+    @media (prefers-reduced-motion: reduce) {
+        .ov-timeline::before { animation: none; }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ov-skillset-cell,
+    .ov-skillset-used,
+    .ov-skillset-go,
+    .ov-skillset-site { transition: none !important; }
+}
