@@ -892,16 +892,46 @@ export default class Overview {
 
         let pickToken = 0
 
+        /*
+         * ── Is anybody looking at the frame ─────────────────────────────
+         *
+         * Kept by the observer at the end of this method, and it matters
+         * because a project can now be chosen from somewhere else on the
+         * page: the skill tiles link into this list, so `select` can run with
+         * the picture thousands of pixels off screen.
+         *
+         * That was a real bug and the trace was unambiguous. Choosing a
+         * project from Skills produced releaseVideo -> showVideo (accepted)
+         * -> hideVideo, twice, and showStill never once. The video wipe was
+         * started for a frame nobody could see, the observer killed it a
+         * tenth of a second later for exactly that reason, and the retreat
+         * landed back on the picture that was already there. So the list said
+         * one project and the frame showed the one before it, until you
+         * picked something else and came back.
+         */
+        let onScreen = false
+        /* A project chosen while the frame was off screen, waiting to be
+           answered with its video when the frame is actually looked at. */
+        let deferred = null
+
         const showPicture = (p, back) => {
             const token = pickToken
             const still = p.spread?.image || p.image
             const src = pickSrc(p)
 
-            // Nothing to wait for: no file for this one, or motion is off.
-            if (!src || noMotion) {
+            // Nothing to wait for: no file for this one, motion is off, or
+            // there is nobody there to watch it. The last of those is the
+            // off-screen case: paint the still, so the frame is RIGHT the
+            // moment the reader arrives, and leave the video for then. It is
+            // also the honest thing to do with somebody's data -- the old
+            // path fetched and played a video for a picture that was two
+            // screens away.
+            if (!src || noMotion || !onScreen) {
                 if (still) frame.showStill(still, false, back)
+                if (src && !noMotion && !onScreen) deferred = p
                 return
             }
+            deferred = null
 
             let settled = false
             let budget = null
@@ -1175,7 +1205,27 @@ export default class Overview {
         this._workIo?.disconnect()
         if (typeof IntersectionObserver !== 'undefined') {
             this._workIo = new IntersectionObserver(([e]) => {
-                if (e.intersectionRatio >= 0.45) return
+                const was = onScreen
+                onScreen = e.intersectionRatio >= 0.45
+                if (onScreen) {
+                    /*
+                     * Arriving. If a project was chosen while this was out of
+                     * sight, NOW is when it gets its video.
+                     *
+                     * Only a chosen one, which is why this reads `deferred`
+                     * rather than simply re-showing whatever is active: the
+                     * section opens on project 01 with nobody having asked
+                     * for it, and answering that with a video the first time
+                     * the frame scrolls into view would be autoplay wearing a
+                     * different hat. See the note in `select`.
+                     */
+                    if (!was && deferred) {
+                        const p = deferred
+                        deferred = null
+                        showPicture(p, false)
+                    }
+                    return
+                }
                 stopVideo(e.intersectionRatio === 0)
             }, { threshold: [0, 0.45] })
             this._workIo.observe(view)
