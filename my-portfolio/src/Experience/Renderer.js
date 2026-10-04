@@ -52,6 +52,7 @@ export default class Renderer {
         // the debug GUI adjusts them live without rebuilding the pipeline.
         this.uEdgeThickness = uniform(2.4)
         this.uEdgeSuppress = uniform(1.6)
+        this.uOutlineActive = uniform(0)
 
         // -- Final grade --
         //
@@ -445,6 +446,18 @@ export default class Renderer {
             edgeGlow: float(0.15)
         })
 
+        // The node re-renders the WHOLE scene into its own depth buffer, then
+        // runs six more full/half-res passes -- every frame, selection or not.
+        // With nothing selected, which is nearly always, all of that draws an
+        // outline of nothing. Returning false skips the frame without marking
+        // it done, so the first frame with a selection renders fresh; the
+        // stale targets in between are zeroed out by uOutlineActive.
+        const runOutline = outlinePass.updateBefore.bind(outlinePass)
+        outlinePass.updateBefore = (frame) => {
+            if (this.selectedObjects.length === 0) return false
+            return runOutline(frame)
+        }
+
         const { visibleEdge, hiddenEdge } = outlinePass
 
         // The suppressor used to be a straight subtraction --
@@ -467,7 +480,8 @@ export default class Renderer {
         const occluderCut = smoothstep(
             float(0.0), CUT_KNEE, hiddenEdge.mul(this.uEdgeSuppress)
         ).oneMinus()
-        const outlineColor = visibleEdge.mul(occluderCut).mul(visibleEdgeColor).mul(edgeStrength)
+        const outlineColor = visibleEdge.mul(occluderCut).mul(visibleEdgeColor)
+            .mul(edgeStrength).mul(this.uOutlineActive)
 
         // The outline is UI drawn over the world, so it is added after the
         // occlusion rather than being dimmed by it.
@@ -483,9 +497,17 @@ export default class Renderer {
 
         // 2. Tilt-Shift Blur (Both Qualities)
         // Reduced intensity: radius 3 for High, 2 for Low to save GPU.
-        // No resolutionScale to prevent fractional texture crashes on iPhone.
+        // Half res on desktop only (see Quality.tiltShiftHalfRes): the
+        // direction halves with it, because the node steps in texels of its
+        // own target and twice-as-big texels would double the blur width.
         const blurRadius = this.quality.tiltShiftRadius
-        const blurredScene = gaussianBlur(composited, vec2(1), blurRadius)
+        const blurHalfRes = this.quality.tiltShiftHalfRes
+        const blurredScene = gaussianBlur(
+            composited,
+            vec2(blurHalfRes ? 0.5 : 1),
+            blurRadius,
+            blurHalfRes ? { resolutionScale: 0.5 } : {}
+        )
 
         const centerY = float(0.5)
         const distFromCenter = abs(screenUV.y.sub(centerY))
@@ -663,10 +685,6 @@ export default class Renderer {
             return
         }
 
-        // The high tier renders above the device pixel ratio (see
-        // Quality.pixelRatio), so switching tiers has to resize as well as
-        // rebuild -- otherwise the change only lands on the next resize.
-        this.instance.setPixelRatio(this.quality.pixelRatio)
         this._buildPostProcessingPipeline()
     }
 
@@ -686,7 +704,8 @@ export default class Renderer {
             sweepDepthlessFromAO(this.scene)
         }
 
-        this._syncOutlineCamera()
+        this.uOutlineActive.value = this.selectedObjects.length > 0 ? 1 : 0
+        if (this.uOutlineActive.value) this._syncOutlineCamera()
         if (this.renderPipeline) {
             this.renderPipeline.render()
         }

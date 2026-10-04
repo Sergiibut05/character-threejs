@@ -23,9 +23,6 @@ import { REAL_SHADOWS_SUPPORTED } from './DeviceCaps.js'
 const STORAGE_KEY = 'portfolio.quality'
 const MOBILE_REGEX = /Mobi|Android|iPhone|iPad|iPod/i
 
-/** Floor for the device pixel ratio on high quality. See `pixelRatio`. */
-const HIGH_MIN_DPR = 1.5
-
 export default class Quality extends EventEmitter {
     constructor() {
         super()
@@ -96,25 +93,17 @@ export default class Quality extends EventEmitter {
     get isMobileHigh() { return this.isHigh && this.isMobile }
 
     /**
-     * pixelRatio — capped at 2 on every device (matching Bruno's defaults).
-     * Mobile retina screens already supersample, so a pixelRatio < 2 is
-     * almost always wasteful blur. Low quality keeps the cap because the
-     * cost is paid once per resize, not per frame.
+     * pixelRatio — the device's own, capped at 2, on both levels (Bruno's
+     * folio-2025 does exactly this).
+     *
+     * High used to floor it at 1.5 so a 1x monitor got supersampling. That
+     * was 2.25x the pixels through EVERY full-screen pass of the pipeline,
+     * every frame, at the monitor's refresh rate -- enough to spin up the
+     * fans of a desktop GPU just standing still. FXAA (see `fxaa`) covers
+     * the edges below 2 for a sliver of that cost.
      */
     get pixelRatio() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2)
-        // On HIGH, never render below 1.5x.
-        //
-        // A retina screen supersamples for free at dpr 2; a plain 1x monitor
-        // -- which is most desktops, and most people looking at this -- gets
-        // no supersampling at all, and that is the single most visible
-        // difference between the two. Rendering at 1.5 and letting the browser
-        // downscale is the oldest and best antialiasing there is.
-        //
-        // It costs 2.25x the pixels, which is why it is the high tier only and
-        // why HIGH_MIN_DPR is a knob: drop it to 1.25 (1.56x) if the frame
-        // budget gets tight.
-        return this.isHigh ? Math.max(dpr, HIGH_MIN_DPR) : dpr
+        return Math.min(window.devicePixelRatio || 1, 2)
     }
 
     /**
@@ -157,6 +146,16 @@ export default class Quality extends EventEmitter {
      * falloff on a phone.
      */
     get tiltShiftRadius() { return (this.isLow || this.isMobile) ? 2 : 3 }
+
+    /**
+     * Tilt-shift blur at half resolution -- desktop only.
+     *
+     * A blur has no detail left to lose at half res, and the Renderer widens
+     * the tap spacing to keep the same on-screen width, so this is a quarter
+     * of the pixels for the same picture. Phones stay at full res: a
+     * resolutionScale on the blur is what used to crash iOS.
+     */
+    get tiltShiftHalfRes() { return !this.isMobile }
 
     /**
      * Real shadow maps on both quality levels — EXCEPT on Android, where
