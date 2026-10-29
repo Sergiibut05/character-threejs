@@ -22,6 +22,24 @@ export const LINKS = {
 // behind a disclosure there. The trophy in-world still lists all of them.
 export const CERTIFICATES = [
     {
+        title: 'Python: Fundamentos hasta los detalles',
+        issuer: 'DevTalles',
+        date: 'Octubre 2026',
+        url: 'https://cursos.devtalles.com/certificates/lbvlxbppss'
+    },
+    {
+        title: 'Claude Code: Guía completa para desarrolladores de software',
+        issuer: 'DevTalles',
+        date: 'Septiembre 2026',
+        url: 'https://cursos.devtalles.com/certificates/4lbico1lc8'
+    },
+    {
+        title: 'Node.js: De cero a experto',
+        issuer: 'DevTalles',
+        date: 'Septiembre 2026',
+        url: 'https://cursos.devtalles.com/certificates/wjasbm7hzf'
+    },
+    {
         // Destacado, y con mas razon que ninguno: esta isla entera está
         // construida con lo que enseña este curso.
         title: 'Three.js Journey',

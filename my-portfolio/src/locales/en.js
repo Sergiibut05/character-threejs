@@ -289,6 +289,11 @@ export default {
            misrepresentation, not a typo. A title with no entry here (Cambridge)
            is already the name it was issued under and stays as it is. */
         certificateTitles: {
+            'Python: Fundamentos hasta los detalles':
+                'Python: From Fundamentals to the Details',
+            'Claude Code: Guía completa para desarrolladores de software':
+                'Claude Code: The Complete Guide for Software Developers',
+            'Node.js: De cero a experto': 'Node.js: From Zero to Expert',
             'JavaScript Moderno: Guía para dominar el lenguaje':
                 'Modern JavaScript: A Guide to Mastering the Language',
             'Curso de Firebase y Angular': 'Firebase and Angular Course',

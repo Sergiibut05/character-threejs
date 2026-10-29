@@ -2387,3 +2387,37 @@ body:has(.fz-hud-leave.is-visible) .map-fab
         0 4px 0 rgba(64, 148, 108, 0.28),
         0 8px 18px rgba(26, 76, 56, 0.30);
 }
+
+/* ═══════════════════════════════════
+   Awwwards Honorable Mention
+   Official ribbon, flush to the right edge. Above the island and the
+   overview page; hidden while a dialog or the boot screen is up so it
+   never sits on top of something you are reading.
+   ═══════════════════════════════════ */
+
+#awwwards
+{
+    position: fixed;
+    z-index: 4100;
+    top: 50%;
+    right: 0;
+    display: block;
+    line-height: 0;
+    transform: translateY(-50%);
+    text-decoration: none;
+}
+
+#awwwards:focus-visible
+{
+    outline: 2px solid #ffffff;
+    outline-offset: 3px;
+}
+
+body:has(#initial-cover:not(.fade-out)) #awwwards,
+body:has(#boot-screen.is-visible) #awwwards,
+body:has(.fz-modal-overlay.is-open) #awwwards,
+body:has(.modal-overlay.is-visible) #awwwards
+{
+    visibility: hidden;
+    pointer-events: none;
+}
