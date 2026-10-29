@@ -2390,9 +2390,9 @@ body:has(.fz-hud-leave.is-visible) .map-fab
 
 /* ═══════════════════════════════════
    Awwwards Honorable Mention
-   Official ribbon, flush to the right edge. Above the island and the
-   overview page; hidden while a dialog or the boot screen is up so it
-   never sits on top of something you are reading.
+   Official ribbon, flush to the right edge of the start screen and the
+   overview. Gone once you are in the island (body.is-in-world), and also
+   while a dialog or the boot screen is up.
    ═══════════════════════════════════ */
 
 #awwwards
@@ -2413,6 +2413,7 @@ body:has(.fz-hud-leave.is-visible) .map-fab
     outline-offset: 3px;
 }
 
+body.is-in-world #awwwards,
 body:has(#initial-cover:not(.fade-out)) #awwwards,
 body:has(#boot-screen.is-visible) #awwwards,
 body:has(.fz-modal-overlay.is-open) #awwwards,
