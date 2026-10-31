@@ -2391,8 +2391,9 @@ body:has(.fz-hud-leave.is-visible) .map-fab
 /* ═══════════════════════════════════
    Awwwards Honorable Mention
    Official ribbon, flush to the right edge of the start screen and the
-   overview. Gone once you are in the island (body.is-in-world), and also
-   while a dialog or the boot screen is up.
+   overview. Gone on a phone (it covers too much of a narrow page), once
+   you are in the island (body.is-in-world), and while a dialog or the
+   boot screen is up.
    ═══════════════════════════════════ */
 
 #awwwards
@@ -2421,4 +2422,14 @@ body:has(.modal-overlay.is-visible) #awwwards
 {
     visibility: hidden;
     pointer-events: none;
+}
+
+/* Same cutoff as the rest of the start screen. A landscape phone is short
+   rather than narrow, so the height check catches that too. */
+@media (max-width: 760px), (max-height: 500px)
+{
+    #awwwards
+    {
+        display: none;
+    }
 }
